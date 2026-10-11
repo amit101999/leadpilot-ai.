@@ -17,8 +17,9 @@ const PROGRESS_DIR = "docs/progress";
 const MAX_FILES_PER_COMMIT = 40;
 const MAX_UNCOMMITTED = 60;
 
+// trimEnd, not trim: `git status --porcelain` lines start with a meaningful space (" M file").
 function git(cwd, args) {
-  return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trimEnd();
 }
 
 function lines(text) {
