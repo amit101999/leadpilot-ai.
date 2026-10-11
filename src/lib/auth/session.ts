@@ -5,8 +5,7 @@ import type { DbExecutor } from "@/lib/database/client";
 import { sessions, users } from "@/lib/database/schema";
 import type { UserRole } from "@/types/domain";
 
-/** `__Host-` prefix in production forces Secure, Path=/ and no Domain attribute. */
-export const SESSION_COOKIE = process.env.NODE_ENV === "production" ? "__Host-lp_session" : "lp_session";
+export { SESSION_COOKIE } from "./cookie";
 
 export interface SessionUser {
   id: string;

@@ -7,6 +7,7 @@ import { env } from "@/lib/configuration/env";
 import { getDb, type Database } from "@/lib/database/client";
 import { childLogger } from "@/lib/logging/logger";
 import { SIGNATURE_HEADER, verifySignature } from "@/lib/security/hmac";
+import { isAllowedRequestOrigin } from "@/lib/security/origin";
 import { InvalidTransitionError } from "@/lib/state-machine";
 import type { UserRole } from "@/types/domain";
 import { AppError, isUniqueViolation } from "./errors";
@@ -33,9 +34,15 @@ export interface InternalContext extends BaseContext {
 type RouteContext = { params: Promise<Params> };
 type Handler<C> = (ctx: C) => Promise<Response | unknown>;
 
-/** Authenticated (session cookie) route. Roles: VIEWER < OPERATOR < ADMIN. */
+/**
+ * Authenticated (session cookie) route. Roles: VIEWER < OPERATOR < ADMIN.
+ * State-changing methods must come from the app's own origin (CSRF defence).
+ */
 export function userRoute(minRole: UserRole, handler: Handler<UserContext>) {
   return wrap(async (req, params, requestId, db) => {
+    if (!isAllowedRequestOrigin(req.method, req.headers.get("origin"), env().APP_BASE_URL)) {
+      throw new AppError("CSRF_REJECTED", "Request origin not allowed");
+    }
     const user = await resolveSession(db, req.cookies.get(SESSION_COOKIE)?.value);
     if (!user) throw new AppError("UNAUTHENTICATED", "Please sign in");
     const actor: Actor = { id: user.id, role: user.role };
