@@ -14,3 +14,7 @@ backups/
 
 # Claude Code worktrees
 .claude/worktrees/
+
+# Progress tracker: auto-generated activity log and its state (local only)
+docs/progress/activity-log.md
+docs/progress/.activity-state.json
