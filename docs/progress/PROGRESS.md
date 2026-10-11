@@ -14,8 +14,8 @@ Plan: `C:\Users\ACER\.claude\plans\clever-noodling-finch.md`.
 | ------------------------ | -------------------------------------------------------------------- | ----------------------------------------------------------------- |
 | Baseline                 | Pre-existing backend core committed                                  | ✅ Done (`703761f`)                                               |
 | A. Foundation            | Seed, `.env.example`, page auth proxy, CSRF check                    | ✅ Merged to `main` (`ab4b7e1`); seed verified during B1          |
-| B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                | ✅ Committed `5c37353` on `worktree-phase-b1-api`; not merged yet |
-| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook | ⏳ Not started (round-2 grilling pending)                         |
+| B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                | ✅ Merged to `main` (`0bed021`); Turbopack build verified on main |
+| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook | ✅ Committed `2e1ea54` on `worktree-phase-b2-api`; not merged yet |
 | C. UI                    | Design system, 10 dashboard sections, profile editor, run screens    | ⏳ Not started                                                    |
 | D. n8n                   | Run and error workflows calling the app's internal step API          | ⏳ Not started                                                    |
 | E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                           | ⏳ Not started                                                    |
@@ -149,7 +149,66 @@ end in which every qualified lead scores at least 75, is fixed-price and has ver
 - The per-e-mail limit lets someone lock a known account out of login for up to 15 minutes (accepted
   trade-off of decision 4).
 - `GET /api/runs/:id` returns `leaseOwner` (an internal executor id). Low sensitivity.
-- The main checkout needs its own `.env` (copy `.env.example`); the generated one exists only in the B1 worktree.
+- The main checkout needs its own `.env` (copy `.env.example`); the generated one exists only in the worktrees.
+
+## Phase B2 (`2e1ea54` on `worktree-phase-b2-api`, not yet merged)
+
+### Decisions (grilling round 2, accepted by the developer 2026-10-11, "accept all")
+
+1. Manual retry: `FAILED_RETRYABLE` any time; `FAILED_PERMANENT` allowed (re-reserved first, opt-in rechecked,
+   audited); `UNCERTAIN` only after 15 minutes and an explicit confirmation; `SENT`/`DELIVERED`/`READ` never.
+2. Integration checks run only on "Test connection" (rate limited); reads return the stored result, flagged stale
+   after 1 hour. Database `select 1`, WhatsApp credential check, OpenAI `models.retrieve` (free), n8n `/healthz`,
+   Upwork configuration only.
+3. Dashboard: totals over everything the user may see (ADMIN: all), a 30-day daily series, no caching.
+4. Audit log: ADMIN only.
+5. WhatsApp webhook: valid `X-Hub-Signature-256` required and refused entirely without `WHATSAPP_APP_SECRET`;
+   raw bodies not stored; forward-only statuses (failed after sent becomes `FAILED_PERMANENT`); unknown ids get 200.
+6. WhatsApp test message: opted-in recipients only, `hello_world`, 3 per 10 minutes, audited, not stored as a notification.
+
+### Implemented
+
+- Services: `src/modules/notifications/{service,webhook}.ts`, `src/modules/integrations/service.ts`,
+  `src/modules/dashboard/service.ts`, `src/modules/exports/{service,http}.ts`, `listAuditLogs` in
+  `src/modules/audit/service.ts`, shared list schemas `src/modules/{runs,jobs}/list-query.ts`.
+- Every WhatsApp send carries `biz_opaque_callback_data` = the notification's idempotency key
+  (`OutboundMessage.callbackData`, `cloud-whatsapp.ts`, `delivery.ts`).
+- `AiEvaluator.checkConnection()` (OpenAI and mock).
+- 13 new routes (36 in total): `notifications` (+ `[id]/retry`), `runs/[id]/notifications`, `integrations/status`,
+  `integrations/[provider]/check`, `integrations/[provider]/test` (only `whatsapp`), `dashboard`,
+  `exports/leads.csv`, `exports/runs.csv`, `audit-logs`, `internal/runs/[id]/steps/[step]`,
+  `internal/runs/[id]/fail`, `webhooks/whatsapp` (GET and POST).
+- `.env.example`: webhook variables now marked as required for the webhook.
+
+### Verification (actual results)
+
+| Check                            | Result                                                                  |
+| -------------------------------- | ----------------------------------------------------------------------- |
+| Unit tests                       | ✅ 86/86 (5 new for the webhook parser)                                 |
+| Integration tests                | ✅ 46/46 (18 new: notifications 9, platform 9)                          |
+| Prettier, ESLint, `tsc --noEmit` | ✅ clean                                                                |
+| `next build --webpack`           | ✅ 36 routes plus the proxy                                             |
+| `next build` (Turbopack)         | ⏳ To run on `main` after merge (worktree `node_modules` is a junction) |
+
+Covered: no repeat alert to the same recipient on a rerun (acceptance #7), the per-run limit (acceptance #8),
+a failed send keeps the qualification and can be retried (acceptance #11), an uncertain send is not retried
+early or unconfirmed (acceptance #16), cross-user 404 and VIEWER 403 on retry, webhook SENT→DELIVERED→READ with
+backwards and unknown updates ignored, UNCERTAIN reconciled through `biz_opaque_callback_data` (audited),
+invalid signature 401, verification handshake (wrong token and a script challenge refused), integration
+statuses and checks, test message opt-in rule, dashboard totals and isolation, CSV filters, truncation header
+and formula-injection escaping, audit log ADMIN-only, internal endpoints (unsigned 401, a full run driven by
+signed steps, error workflow marks FAILED with the secret removed from the stored message).
+
+Finding during testing: run summaries (`alertOnFailure`) are separate messages and are not limited by
+`maxPerRun`. The mock feed ends runs as `COMPLETED_WITH_ERRORS` (scripted AI errors), so it sends one failure summary.
+
+### Open items and risks
+
+- A status webhook that arrives while a row is still `SENDING` is ignored (`SENDING → DELIVERED` is not an allowed
+  transition). A later `read` still advances it, but if the recipient has read receipts off, the row can stay
+  `SENT` although it was delivered. Not handled yet.
+- UNCERTAIN reconciliation only works with the real Cloud provider, which echoes `biz_opaque_callback_data`.
+- `integration_status` is shared by all users; it holds only non-secret configuration and results.
 
 ## Environment notes
 
