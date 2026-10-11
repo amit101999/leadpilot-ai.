@@ -15,8 +15,10 @@ Plan: `C:\Users\ACER\.claude\plans\clever-noodling-finch.md`.
 | Baseline                 | Pre-existing backend core committed                                  | ✅ Done (`703761f`)                                               |
 | A. Foundation            | Seed, `.env.example`, page auth proxy, CSRF check                    | ✅ Merged to `main` (`ab4b7e1`); seed verified during B1          |
 | B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                | ✅ Merged to `main` (`0bed021`); Turbopack build verified on main |
-| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook | ✅ Committed `2e1ea54` on `worktree-phase-b2-api`; not merged yet |
-| C. UI                    | Design system, 10 dashboard sections, profile editor, run screens    | ⏳ Not started                                                    |
+| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook | ✅ Merged to `main` (`41e8d95`); Turbopack build verified on main |
+| C1. UI (part 1)          | Design system, app shell, login, Dashboard, Run Agent                | ✅ Committed `f894985` on `worktree-phase-c1-ui`; not merged yet  |
+| C2. UI (part 2)          | Search History and run detail, Qualified Leads, All Jobs             | ⏳ Not started                                                    |
+| C3. UI (part 3)          | Profiles editor, Notifications, Integrations, Settings, Audit Logs   | ⏳ Not started                                                    |
 | D. n8n                   | Run and error workflows calling the app's internal step API          | ⏳ Not started                                                    |
 | E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                           | ⏳ Not started                                                    |
 | F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                  | ⏳ Not started                                                    |
@@ -209,6 +211,63 @@ Finding during testing: run summaries (`alertOnFailure`) are separate messages a
   `SENT` although it was delivered. Not handled yet.
 - UNCERTAIN reconciliation only works with the real Cloud provider, which echoes `biz_opaque_callback_data`.
 - `integration_status` is shared by all users; it holds only non-secret configuration and results.
+
+## Phase C: UI, grilled decisions (accepted by the developer 2026-10-11, "accept all")
+
+1. Split into C1 (design system, layout, login, Dashboard, Run Agent), C2 (Search History and run detail,
+   Qualified Leads, All Jobs), C3 (Profiles editor, Notifications, Integrations, Settings, Audit Logs).
+2. Pages read through server components calling the services directly with the signed-in user; mutations and
+   polling go through `/api/**` (CSRF, rate limits, idempotency). No new data-fetching library.
+3. Visual direction: calm and data-dense, neutral surfaces, one teal accent, status colours, Inter, light default
+   with a dark toggle, no gradients or decorative motion.
+4. Mock data is labelled: a demo-mode banner naming each mocked integration and a "Mock source" badge on runs.
+5. Profile editor (C3): tabs, one save = one version, unsaved-changes guard, shared Zod validation, live weight
+   total, 409 conflict dialog.
+6. Playwright Chromium downloaded; smoke tests per part, full e2e in Phase F.
+7. WCAG 2.2 AA target, tables scroll inside their panel on phones, English only.
+
+## Phase C1 (`f894985` on `worktree-phase-c1-ui`, not yet merged)
+
+### Implemented
+
+- Tokens in `src/app/globals.css`. Chart series colours were checked with the `dataviz` skill's validator:
+  `#0f766e` failed the chroma floor (reads grey in a chart), so the series use `#0a9a8a`/`#2a78d6` (light) and
+  `#10a594`/`#3987e5` (dark); both pairs pass every check against the real surfaces.
+- Components in `src/components/ui/` (button, field, badge with `StatusBadge`, panel, dialog and sheet, time),
+  `src/components/layout/` (app shell, navigation), `src/components/dashboard/` (metric strip, daily chart),
+  `src/components/runs/` (funnel rail, run launcher, live run progress).
+- Pages: `/login`, `/dashboard`, `/run`, `/run/[id]` (route group `src/app/(app)/` validates the session through
+  `requireUser()` in `src/lib/auth/current-user.ts`).
+- Browser helpers: `src/lib/http/client.ts` (`apiFetch`, `ApiError`, idempotency keys), `src/lib/ui/use-polling.ts`.
+- Navigation items for C2/C3 pages are disabled with "Soon" instead of linking to 404s.
+- Playwright: `playwright.config.ts`, `tests/e2e/{global-setup.ts,smoke.spec.ts}`.
+- `AGENTS.md`: written by `next dev` (Next.js 16 agent rules); re-created if deleted, so committed.
+
+### Verification (actual results)
+
+| Check                            | Result                                                                                       |
+| -------------------------------- | -------------------------------------------------------------------------------------------- |
+| Playwright smoke tests           | ✅ 5/5 against a production build (`next build --webpack` + `next start`), 1.4 min           |
+| Unit / integration tests         | ✅ 86/86, 46/46                                                                              |
+| Prettier, ESLint, `tsc --noEmit` | ✅ clean                                                                                     |
+| Visual review (screenshots)      | ✅ login, dashboard light/dark, run page, confirm dialog, live and finished run, phone width |
+| Browser console                  | ✅ no errors in the final screenshot run                                                     |
+
+### Bugs found during review and fixed
+
+- Phone width: the page was 600 px wide on a 390 px screen (grid children could not shrink below their tables) and
+  panel headers squeezed titles into a narrow column. `Panel` now has `min-w-0` and a wrapping header; the smoke
+  test asserts no horizontal scroll.
+- Login form: a submit before React hydrated fell back to a native GET, putting email and password in the URL.
+  The form now uses `method="post"`; a smoke test checks it.
+- Chart load animation hid bars in early screenshots and is decorative motion; disabled.
+- Copy: "1 AI errors", "Ai errors", and a noisy finalization metrics line.
+
+### Open items
+
+- Run detail with per-job results and qualification reasons arrives with Search History (C2); finished runs say so.
+- E2E tests run against `next dev` stalled for about 49 minutes once (on-demand compile); they now use a production build.
+- Times render in the viewer's local zone; the 30-day chart uses UTC days and says so.
 
 ## Environment notes
 
