@@ -1,0 +1,120 @@
+@import "tailwindcss";
+
+/* Dark mode follows the .dark class set by next-themes. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Design tokens. Neutral working surfaces, one teal accent for primary actions
+ * and focus, and semantic status colours. Every text/background pair used in
+ * the UI meets WCAG AA (4.5:1) in both themes.
+ */
+:root {
+  --canvas: #f6f7f9;
+  --surface: #ffffff;
+  --surface-sunken: #eef1f4;
+  --line: #e3e6ea;
+  --line-strong: #c9cfd6;
+  --ink: #17202a;
+  --muted: #5b6672;
+  --accent: #0f766e;
+  --accent-hover: #0d645d;
+  --accent-ink: #ffffff;
+  --accent-soft: #e3f3f1;
+  --success: #15803d;
+  --success-soft: #e6f4ea;
+  --warning: #b45309;
+  --warning-soft: #fdf1e2;
+  --danger: #b91c1c;
+  --danger-soft: #fcebea;
+  --info-soft: #eef1f4;
+  --focus: #0f766e;
+  /* Chart series, validated with the dataviz validator against #ffffff (all checks pass). */
+  --series-1: #0a9a8a;
+  --series-2: #2a78d6;
+}
+
+.dark {
+  --canvas: #0e1316;
+  --surface: #151b1f;
+  --surface-sunken: #1b2328;
+  --line: #253038;
+  --line-strong: #344049;
+  --ink: #e6ebee;
+  --muted: #9aa6af;
+  --accent: #2dd4bf;
+  --accent-hover: #5eead4;
+  --accent-ink: #062b27;
+  --accent-soft: #10302c;
+  --success: #4ade80;
+  --success-soft: #11291b;
+  --warning: #fbbf24;
+  --warning-soft: #2e2410;
+  --danger: #f87171;
+  --danger-soft: #331617;
+  --info-soft: #1b2328;
+  --focus: #2dd4bf;
+  /* Dark steps of the same hues, validated against #151b1f (all checks pass). */
+  --series-1: #10a594;
+  --series-2: #3987e5;
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-sunken: var(--surface-sunken);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info-soft: var(--info-soft);
+  --color-focus: var(--focus);
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --radius-control: 6px;
+  --radius-panel: 10px;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Visible keyboard focus everywhere; mouse clicks do not show the ring. */
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}

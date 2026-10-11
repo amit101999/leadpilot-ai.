@@ -86,7 +86,7 @@ export async function getDashboard(db: Database, actor: Actor, providers: Provid
     latestSuccessfulRun: latestSuccess
       ? {
           id: latestSuccess.id as string,
-          finishedAt: latestSuccess.finished_at,
+          finishedAt: latestSuccess.finished_at as Date | null,
           qualified: Number(latestSuccess.qualified_count),
           notified: Number(latestSuccess.notified_count),
         }
@@ -94,9 +94,10 @@ export async function getDashboard(db: Database, actor: Actor, providers: Provid
     recentFailures: recentFailures.map((r) => ({
       id: r.id as string,
       status: r.status as string,
-      errorSummary: r.error_summary ?? null,
-      createdAt: r.created_at,
-      finishedAt: r.finished_at,
+      errorSummary:
+        (r.error_summary as { code?: string; message?: string; stage?: string | null } | null) ?? null,
+      createdAt: r.created_at as Date,
+      finishedAt: r.finished_at as Date | null,
     })),
     recentRuns: recentRuns.items,
     recentLeads: recentLeads.items,
