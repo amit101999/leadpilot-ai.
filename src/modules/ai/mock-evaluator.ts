@@ -1,5 +1,5 @@
 import type { AiOutput } from "./output-schema";
-import type { AiEvaluator, EvaluationInput } from "./evaluator";
+import type { AiConnection, AiEvaluator, EvaluationInput } from "./evaluator";
 import { AiProviderError } from "./evaluator";
 
 /**
@@ -69,6 +69,10 @@ export class MockAiEvaluator implements AiEvaluator {
 
   checkConfiguration() {
     return { configured: true, message: "Mock evaluator (no external AI calls)" };
+  }
+
+  async checkConnection(): Promise<AiConnection> {
+    return { state: "MOCK", message: "Mock evaluator: no external AI calls are made" };
   }
 }
 

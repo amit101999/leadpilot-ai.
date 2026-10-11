@@ -22,6 +22,13 @@ export interface AiEvaluator {
   /** Returns the raw model output (validated by the caller). Throws AiProviderError on transport failure. */
   evaluate(input: EvaluationInput): Promise<unknown>;
   checkConfiguration(): { configured: boolean; message: string };
+  /** Live, cost-free credential check (no evaluation request). */
+  checkConnection(): Promise<AiConnection>;
+}
+
+export interface AiConnection {
+  state: "CONNECTED" | "NOT_CONFIGURED" | "NOT_AUTHORIZED" | "UNAVAILABLE" | "MOCK";
+  message: string;
 }
 
 export class AiProviderError extends Error {

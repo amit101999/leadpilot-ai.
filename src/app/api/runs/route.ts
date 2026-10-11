@@ -1,34 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { paginated, parseJson, parseQuery, userRoute } from "@/lib/http/api";
-import { runStatus } from "@/lib/database/schema";
 import { AppError } from "@/lib/http/errors";
 import { enforceRateLimit, RATE_LIMITS } from "@/lib/security/rate-limit";
-import {
-  idempotencyKeySchema,
-  paginationQuery,
-  q,
-  resolvePagination,
-  uuidParam,
-} from "@/lib/validation/common";
+import { idempotencyKeySchema, resolvePagination, uuidParam } from "@/lib/validation/common";
 import { getProviders } from "@/modules/providers";
-import { createRun, listRuns, RUN_SORT_COLUMNS } from "@/modules/runs/service";
-
-const listQuery = z.object({
-  ...paginationQuery,
-  profileId: q.uuid(),
-  status: q.enumList(runStatus.enumValues),
-  from: q.date(),
-  to: q.date(),
-  minQualified: q.int(0, 100_000),
-  failedOnly: q.bool(),
-  notificationFailures: q.bool(),
-  search: q.string(100),
-  sort: q.enumOf(Object.keys(RUN_SORT_COLUMNS) as [keyof typeof RUN_SORT_COLUMNS]),
-});
+import { runListQuery } from "@/modules/runs/list-query";
+import { createRun, listRuns } from "@/modules/runs/service";
 
 export const GET = userRoute("VIEWER", async ({ req, db, actor }) => {
-  const query = parseQuery(req, listQuery);
+  const query = parseQuery(req, runListQuery);
   const page = resolvePagination(query);
   const { items, total } = await listRuns(db, actor, { ...query, ...page });
   return paginated(items, { page: page.page, pageSize: page.pageSize, total });

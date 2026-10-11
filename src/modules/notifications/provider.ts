@@ -9,6 +9,12 @@ export interface OutboundMessage {
   /** Human-readable rendering stored for the UI (contains no phone numbers). */
   previewText: string;
   idempotencyKey: string;
+  /**
+   * Echoed back by the provider in delivery-status webhooks (WhatsApp
+   * `biz_opaque_callback_data`), so a send whose response was lost (UNCERTAIN)
+   * can still be matched to its notification. Must not contain personal data.
+   */
+  callbackData?: string;
 }
 
 /**

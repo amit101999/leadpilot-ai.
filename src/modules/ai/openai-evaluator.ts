@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { AiEvaluator, EvaluationInput } from "./evaluator";
+import type { AiConnection, AiEvaluator, EvaluationInput } from "./evaluator";
 import { AiProviderError } from "./evaluator";
 import { aiOutputJsonSchema } from "./output-schema";
 import { buildUserMessage, SYSTEM_INSTRUCTIONS } from "./prompts/v1";
@@ -28,6 +28,25 @@ export class OpenAiEvaluator implements AiEvaluator {
     if (!this.apiKey) return { configured: false, message: "OPENAI_API_KEY is not set" };
     if (!this.model) return { configured: false, message: "OPENAI_MODEL is not set" };
     return { configured: true, message: `OpenAI model ${this.model}` };
+  }
+
+  /** Retrieves the configured model: free, and proves both the key and the model id. */
+  async checkConnection(): Promise<AiConnection> {
+    const config = this.checkConfiguration();
+    if (!config.configured) return { state: "NOT_CONFIGURED", message: config.message };
+    this.client ??= new OpenAI({ apiKey: this.apiKey, maxRetries: 0 });
+    try {
+      await this.client.models.retrieve(this.model, { timeout: Math.min(this.timeoutMs, 10_000) });
+      return { state: "CONNECTED", message: `OpenAI key accepted; model ${this.model} is available` };
+    } catch (error) {
+      if (error instanceof OpenAI.AuthenticationError || error instanceof OpenAI.PermissionDeniedError) {
+        return { state: "NOT_AUTHORIZED", message: "OpenAI rejected the API key" };
+      }
+      if (error instanceof OpenAI.NotFoundError) {
+        return { state: "NOT_CONFIGURED", message: `OpenAI model ${this.model} was not found for this key` };
+      }
+      return { state: "UNAVAILABLE", message: "OpenAI could not be reached" };
+    }
   }
 
   async evaluate(input: EvaluationInput): Promise<unknown> {

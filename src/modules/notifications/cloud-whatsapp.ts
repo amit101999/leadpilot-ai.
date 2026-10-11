@@ -100,6 +100,7 @@ export class CloudWhatsAppProvider implements WhatsAppProvider {
             ? [{ type: "body", parameters: message.templateParams.map((text) => ({ type: "text", text })) }]
             : [],
       },
+      ...(message.callbackData ? { biz_opaque_callback_data: message.callbackData } : {}),
     };
 
     let response: Response;

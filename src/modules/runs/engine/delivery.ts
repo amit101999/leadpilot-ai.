@@ -127,6 +127,7 @@ export async function deliverNotification(
         templateParams: payload.templateParams ?? [],
         previewText: claimed.messagePreview,
         idempotencyKey: claimed.idempotencyKey,
+        callbackData: claimed.idempotencyKey,
       });
     } catch (error) {
       // An unexpected exception inside the provider call may have happened after the request was sent.
