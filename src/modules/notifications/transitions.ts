@@ -36,7 +36,10 @@ export const CLAIMED_NOTIFICATION_STATUSES: readonly NotificationStatus[] = [
 ];
 
 /** Statuses a later run may re-claim. */
-export const RECLAIMABLE_NOTIFICATION_STATUSES: readonly NotificationStatus[] = ["FAILED_PERMANENT", "CANCELLED"];
+export const RECLAIMABLE_NOTIFICATION_STATUSES: readonly NotificationStatus[] = [
+  "FAILED_PERMANENT",
+  "CANCELLED",
+];
 
 /** Successful delivery states only advance (SENT < DELIVERED < READ); stale webhooks never regress them. */
 export const DELIVERY_ORDER: Partial<Record<NotificationStatus, number>> = { SENT: 1, DELIVERED: 2, READ: 3 };

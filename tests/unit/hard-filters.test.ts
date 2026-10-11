@@ -46,7 +46,11 @@ describe("hard filters — initial profile", () => {
   });
 
   it("judges a range by its lower bound", () => {
-    const summary = evaluateHardChecks(makeJob({ budgetAmount: "300.00", budgetMax: "900.00" }), config(), context);
+    const summary = evaluateHardChecks(
+      makeJob({ budgetAmount: "300.00", budgetMax: "900.00" }),
+      config(),
+      context,
+    );
     expect(rule(summary, "BUDGET").outcome).toBe("FAIL");
   });
 
@@ -68,7 +72,12 @@ describe("hard filters — initial profile", () => {
 
   it("does not infer payment verification from strong client history", () => {
     const summary = evaluateHardChecks(
-      makeJob({ paymentVerified: null, clientTotalSpent: "1000000.00", clientHires: 500, clientRating: "5.00" }),
+      makeJob({
+        paymentVerified: null,
+        clientTotalSpent: "1000000.00",
+        clientHires: 500,
+        clientRating: "5.00",
+      }),
       config(),
       context,
     );
@@ -114,11 +123,13 @@ describe("hard filters — currency policy", () => {
   });
 
   it("converts with a configured fixed rate, rounding down", () => {
-    const withRate = config((c) => (c.budget.currencyPolicy = { mode: "FIXED_RATES", rates: { EUR: "1.08" } }));
-    // 463.00 EUR * 1.08 = 500.04 USD -> passes
-    expect(evaluateHardChecks(makeJob({ currency: "EUR", budgetAmount: "463.00" }), withRate, context).status).toBe(
-      "PENDING_AI",
+    const withRate = config(
+      (c) => (c.budget.currencyPolicy = { mode: "FIXED_RATES", rates: { EUR: "1.08" } }),
     );
+    // 463.00 EUR * 1.08 = 500.04 USD -> passes
+    expect(
+      evaluateHardChecks(makeJob({ currency: "EUR", budgetAmount: "463.00" }), withRate, context).status,
+    ).toBe("PENDING_AI");
     // 462.96 EUR * 1.08 = 499.9968 -> 499.99 USD -> fails
     const fail = evaluateHardChecks(makeJob({ currency: "EUR", budgetAmount: "462.96" }), withRate, context);
     expect(rule(fail, "BUDGET").outcome).toBe("FAIL");
@@ -165,7 +176,9 @@ describe("hard filters — skills and keywords", () => {
 
 describe("hard filters — optional client conditions", () => {
   it("is NOT_APPLICABLE when not configured and UNKNOWN when data is missing", () => {
-    expect(rule(evaluateHardChecks(makeJob(), config(), context), "CLIENT_RATING").outcome).toBe("NOT_APPLICABLE");
+    expect(rule(evaluateHardChecks(makeJob(), config(), context), "CLIENT_RATING").outcome).toBe(
+      "NOT_APPLICABLE",
+    );
     const withMin = config((c) => (c.client.minRating = 4.5));
     const summary = evaluateHardChecks(makeJob({ clientRating: null }), withMin, context);
     expect(rule(summary, "CLIENT_RATING").outcome).toBe("UNKNOWN");

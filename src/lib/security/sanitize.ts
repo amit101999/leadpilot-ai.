@@ -16,7 +16,11 @@ const PATTERNS: Array<[RegExp, string]> = [
 
 export function sanitizeErrorMessage(error: unknown, maxLength = 500): string {
   const raw =
-    error instanceof Error ? `${error.name}: ${error.message}` : typeof error === "string" ? error : "Unknown error";
+    error instanceof Error
+      ? `${error.name}: ${error.message}`
+      : typeof error === "string"
+        ? error
+        : "Unknown error";
   let text = raw;
   for (const [pattern, replacement] of PATTERNS) text = text.replace(pattern, replacement);
   return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;

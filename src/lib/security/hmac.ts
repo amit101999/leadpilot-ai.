@@ -8,7 +8,11 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 export const SIGNATURE_HEADER = "x-leadpilot-signature";
 export const MAX_CLOCK_SKEW_SECONDS = 300;
 
-export function signPayload(secret: string, body: string, timestampSeconds = Math.floor(Date.now() / 1000)): string {
+export function signPayload(
+  secret: string,
+  body: string,
+  timestampSeconds = Math.floor(Date.now() / 1000),
+): string {
   const digest = createHmac("sha256", secret).update(`${timestampSeconds}.${body}`).digest("hex");
   return `t=${timestampSeconds},v1=${digest}`;
 }
@@ -31,7 +35,8 @@ export function verifySignature(
   const timestamp = Number(parts.t);
   const provided = parts.v1;
   if (!Number.isInteger(timestamp) || !provided) return { ok: false, reason: "malformed signature" };
-  if (Math.abs(nowSeconds - timestamp) > MAX_CLOCK_SKEW_SECONDS) return { ok: false, reason: "stale signature" };
+  if (Math.abs(nowSeconds - timestamp) > MAX_CLOCK_SKEW_SECONDS)
+    return { ok: false, reason: "stale signature" };
   const expected = createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex");
   return safeEqualHex(expected, provided) ? { ok: true } : { ok: false, reason: "signature mismatch" };
 }

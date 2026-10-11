@@ -165,7 +165,9 @@ export async function listRuns(db: Database, actor: Actor, filters: RunListFilte
     filters.from ? gte(agentRuns.createdAt, filters.from) : undefined,
     filters.to ? lte(agentRuns.createdAt, filters.to) : undefined,
     filters.minQualified !== undefined ? gte(agentRuns.qualifiedCount, filters.minQualified) : undefined,
-    filters.failedOnly ? inArray(agentRuns.status, ["FAILED", "BLOCKED_SOURCE", "COMPLETED_WITH_ERRORS"]) : undefined,
+    filters.failedOnly
+      ? inArray(agentRuns.status, ["FAILED", "BLOCKED_SOURCE", "COMPLETED_WITH_ERRORS"])
+      : undefined,
     filters.notificationFailures ? sql`${agentRuns.failedNotificationCount} > 0` : undefined,
     filters.search
       ? sql`(${agentRuns.id}::text ilike ${`${escapeLike(filters.search)}%`} or ${searchProfiles.name} ilike ${`%${escapeLike(filters.search)}%`})`
@@ -197,7 +199,8 @@ export async function listRuns(db: Database, actor: Actor, filters: RunListFilte
       ...withoutSnapshot(r.run),
       profileName: r.profileName,
       versionNumber: r.versionNumber,
-      durationMs: r.run.startedAt && r.run.finishedAt ? r.run.finishedAt.getTime() - r.run.startedAt.getTime() : null,
+      durationMs:
+        r.run.startedAt && r.run.finishedAt ? r.run.finishedAt.getTime() - r.run.startedAt.getTime() : null,
     })),
     total: total?.count ?? 0,
   };
@@ -221,7 +224,11 @@ export async function cancelRun(db: Database, actor: Actor, id: string, requestI
     .where(eq(agentRuns.id, id));
   if (run.status === "QUEUED" && !run.startedAt) {
     // Not picked up yet (or the executor never received it): cancel directly.
-    await transitionRun(db, id, "CANCELLED", { finishedAt: new Date(), leaseOwner: null, leaseExpiresAt: null });
+    await transitionRun(db, id, "CANCELLED", {
+      finishedAt: new Date(),
+      leaseOwner: null,
+      leaseExpiresAt: null,
+    });
   }
   await recordAudit(db, {
     actor: userActor(actor.id),
@@ -241,7 +248,8 @@ export async function cancelRun(db: Database, actor: Actor, id: string, requestI
 export async function resumeRun(db: Database, actor: Actor, id: string, requestId?: string) {
   requireRole(actor, "OPERATOR");
   const run = await getRun(db, actor, id);
-  if (isTerminal(RUN_TRANSITIONS, run.status)) throw new AppError("INVALID_STATE", `Run is already ${run.status}`);
+  if (isTerminal(RUN_TRANSITIONS, run.status))
+    throw new AppError("INVALID_STATE", `Run is already ${run.status}`);
   if (run.leaseExpiresAt && run.leaseExpiresAt.getTime() > Date.now()) {
     throw new AppError("LEASE_HELD", "The run is still being processed; try again after its lease expires");
   }

@@ -43,6 +43,8 @@ export async function enforceRateLimit(db: DbExecutor, rule: RateLimitRule, subj
 
   if ((row?.count ?? 0) > rule.limit) {
     const retryAfter = Math.ceil((windowStart.getTime() + windowMs - Date.now()) / 1000);
-    throw new AppError("RATE_LIMITED", "Too many requests. Please try again later.", { retryAfterSeconds: retryAfter });
+    throw new AppError("RATE_LIMITED", "Too many requests. Please try again later.", {
+      retryAfterSeconds: retryAfter,
+    });
   }
 }

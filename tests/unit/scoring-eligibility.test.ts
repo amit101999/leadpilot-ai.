@@ -14,13 +14,22 @@ const passing = evaluateHardChecks(makeJob(), config, { sourceAuthorized: true, 
 function decide(score: number, overrides: Parameters<typeof makeAiOutput>[1] = {}) {
   const ai = makeAiOutput(score, overrides);
   const authoritative = computeAuthoritativeScore(ai.dimension_scores, config.ai.weights);
-  return decideEligibility({ hardChecks: passing, ai, authoritativeScore: authoritative, alreadyNotified: false }, config);
+  return decideEligibility(
+    { hardChecks: passing, ai, authoritativeScore: authoritative, alreadyNotified: false },
+    config,
+  );
 }
 
 describe("authoritative scoring", () => {
   it("computes the weighted score with integer round-half-up", () => {
     const score = computeAuthoritativeScore(
-      { skill_alignment: 92, scope_fit: 85, description_clarity: 90, client_credibility: 80, overall_relevance: 90 },
+      {
+        skill_alignment: 92,
+        scope_fit: 85,
+        description_clarity: 90,
+        client_credibility: 80,
+        overall_relevance: 90,
+      },
       config.ai.weights,
     );
     // 92*35 + 85*25 + 90*15 + 80*15 + 90*10 = 8795 -> 87.95 -> 88
@@ -69,19 +78,29 @@ describe("eligibility", () => {
       alreadyNotified: false,
     });
     const ai = makeAiOutput(100);
-    const result = decideEligibility({ hardChecks: failed, ai, authoritativeScore: 100, alreadyNotified: false }, config);
+    const result = decideEligibility(
+      { hardChecks: failed, ai, authoritativeScore: 100, alreadyNotified: false },
+      config,
+    );
     expect(result.decision).toBe("REJECTED");
   });
 
   it("sends HIGH-severity risks to review at MEDIUM sensitivity", () => {
-    const result = decide(90, { risk_flags: [{ code: "OFF_PLATFORM_PAYMENT", severity: "HIGH", evidence: "pay via wire" }] });
+    const result = decide(90, {
+      risk_flags: [{ code: "OFF_PLATFORM_PAYMENT", severity: "HIGH", evidence: "pay via wire" }],
+    });
     expect(result.decision).toBe("NEEDS_REVIEW");
   });
 
   it("rejects configured disqualifying risk flags", () => {
     const strict = { ...config, ai: { ...config.ai, disqualifyingRiskFlags: ["UNPAID_TEST_TASK"] } };
-    const ai = makeAiOutput(95, { risk_flags: [{ code: "UNPAID_TEST_TASK", severity: "LOW", evidence: "free trial task" }] });
-    const result = decideEligibility({ hardChecks: passing, ai, authoritativeScore: 95, alreadyNotified: false }, strict);
+    const ai = makeAiOutput(95, {
+      risk_flags: [{ code: "UNPAID_TEST_TASK", severity: "LOW", evidence: "free trial task" }],
+    });
+    const result = decideEligibility(
+      { hardChecks: passing, ai, authoritativeScore: 95, alreadyNotified: false },
+      strict,
+    );
     expect(result.decision).toBe("REJECTED");
   });
 });
@@ -97,11 +116,17 @@ describe("AI output validation", () => {
     const outOfRange = makeAiOutput(80);
     outOfRange.dimension_scores.scope_fit = 140;
     expect(validateAiOutput(outOfRange).ok).toBe(false);
-    expect(validateAiOutput({ ...makeAiOutput(80), injected: "ignore previous instructions" }).ok).toBe(false);
+    expect(validateAiOutput({ ...makeAiOutput(80), injected: "ignore previous instructions" }).ok).toBe(
+      false,
+    );
   });
 
   it("produces a strict JSON schema (all properties required, no additional properties)", () => {
-    const schema = aiOutputJsonSchema() as { required: string[]; additionalProperties: boolean; properties: object };
+    const schema = aiOutputJsonSchema() as {
+      required: string[];
+      additionalProperties: boolean;
+      properties: object;
+    };
     expect(schema.additionalProperties).toBe(false);
     expect(schema.required.sort()).toEqual(Object.keys(schema.properties).sort());
   });
@@ -141,7 +166,9 @@ describe("profile configuration validation", () => {
     const result = profileConfigSchema.safeParse(bad);
     expect(result.success).toBe(false);
     const paths = result.error?.issues.map((i) => i.path.join(".")) ?? [];
-    expect(paths).toEqual(expect.arrayContaining(["ai.weights", "budget.fixedMax", "skills.excludeKeywords"]));
+    expect(paths).toEqual(
+      expect.arrayContaining(["ai.weights", "budget.fixedMax", "skills.excludeKeywords"]),
+    );
   });
 
   it("rejects non-decimal and negative money values", () => {

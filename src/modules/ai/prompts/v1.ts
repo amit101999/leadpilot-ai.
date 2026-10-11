@@ -45,7 +45,9 @@ export function buildUserMessage(input: EvaluationInput): string {
     category: job.category,
     job_type: job.budgetType,
     budget: job.budgetAmount ? `${job.budgetAmount} ${job.currency ?? "(currency unknown)"}` : "not stated",
-    hourly_range: job.hourlyMin ? `${job.hourlyMin}-${job.hourlyMax ?? "?"} ${job.currency ?? ""}` : "not stated",
+    hourly_range: job.hourlyMin
+      ? `${job.hourlyMin}-${job.hourlyMax ?? "?"} ${job.currency ?? ""}`
+      : "not stated",
     client: {
       payment_verified: job.paymentVerified === null ? "unknown" : job.paymentVerified,
       rating: job.clientRating ?? "unknown",

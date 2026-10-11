@@ -2,8 +2,7 @@ import type { DbExecutor } from "@/lib/database/client";
 import { auditLogs } from "@/lib/database/schema";
 
 export type AuditActor =
-  | { type: "USER"; userId: string }
-  | { type: "SYSTEM" | "EXECUTOR" | "WEBHOOK"; userId?: null };
+  { type: "USER"; userId: string } | { type: "SYSTEM" | "EXECUTOR" | "WEBHOOK"; userId?: null };
 
 export interface AuditEntry {
   actor: AuditActor;

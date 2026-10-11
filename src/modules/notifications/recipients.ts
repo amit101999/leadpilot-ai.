@@ -62,7 +62,11 @@ export async function listRecipients(db: Database, actor: Actor, includeArchived
 }
 
 export async function getRecipientForSend(db: DbExecutor, id: string): Promise<RecipientRow | null> {
-  const [row] = await db.select().from(notificationRecipients).where(eq(notificationRecipients.id, id)).limit(1);
+  const [row] = await db
+    .select()
+    .from(notificationRecipients)
+    .where(eq(notificationRecipients.id, id))
+    .limit(1);
   return row ?? null;
 }
 
@@ -131,7 +135,11 @@ export async function updateRecipient(
       action: "recipient.update",
       entityType: "notification_recipient",
       entityId: id,
-      before: { label: current.label, optIn: Boolean(current.optInConfirmedAt), archived: Boolean(current.archivedAt) },
+      before: {
+        label: current.label,
+        optIn: Boolean(current.optInConfirmedAt),
+        archived: Boolean(current.archivedAt),
+      },
       after: { label: row!.label, optIn: Boolean(row!.optInConfirmedAt), archived: Boolean(row!.archivedAt) },
       requestId,
     });

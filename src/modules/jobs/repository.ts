@@ -15,7 +15,10 @@ export function contentHash(job: NormalizedJob): string {
  * Inserts or refreshes a job by its stable (source, source_job_id) identity.
  * first_seen_at is preserved; last_seen_at and content are refreshed.
  */
-export async function upsertJob(db: DbExecutor, job: NormalizedJob): Promise<{ id: string; firstSeenAt: Date }> {
+export async function upsertJob(
+  db: DbExecutor,
+  job: NormalizedJob,
+): Promise<{ id: string; firstSeenAt: Date }> {
   const values = {
     source: job.source,
     sourceJobId: job.sourceJobId,

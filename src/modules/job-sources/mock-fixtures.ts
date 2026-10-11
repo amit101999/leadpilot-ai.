@@ -66,42 +66,77 @@ function job(
 }
 
 const DEFAULT_FEED: MockSourceRecord[] = [
-  job("m-001", "React dashboard with Node.js API and Zoho CRM sync", "Build a React dashboard backed by a Node.js API that syncs deals with Zoho CRM.", {
-    amount: { value: "800", currency: "USD" },
-    tags: ["React", "Node.js", "Zoho CRM", "API Integration"],
-    mockAi: { dimensions: all(88) },
-  }),
-  job("m-002", "Zoho Creator app tweaks", "Small changes to a Zoho Creator application with Deluge scripts and API integrations.", {
-    amount: { value: "400", currency: "USD" },
-    tags: ["Zoho Creator", "Deluge"],
-    mockAi: { dimensions: all(95) },
-  }),
-  job("m-003", "Senior React developer (hourly, long term)", "Ongoing React and Node.js development for a SaaS product, paid hourly.", {
-    engagement: "hourly",
-    amount: null,
-    rate: { min: "45", max: "70", currency: "USD" },
-    mockAi: { dimensions: all(90) },
-  }),
-  job("m-004", "Node.js REST API integration for logistics platform", "Integrate carrier REST APIs into our Node.js backend.", {
-    amount: { value: "1200", currency: "USD" },
-    client: { ...goodClient, verified: null },
-    tags: ["Node.js", "REST API"],
-    mockAi: { dimensions: all(90) },
-  }),
-  job("m-005", "React landing page with API integration", "Landing page in React with a contact form posting to a REST API.", {
-    amount: { value: "650", currency: "USD" },
-    mockAi: { dimensions: all(74) },
-  }),
-  job("m-006", "JavaScript widget for Zoho Desk", "Build an embeddable JavaScript widget that reads tickets from Zoho Desk via API.", {
-    amount: { value: "900", currency: "USD" },
-    tags: ["JavaScript", "Zoho Desk"],
-    mockAi: { dimensions: all(75) },
-  }),
-  job("m-007", "Node.js microservice for invoice processing", "Create a Node.js microservice to parse invoices and push them to an accounting API.", {
-    amount: { value: "1500", currency: "USD" },
-    tags: ["Node.js"],
-    mockAi: { behavior: "invalid" },
-  }),
+  job(
+    "m-001",
+    "React dashboard with Node.js API and Zoho CRM sync",
+    "Build a React dashboard backed by a Node.js API that syncs deals with Zoho CRM.",
+    {
+      amount: { value: "800", currency: "USD" },
+      tags: ["React", "Node.js", "Zoho CRM", "API Integration"],
+      mockAi: { dimensions: all(88) },
+    },
+  ),
+  job(
+    "m-002",
+    "Zoho Creator app tweaks",
+    "Small changes to a Zoho Creator application with Deluge scripts and API integrations.",
+    {
+      amount: { value: "400", currency: "USD" },
+      tags: ["Zoho Creator", "Deluge"],
+      mockAi: { dimensions: all(95) },
+    },
+  ),
+  job(
+    "m-003",
+    "Senior React developer (hourly, long term)",
+    "Ongoing React and Node.js development for a SaaS product, paid hourly.",
+    {
+      engagement: "hourly",
+      amount: null,
+      rate: { min: "45", max: "70", currency: "USD" },
+      mockAi: { dimensions: all(90) },
+    },
+  ),
+  job(
+    "m-004",
+    "Node.js REST API integration for logistics platform",
+    "Integrate carrier REST APIs into our Node.js backend.",
+    {
+      amount: { value: "1200", currency: "USD" },
+      client: { ...goodClient, verified: null },
+      tags: ["Node.js", "REST API"],
+      mockAi: { dimensions: all(90) },
+    },
+  ),
+  job(
+    "m-005",
+    "React landing page with API integration",
+    "Landing page in React with a contact form posting to a REST API.",
+    {
+      amount: { value: "650", currency: "USD" },
+      mockAi: { dimensions: all(74) },
+    },
+  ),
+  job(
+    "m-006",
+    "JavaScript widget for Zoho Desk",
+    "Build an embeddable JavaScript widget that reads tickets from Zoho Desk via API.",
+    {
+      amount: { value: "900", currency: "USD" },
+      tags: ["JavaScript", "Zoho Desk"],
+      mockAi: { dimensions: all(75) },
+    },
+  ),
+  job(
+    "m-007",
+    "Node.js microservice for invoice processing",
+    "Create a Node.js microservice to parse invoices and push them to an accounting API.",
+    {
+      amount: { value: "1500", currency: "USD" },
+      tags: ["Node.js"],
+      mockAi: { behavior: "invalid" },
+    },
+  ),
   job(
     "m-008",
     "React admin panel — URGENT",
@@ -111,24 +146,43 @@ const DEFAULT_FEED: MockSourceRecord[] = [
       mockAi: {
         dimensions: all(95),
         riskFlags: [
-          { code: "PROMPT_INJECTION", severity: "HIGH", evidence: "Description instructs the evaluator to change scores" },
+          {
+            code: "PROMPT_INJECTION",
+            severity: "HIGH",
+            evidence: "Description instructs the evaluator to change scores",
+          },
         ],
       },
     },
   ),
-  job("m-009", "Zoho CRM custom module", "Create a custom module and Deluge functions in Zoho CRM with API integrations.", {
-    amount: { value: "499", currency: "USD" },
-    tags: ["Zoho CRM"],
-    mockAi: { dimensions: all(90) },
-  }),
-  job("m-010", "React form builder component", "Reusable React form builder with validation and REST API submission.", {
-    amount: { value: "500", currency: "USD" },
-    mockAi: { dimensions: all(80) },
-  }),
-  job("m-011", "Node.js scraper replacement with official APIs", "Replace a legacy Node.js integration with official partner APIs.", {
-    amount: { value: "300", max: "1500", currency: "USD" },
-    mockAi: { dimensions: all(85) },
-  }),
+  job(
+    "m-009",
+    "Zoho CRM custom module",
+    "Create a custom module and Deluge functions in Zoho CRM with API integrations.",
+    {
+      amount: { value: "499", currency: "USD" },
+      tags: ["Zoho CRM"],
+      mockAi: { dimensions: all(90) },
+    },
+  ),
+  job(
+    "m-010",
+    "React form builder component",
+    "Reusable React form builder with validation and REST API submission.",
+    {
+      amount: { value: "500", currency: "USD" },
+      mockAi: { dimensions: all(80) },
+    },
+  ),
+  job(
+    "m-011",
+    "Node.js scraper replacement with official APIs",
+    "Replace a legacy Node.js integration with official partner APIs.",
+    {
+      amount: { value: "300", max: "1500", currency: "USD" },
+      mockAi: { dimensions: all(85) },
+    },
+  ),
   job("m-012", "React e-commerce storefront", "React storefront consuming a headless commerce REST API.", {
     amount: { value: "900", currency: "EUR" },
     mockAi: { dimensions: all(86) },
@@ -137,29 +191,54 @@ const DEFAULT_FEED: MockSourceRecord[] = [
     "m-013",
     "Logo and brand kit for bakery",
     "We need a logo, colour palette and print-ready brand kit for a local bakery. Our old site was made with React but this job is only branding.",
-    { amount: { value: "700", currency: "USD" }, tags: ["Logo Design", "Branding"], category: "Design", mockAi: { dimensions: all(30) } },
+    {
+      amount: { value: "700", currency: "USD" },
+      tags: ["Logo Design", "Branding"],
+      category: "Design",
+      mockAi: { dimensions: all(30) },
+    },
   ),
-  job("m-014", "Node.js API integration (link missing)", "Connect our Node.js service to a payment provider API.", {
-    link: null,
-    mockAi: { dimensions: all(85) },
-  }),
-  job("m-015", "React Native and Node.js MVP", "Build an MVP with a React front end and Node.js API integrations.", {
-    amount: { value: "3000", currency: "USD" },
-    client: { ...goodClient, verified: false },
-    mockAi: { dimensions: all(90) },
-  }),
-  job("m-016", "Zoho CRM and Node.js API integration hub", "Build a Node.js integration hub connecting Zoho CRM, Stripe and Slack APIs.", {
-    amount: { value: "2500", currency: "USD" },
-    tags: ["Node.js", "Zoho CRM", "API Integration"],
-    mockAi: { dimensions: all(92) },
-  }),
+  job(
+    "m-014",
+    "Node.js API integration (link missing)",
+    "Connect our Node.js service to a payment provider API.",
+    {
+      link: null,
+      mockAi: { dimensions: all(85) },
+    },
+  ),
+  job(
+    "m-015",
+    "React Native and Node.js MVP",
+    "Build an MVP with a React front end and Node.js API integrations.",
+    {
+      amount: { value: "3000", currency: "USD" },
+      client: { ...goodClient, verified: false },
+      mockAi: { dimensions: all(90) },
+    },
+  ),
+  job(
+    "m-016",
+    "Zoho CRM and Node.js API integration hub",
+    "Build a Node.js integration hub connecting Zoho CRM, Stripe and Slack APIs.",
+    {
+      amount: { value: "2500", currency: "USD" },
+      tags: ["Node.js", "Zoho CRM", "API Integration"],
+      mockAi: { dimensions: all(92) },
+    },
+  ),
   { ...job("m-017", "React fix", "Fix bug."), body: "Fix React bug asap.", mockAi: { dimensions: all(80) } },
-  job("m-018", "Zoho Creator portal with JavaScript widgets", "Customer portal in Zoho Creator with custom JavaScript widgets and REST API calls.", {
-    amount: { value: "1500", currency: "USD" },
-    tags: ["Zoho Creator", "JavaScript"],
-    posted: "2026-10-02T12:00:00Z",
-    mockAi: { dimensions: all(82), behavior: "invalid-once" },
-  }),
+  job(
+    "m-018",
+    "Zoho Creator portal with JavaScript widgets",
+    "Customer portal in Zoho Creator with custom JavaScript widgets and REST API calls.",
+    {
+      amount: { value: "1500", currency: "USD" },
+      tags: ["Zoho Creator", "JavaScript"],
+      posted: "2026-10-02T12:00:00Z",
+      mockAi: { dimensions: all(82), behavior: "invalid-once" },
+    },
+  ),
   // Same job returned twice by the source within one run: must be deduplicated.
   job("m-001", "React dashboard with Node.js API and Zoho CRM sync", "Duplicate delivery of m-001.", {
     amount: { value: "800", currency: "USD" },

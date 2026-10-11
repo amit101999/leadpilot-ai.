@@ -46,12 +46,18 @@ export async function selectStep(ctx: RunContext): Promise<StageResponse> {
     })
     .from(runJobs)
     .innerJoin(jobs, eq(jobs.id, runJobs.jobId))
-    .innerJoin(qualifications, and(eq(qualifications.runId, runJobs.runId), eq(qualifications.jobId, runJobs.jobId)))
+    .innerJoin(
+      qualifications,
+      and(eq(qualifications.runId, runJobs.runId), eq(qualifications.jobId, runJobs.jobId)),
+    )
     .where(and(eq(runJobs.runId, run.id), eq(runJobs.processingStatus, "QUALIFIED")));
 
   const ranked = rankCandidates(qualified.map((q) => ({ ...q, id: q.runJobId, score: q.score ?? 0 })));
   for (const [index, candidate] of ranked.entries()) {
-    await db.update(runJobs).set({ rank: index + 1 }).where(eq(runJobs.id, candidate.runJobId));
+    await db
+      .update(runJobs)
+      .set({ rank: index + 1 })
+      .where(eq(runJobs.id, candidate.runJobId));
   }
 
   const recipientId = config.notifications.recipientId;
@@ -61,10 +67,23 @@ export async function selectStep(ctx: RunContext): Promise<StageResponse> {
       await db
         .update(runJobs)
         .set({ notificationNote: skipReason })
-        .where(inArray(runJobs.id, ranked.map((r) => r.runJobId)));
-      await addWarning(db, run.id, { code: "NOTIFICATIONS_SKIPPED", stage: "SELECTION", message: skipReason });
+        .where(
+          inArray(
+            runJobs.id,
+            ranked.map((r) => r.runJobId),
+          ),
+        );
+      await addWarning(db, run.id, {
+        code: "NOTIFICATIONS_SKIPPED",
+        stage: "SELECTION",
+        message: skipReason,
+      });
     }
-    await completeStage(db, run.id, "SELECTION", { qualified: ranked.length, reserved: 0, skipped: skipReason });
+    await completeStage(db, run.id, "SELECTION", {
+      qualified: ranked.length,
+      reserved: 0,
+      skipped: skipReason,
+    });
     return respond(ctx, "select", "notify");
   }
 
@@ -95,7 +114,10 @@ export async function selectStep(ctx: RunContext): Promise<StageResponse> {
         )
         .limit(1);
       if (existing?.runId === run.id && existing.status !== "CANCELLED") {
-        await tx.update(runJobs).set({ notificationNote: "Reserved for notification" }).where(eq(runJobs.id, candidate.runJobId));
+        await tx
+          .update(runJobs)
+          .set({ notificationNote: "Reserved for notification" })
+          .where(eq(runJobs.id, candidate.runJobId));
         continue;
       }
       if (slots <= 0) {
@@ -171,7 +193,9 @@ export async function selectStep(ctx: RunContext): Promise<StageResponse> {
         claimedElsewhere += 1;
         await tx
           .update(runJobs)
-          .set({ notificationNote: "Not sent: already notified or claimed by another run for this recipient" })
+          .set({
+            notificationNote: "Not sent: already notified or claimed by another run for this recipient",
+          })
           .where(eq(runJobs.id, candidate.runJobId));
       }
     }
@@ -185,7 +209,8 @@ export async function selectStep(ctx: RunContext): Promise<StageResponse> {
 
 async function notificationSkipReason(ctx: RunContext, recipientId: string | null): Promise<string | null> {
   const config = ctx.snapshot.configuration;
-  if (!config.notifications.whatsappEnabled) return "Not sent: WhatsApp notifications are disabled for this profile";
+  if (!config.notifications.whatsappEnabled)
+    return "Not sent: WhatsApp notifications are disabled for this profile";
   if (!recipientId) return "Not sent: no recipient configured";
   const recipient = await getRecipientForSend(ctx.db, recipientId);
   if (!recipient || recipient.archivedAt || recipient.ownerUserId !== ctx.snapshot.profile.ownerUserId) {

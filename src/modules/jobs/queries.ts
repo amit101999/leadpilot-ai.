@@ -66,8 +66,15 @@ export async function listJobs(db: Database, actor: Actor, f: JobListFilters) {
     left join qualifications q on q.run_id = l.run_id and q.job_id = l.job_id`;
 
   const filters = whereAll([
-    f.status?.length ? sql`l.processing_status in (${sql.join(f.status.map((s) => sql`${s}`), sql`, `)})` : undefined,
-    f.search ? sql`(j.title ilike ${`%${escapeLike(f.search)}%`} or j.source_job_id = ${f.search})` : undefined,
+    f.status?.length
+      ? sql`l.processing_status in (${sql.join(
+          f.status.map((s) => sql`${s}`),
+          sql`, `,
+        )})`
+      : undefined,
+    f.search
+      ? sql`(j.title ilike ${`%${escapeLike(f.search)}%`} or j.source_job_id = ${f.search})`
+      : undefined,
     f.previouslySeen !== undefined ? sql`l.previously_seen = ${f.previouslySeen}` : undefined,
     f.source ? sql`j.source = ${f.source}` : undefined,
   ]);
@@ -77,7 +84,9 @@ export async function listJobs(db: Database, actor: Actor, f: JobListFilters) {
     select * from (${base} where ${filters}) t where ${notifiedFilter}
     order by ${sql.raw(JOB_SORT[f.sort ?? "firstSeen"])} ${sql.raw(f.sortDir === "asc" ? "asc" : "desc")} nulls last, t.id
     limit ${f.pageSize} offset ${f.offset}`);
-  const [count] = await db.execute(sql`select count(*)::int as total from (${base} where ${filters}) t where ${notifiedFilter}`);
+  const [count] = await db.execute(
+    sql`select count(*)::int as total from (${base} where ${filters}) t where ${notifiedFilter}`,
+  );
   return { items: rows.map(mapJobListRow), total: Number((count as { total?: number })?.total ?? 0) };
 }
 
@@ -165,7 +174,10 @@ export async function listLeads(db: Database, actor: Actor, f: LeadListFilters) 
     ) n on true`;
 
   const filters = whereAll([
-    sql`l.decision in (${sql.join(decisions.map((d) => sql`${d}`), sql`, `)})`,
+    sql`l.decision in (${sql.join(
+      decisions.map((d) => sql`${d}`),
+      sql`, `,
+    )})`,
     f.budgetMin ? sql`j.budget_amount >= ${f.budgetMin}::numeric` : undefined,
     f.budgetMax ? sql`j.budget_amount <= ${f.budgetMax}::numeric` : undefined,
     f.scoreMin !== undefined ? sql`l.score >= ${f.scoreMin}` : undefined,
@@ -185,7 +197,10 @@ export async function listLeads(db: Database, actor: Actor, f: LeadListFilters) 
     f.notificationStatus?.length
       ? sql`(${
           notificationStatuses.length
-            ? sql`n.status in (${sql.join(notificationStatuses.map((s) => sql`${s}`), sql`, `)})`
+            ? sql`n.status in (${sql.join(
+                notificationStatuses.map((s) => sql`${s}`),
+                sql`, `,
+              )})`
             : sql`false`
         } ${f.notificationStatus.includes("NONE") ? sql`or n.status is null` : sql``})`
       : undefined,
@@ -257,7 +272,10 @@ export async function getJobDetail(db: Database, actor: Actor, jobId: string) {
   const attemptRows = notificationRows.length
     ? await db.execute(sql`
         select a.* from notification_attempts a
-        where a.notification_id in (${sql.join(notificationRows.map((n) => sql`${n.id as string}`), sql`, `)})
+        where a.notification_id in (${sql.join(
+          notificationRows.map((n) => sql`${n.id as string}`),
+          sql`, `,
+        )})
         order by a.started_at desc`)
     : [];
 
@@ -292,7 +310,10 @@ export async function listRunJobs(db: Database, actor: Actor, runId: string) {
 
 function camelize(row: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(
-    Object.entries(row).map(([key, value]) => [key.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase()), value]),
+    Object.entries(row).map(([key, value]) => [
+      key.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase()),
+      value,
+    ]),
   );
 }
 

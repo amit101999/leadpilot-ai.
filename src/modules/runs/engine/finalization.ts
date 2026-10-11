@@ -39,7 +39,19 @@ export async function finalizeStep(ctx: RunContext): Promise<StageResponse> {
     await db
       .update(runStages)
       .set({ status: "SKIPPED", updatedAt: new Date() })
-      .where(and(eq(runStages.runId, run.id), inArray(runStages.status, ["PENDING", "RUNNING"]), inArray(runStages.stage, ["DISCOVERY", "HARD_FILTERS", "AI_EVALUATION", "SELECTION", "NOTIFICATION"])));
+      .where(
+        and(
+          eq(runStages.runId, run.id),
+          inArray(runStages.status, ["PENDING", "RUNNING"]),
+          inArray(runStages.stage, [
+            "DISCOVERY",
+            "HARD_FILTERS",
+            "AI_EVALUATION",
+            "SELECTION",
+            "NOTIFICATION",
+          ]),
+        ),
+      );
   }
   await completeStage(db, run.id, "FINALIZATION", { ...counters, finalStatus: status });
   const finished = await transitionRun(db, run.id, status, {
@@ -75,14 +87,25 @@ export async function failRun(
     await db
       .update(runStages)
       .set({ status: "FAILED", error: message, finishedAt: new Date(), updatedAt: new Date() })
-      .where(and(eq(runStages.runId, runId), eq(runStages.stage, input.stage), inArray(runStages.status, ["PENDING", "RUNNING"])));
+      .where(
+        and(
+          eq(runStages.runId, runId),
+          eq(runStages.stage, input.stage),
+          inArray(runStages.status, ["PENDING", "RUNNING"]),
+        ),
+      );
   }
   await refreshRunCounters(db, runId);
   const failed = await transitionRun(db, runId, "FAILED", {
     finishedAt: new Date(),
     leaseOwner: null,
     leaseExpiresAt: null,
-    errorSummary: { code: "WORKFLOW_EXECUTION_FAILED", message, stage: input.stage ?? null, executionId: input.executionId ?? null },
+    errorSummary: {
+      code: "WORKFLOW_EXECUTION_FAILED",
+      message,
+      stage: input.stage ?? null,
+      executionId: input.executionId ?? null,
+    },
   });
   const run = failed ?? (await loadRun(db, runId));
   if (failed) {
@@ -116,7 +139,15 @@ async function settleUnsentNotifications(db: Database, runId: string): Promise<v
     await db
       .update(notificationAttempts)
       .set({ outcome: "UNCERTAIN", finishedAt: new Date() })
-      .where(and(inArray(notificationAttempts.notificationId, stuck.map((s) => s.id)), eq(notificationAttempts.outcome, "SENDING")));
+      .where(
+        and(
+          inArray(
+            notificationAttempts.notificationId,
+            stuck.map((s) => s.id),
+          ),
+          eq(notificationAttempts.outcome, "SENDING"),
+        ),
+      );
   }
 }
 
@@ -128,7 +159,8 @@ async function maybeSendRunSummary(db: Database, providers: Providers, run: RunR
   if (run.summaryNotification) return;
   const snapshot = parseSnapshot(run.configurationSnapshot);
   const n = snapshot.configuration.notifications;
-  const failed = run.status === "FAILED" || run.status === "COMPLETED_WITH_ERRORS" || run.status === "BLOCKED_SOURCE";
+  const failed =
+    run.status === "FAILED" || run.status === "COMPLETED_WITH_ERRORS" || run.status === "BLOCKED_SOURCE";
   const wanted = n.whatsappEnabled && n.recipientId && (n.sendRunSummary || (n.alertOnFailure && failed));
   if (!wanted || !n.recipientId) return;
 
@@ -165,7 +197,10 @@ async function maybeSendRunSummary(db: Database, providers: Providers, run: RunR
       result =
         outcome.kind === "accepted"
           ? { status: "SENT", providerMessageId: outcome.providerMessageId }
-          : { status: outcome.kind === "uncertain" ? "UNCERTAIN" : "FAILED", error: sanitizeErrorMessage(outcome.error) };
+          : {
+              status: outcome.kind === "uncertain" ? "UNCERTAIN" : "FAILED",
+              error: sanitizeErrorMessage(outcome.error),
+            };
     } catch (error) {
       result = { status: "UNCERTAIN", error: sanitizeErrorMessage(error) };
     }

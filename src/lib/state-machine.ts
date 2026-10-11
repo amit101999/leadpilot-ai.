@@ -10,7 +10,12 @@ export function canTransition<S extends string>(map: TransitionMap<S>, from: S, 
   return map[from].includes(to);
 }
 
-export function assertTransition<S extends string>(map: TransitionMap<S>, from: S, to: S, entity: string): void {
+export function assertTransition<S extends string>(
+  map: TransitionMap<S>,
+  from: S,
+  to: S,
+  entity: string,
+): void {
   if (!canTransition(map, from, to)) {
     throw new InvalidTransitionError(entity, from, to);
   }

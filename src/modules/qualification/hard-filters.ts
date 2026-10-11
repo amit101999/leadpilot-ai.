@@ -2,7 +2,13 @@ import { centsToString, convertCents, toCents, type Cents } from "@/lib/money/de
 import { validateJobUrl } from "@/lib/security/url";
 import type { NormalizedJob } from "@/modules/job-sources/types";
 import type { ProfileConfig, UnknownPolicy } from "@/modules/profiles/config-schema";
-import { containsTerm, matchSkill, toSearchable, type SearchableJob, type TermMatch } from "./keyword-matching";
+import {
+  containsTerm,
+  matchSkill,
+  toSearchable,
+  type SearchableJob,
+  type TermMatch,
+} from "./keyword-matching";
 
 export type CheckOutcome = "PASS" | "FAIL" | "UNKNOWN" | "NOT_APPLICABLE";
 /** What a check result means for the job: continue, reject outright, or park for manual review. */
@@ -118,14 +124,26 @@ function checkSourceAuthorized(context: HardCheckContext): HardCheckResult {
 function checkStableIdentifier(job: NormalizedJob): HardCheckResult {
   return STABLE_ID_RE.test(job.sourceJobId)
     ? pass("STABLE_IDENTIFIER", "Job has a stable source identifier")
-    : result("STABLE_IDENTIFIER", "FAIL", "REJECT", "INVALID_SOURCE_ID", "Job has no stable source identifier");
+    : result(
+        "STABLE_IDENTIFIER",
+        "FAIL",
+        "REJECT",
+        "INVALID_SOURCE_ID",
+        "Job has no stable source identifier",
+      );
 }
 
 function checkUrl(job: NormalizedJob): HardCheckResult {
   const validation = validateJobUrl(job.jobUrl, job.source);
   return validation.ok
     ? pass("VALID_URL", "Job has a valid source-provided URL")
-    : result("VALID_URL", "FAIL", "REJECT", validation.reason, `Job URL is not usable (${validation.reason})`);
+    : result(
+        "VALID_URL",
+        "FAIL",
+        "REJECT",
+        validation.reason,
+        `Job URL is not usable (${validation.reason})`,
+      );
 }
 
 function checkDataSufficiency(job: NormalizedJob): HardCheckResult {
@@ -213,10 +231,17 @@ function checkBudget(job: NormalizedJob, config: ProfileConfig): HardCheckResult
   if (minCents !== null && comparable < minCents) {
     return [
       currencyCheck,
-      result("BUDGET", "FAIL", "REJECT", "BUDGET_BELOW_MINIMUM", `Budget ${observed}${unit} is below minimum`, {
-        observed,
-        expected: `>= ${minimum} ${budget.currency}${unit}`,
-      }),
+      result(
+        "BUDGET",
+        "FAIL",
+        "REJECT",
+        "BUDGET_BELOW_MINIMUM",
+        `Budget ${observed}${unit} is below minimum`,
+        {
+          observed,
+          expected: `>= ${minimum} ${budget.currency}${unit}`,
+        },
+      ),
     ];
   }
   const maxCents = toCents(maximum);
@@ -233,8 +258,7 @@ function checkBudget(job: NormalizedJob, config: ProfileConfig): HardCheckResult
 }
 
 type Conversion =
-  | { ok: true; cents: Cents; message: string }
-  | { ok: false; reasonCode: string; message: string };
+  { ok: true; cents: Cents; message: string } | { ok: false; reasonCode: string; message: string };
 
 function convertToProfileCurrency(amount: Cents, currency: string | null, config: ProfileConfig): Conversion {
   const target = config.budget.currency;
@@ -282,7 +306,9 @@ function checkClient(job: NormalizedJob, config: ProfileConfig): HardCheckResult
   if (client.minRating === null) {
     checks.push(notApplicable("CLIENT_RATING", "No minimum client rating"));
   } else if (job.clientRating === null) {
-    checks.push(result("CLIENT_RATING", "UNKNOWN", unknown, "RATING_UNKNOWN", "Client rating is unavailable"));
+    checks.push(
+      result("CLIENT_RATING", "UNKNOWN", unknown, "RATING_UNKNOWN", "Client rating is unavailable"),
+    );
   } else {
     // Ratings have 2 decimals; compare in hundredths to avoid float issues.
     const observed = toCents(job.clientRating) ?? 0n;
@@ -300,31 +326,49 @@ function checkClient(job: NormalizedJob, config: ProfileConfig): HardCheckResult
   if (client.minHires === null) {
     checks.push(notApplicable("CLIENT_HIRES", "No minimum hire history"));
   } else if (job.clientHires === null) {
-    checks.push(result("CLIENT_HIRES", "UNKNOWN", unknown, "HIRES_UNKNOWN", "Client hire history is unavailable"));
+    checks.push(
+      result("CLIENT_HIRES", "UNKNOWN", unknown, "HIRES_UNKNOWN", "Client hire history is unavailable"),
+    );
   } else {
     checks.push(
       job.clientHires >= client.minHires
         ? pass("CLIENT_HIRES", `Client has ${job.clientHires} hires`)
-        : result("CLIENT_HIRES", "FAIL", "REJECT", "HIRES_BELOW_MINIMUM", "Client hire history below minimum", {
-            observed: job.clientHires,
-            expected: `>= ${client.minHires}`,
-          }),
+        : result(
+            "CLIENT_HIRES",
+            "FAIL",
+            "REJECT",
+            "HIRES_BELOW_MINIMUM",
+            "Client hire history below minimum",
+            {
+              observed: job.clientHires,
+              expected: `>= ${client.minHires}`,
+            },
+          ),
     );
   }
 
   if (client.minTotalSpent === null) {
     checks.push(notApplicable("CLIENT_SPEND", "No minimum client spend"));
   } else if (job.clientTotalSpent === null) {
-    checks.push(result("CLIENT_SPEND", "UNKNOWN", unknown, "SPEND_UNKNOWN", "Client total spend is unavailable"));
+    checks.push(
+      result("CLIENT_SPEND", "UNKNOWN", unknown, "SPEND_UNKNOWN", "Client total spend is unavailable"),
+    );
   } else {
     const ok = (toCents(job.clientTotalSpent) ?? 0n) >= (toCents(client.minTotalSpent) ?? 0n);
     checks.push(
       ok
         ? pass("CLIENT_SPEND", "Client spend meets minimum")
-        : result("CLIENT_SPEND", "FAIL", "REJECT", "SPEND_BELOW_MINIMUM", "Client total spend below minimum", {
-            observed: job.clientTotalSpent,
-            expected: `>= ${client.minTotalSpent}`,
-          }),
+        : result(
+            "CLIENT_SPEND",
+            "FAIL",
+            "REJECT",
+            "SPEND_BELOW_MINIMUM",
+            "Client total spend below minimum",
+            {
+              observed: job.clientTotalSpent,
+              expected: `>= ${client.minTotalSpent}`,
+            },
+          ),
     );
   }
 
@@ -333,16 +377,25 @@ function checkClient(job: NormalizedJob, config: ProfileConfig): HardCheckResult
   if (allowed.length === 0 && blocked.length === 0) {
     checks.push(notApplicable("CLIENT_LOCATION", "No location restrictions"));
   } else if (!job.clientCountry) {
-    checks.push(result("CLIENT_LOCATION", "UNKNOWN", unknown, "LOCATION_UNKNOWN", "Client location is unavailable"));
+    checks.push(
+      result("CLIENT_LOCATION", "UNKNOWN", unknown, "LOCATION_UNKNOWN", "Client location is unavailable"),
+    );
   } else {
     const country = job.clientCountry.toLowerCase();
     const ok = (allowed.length === 0 || allowed.includes(country)) && !blocked.includes(country);
     checks.push(
       ok
         ? pass("CLIENT_LOCATION", `Client location ${job.clientCountry} allowed`)
-        : result("CLIENT_LOCATION", "FAIL", "REJECT", "LOCATION_NOT_ALLOWED", "Client location is not allowed", {
-            observed: job.clientCountry,
-          }),
+        : result(
+            "CLIENT_LOCATION",
+            "FAIL",
+            "REJECT",
+            "LOCATION_NOT_ALLOWED",
+            "Client location is not allowed",
+            {
+              observed: job.clientCountry,
+            },
+          ),
     );
   }
   return checks;
@@ -351,7 +404,8 @@ function checkClient(job: NormalizedJob, config: ProfileConfig): HardCheckResult
 function checkCategory(job: NormalizedJob, config: ProfileConfig): HardCheckResult {
   const wanted = config.skills.category;
   if (!wanted) return notApplicable("CATEGORY", "No category restriction");
-  if (!job.category) return result("CATEGORY", "UNKNOWN", "REVIEW", "CATEGORY_UNKNOWN", "Job category is unknown");
+  if (!job.category)
+    return result("CATEGORY", "UNKNOWN", "REVIEW", "CATEGORY_UNKNOWN", "Job category is unknown");
   return job.category.toLowerCase() === wanted.toLowerCase()
     ? pass("CATEGORY", "Category matches")
     : result("CATEGORY", "FAIL", "REJECT", "CATEGORY_MISMATCH", "Job category does not match", {
@@ -387,36 +441,40 @@ function checkRequiredSkills(matches: TermMatch[], config: ProfileConfig): HardC
   );
 }
 
-function checkIncludeKeywords(
-  job: SearchableJob,
-  config: ProfileConfig,
-): HardCheckResult {
+function checkIncludeKeywords(job: SearchableJob, config: ProfileConfig): HardCheckResult {
   const keywords = config.skills.includeKeywords;
   if (keywords.length === 0) return notApplicable("INCLUDE_KEYWORDS", "No include keywords");
   const found = keywords.filter((k) => containsTerm(job, k));
   return found.length > 0
     ? pass("INCLUDE_KEYWORDS", `Contains: ${found.join(", ")}`)
-    : result("INCLUDE_KEYWORDS", "FAIL", "REJECT", "NO_INCLUDE_KEYWORD", "None of the include keywords found");
+    : result(
+        "INCLUDE_KEYWORDS",
+        "FAIL",
+        "REJECT",
+        "NO_INCLUDE_KEYWORD",
+        "None of the include keywords found",
+      );
 }
 
-function checkExcludeKeywords(
-  job: SearchableJob,
-  config: ProfileConfig,
-): HardCheckResult {
+function checkExcludeKeywords(job: SearchableJob, config: ProfileConfig): HardCheckResult {
   const keywords = config.skills.excludeKeywords;
   if (keywords.length === 0) return notApplicable("EXCLUDE_KEYWORDS", "No exclude keywords");
   const found = keywords.filter((k) => containsTerm(job, k));
   return found.length === 0
     ? pass("EXCLUDE_KEYWORDS", "No excluded keywords found")
-    : result("EXCLUDE_KEYWORDS", "FAIL", "REJECT", "EXCLUDED_KEYWORD", `Contains excluded keyword: ${found.join(", ")}`, {
-        observed: found,
-      });
+    : result(
+        "EXCLUDE_KEYWORDS",
+        "FAIL",
+        "REJECT",
+        "EXCLUDED_KEYWORD",
+        `Contains excluded keyword: ${found.join(", ")}`,
+        {
+          observed: found,
+        },
+      );
 }
 
-function checkRequiredCombinations(
-  job: SearchableJob,
-  config: ProfileConfig,
-): HardCheckResult {
+function checkRequiredCombinations(job: SearchableJob, config: ProfileConfig): HardCheckResult {
   const combinations = config.skills.requiredCombinations;
   if (combinations.length === 0) return notApplicable("REQUIRED_COMBINATIONS", "No required combinations");
   const matched = combinations.find((combo) => combo.every((t) => containsTerm(job, t)));

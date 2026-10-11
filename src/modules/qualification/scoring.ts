@@ -36,7 +36,13 @@ export function normalizeWeights(weights: ScoringWeights): ScoringWeights {
   const entries = Object.entries(weights) as Array<[keyof ScoringWeights, number]>;
   const total = entries.reduce((sum, [, w]) => sum + Math.max(0, w), 0);
   if (total === 0) {
-    return { skillAlignment: 20, scopeFit: 20, descriptionClarity: 20, clientCredibility: 20, overallRelevance: 20 };
+    return {
+      skillAlignment: 20,
+      scopeFit: 20,
+      descriptionClarity: 20,
+      clientCredibility: 20,
+      overallRelevance: 20,
+    };
   }
   const parts = entries.map(([key, w]) => {
     const exact = (Math.max(0, w) * 100) / total;

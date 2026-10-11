@@ -48,7 +48,11 @@ async function lockProfile(tx: DbExecutor, actor: Actor, id: string): Promise<Pr
 }
 
 /** A profile may only notify recipients that belong to the profile's owner. */
-async function assertRecipientUsable(tx: DbExecutor, ownerUserId: string, config: ProfileConfig): Promise<void> {
+async function assertRecipientUsable(
+  tx: DbExecutor,
+  ownerUserId: string,
+  config: ProfileConfig,
+): Promise<void> {
   const recipientId = config.notifications.recipientId;
   if (!recipientId) return;
   const [recipient] = await tx
@@ -124,7 +128,8 @@ export async function updateProfile(
   requireRole(actor, "OPERATOR");
   return db.transaction(async (tx) => {
     const current = await lockProfile(tx, actor, id);
-    if (current.archivedAt) throw new AppError("INVALID_STATE", "Archived profiles cannot be edited; restore it first");
+    if (current.archivedAt)
+      throw new AppError("INVALID_STATE", "Archived profiles cannot be edited; restore it first");
     if (current.currentVersion !== input.expectedVersion) {
       throw new AppError(
         "VERSION_CONFLICT",
@@ -234,7 +239,12 @@ export async function setArchived(
   });
 }
 
-export async function setDefault(db: Database, actor: Actor, id: string, requestId?: string): Promise<ProfileRow> {
+export async function setDefault(
+  db: Database,
+  actor: Actor,
+  id: string,
+  requestId?: string,
+): Promise<ProfileRow> {
   requireRole(actor, "OPERATOR");
   return db.transaction(async (tx) => {
     const current = await lockProfile(tx, actor, id);
@@ -272,7 +282,12 @@ export async function getCurrentVersion(tx: DbExecutor, profile: ProfileRow): Pr
   const [version] = await tx
     .select()
     .from(profileVersions)
-    .where(and(eq(profileVersions.profileId, profile.id), eq(profileVersions.versionNumber, profile.currentVersion)))
+    .where(
+      and(
+        eq(profileVersions.profileId, profile.id),
+        eq(profileVersions.versionNumber, profile.currentVersion),
+      ),
+    )
     .limit(1);
   if (!version) throw new Error(`Profile ${profile.id} is missing version ${profile.currentVersion}`);
   return version;

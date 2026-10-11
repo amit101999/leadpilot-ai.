@@ -122,9 +122,16 @@ export const profileConfigSchema = z
       });
     }
     if (skills.requiredMatchMode !== "ANY" && skills.required.length === 0) {
-      ctx.addIssue({ code: "custom", path: ["skills", "required"], message: "Add at least one required skill" });
+      ctx.addIssue({
+        code: "custom",
+        path: ["skills", "required"],
+        message: "Add at least one required skill",
+      });
     }
-    if (budget.currencyPolicy.mode === "FIXED_RATES" && Object.keys(budget.currencyPolicy.rates).length === 0) {
+    if (
+      budget.currencyPolicy.mode === "FIXED_RATES" &&
+      Object.keys(budget.currencyPolicy.rates).length === 0
+    ) {
       ctx.addIssue({
         code: "custom",
         path: ["budget", "currencyPolicy", "rates"],

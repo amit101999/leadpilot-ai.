@@ -1,0 +1,4 @@
+# Keep LF in the repo and working tree on every OS (Prettier expects LF).
+* text=auto eol=lf
+*.png binary
+*.ico binary

@@ -41,7 +41,10 @@ const envSchema = z.object({
   /** Meta provisions "hello_world" (no parameters) on new WhatsApp Business accounts. */
   WHATSAPP_TEST_TEMPLATE_NAME: z.string().default("hello_world"),
   WHATSAPP_TEMPLATE_LANGUAGE: z.string().default("en_US"),
-  WHATSAPP_GRAPH_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default("v21.0"),
+  WHATSAPP_GRAPH_API_VERSION: z
+    .string()
+    .regex(/^v\d+\.\d+$/)
+    .default("v21.0"),
   WHATSAPP_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(15000),
 
   JOB_SOURCE_PROVIDER: z.enum(["mock", "upwork"]).default("mock"),

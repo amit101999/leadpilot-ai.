@@ -148,7 +148,11 @@ async function evaluateOne(ctx: RunContext, runJob: RunJobRow, jobRow: JobRow): 
   );
 }
 
-async function mapWithConcurrency<T>(items: T[], limit: number, worker: (item: T) => Promise<void>): Promise<void> {
+async function mapWithConcurrency<T>(
+  items: T[],
+  limit: number,
+  worker: (item: T) => Promise<void>,
+): Promise<void> {
   let index = 0;
   const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
     while (index < items.length) {

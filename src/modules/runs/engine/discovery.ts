@@ -1,5 +1,11 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { integrationStatus, notificationAttempts, notifications, runJobs, runStages } from "@/lib/database/schema";
+import {
+  integrationStatus,
+  notificationAttempts,
+  notifications,
+  runJobs,
+  runStages,
+} from "@/lib/database/schema";
 import { AppError } from "@/lib/http/errors";
 import { sanitizeErrorMessage } from "@/lib/security/sanitize";
 import { upsertJob } from "@/modules/jobs/repository";
@@ -49,7 +55,8 @@ export async function startStep(ctx: RunContext): Promise<StageResponse> {
       status: connection.state,
       lastCheckedAt: new Date(),
       lastSuccessAt: connection.state === "CONNECTED" || connection.state === "MOCK" ? new Date() : null,
-      sanitizedError: connection.state === "CONNECTED" || connection.state === "MOCK" ? null : connection.message,
+      sanitizedError:
+        connection.state === "CONNECTED" || connection.state === "MOCK" ? null : connection.message,
       metadata: { provider: provider.id, missing: connection.missing ?? [] },
     })
     .onConflictDoUpdate({
@@ -57,7 +64,8 @@ export async function startStep(ctx: RunContext): Promise<StageResponse> {
       set: {
         status: connection.state,
         lastCheckedAt: new Date(),
-        sanitizedError: connection.state === "CONNECTED" || connection.state === "MOCK" ? null : connection.message,
+        sanitizedError:
+          connection.state === "CONNECTED" || connection.state === "MOCK" ? null : connection.message,
         metadata: { provider: provider.id, missing: connection.missing ?? [] },
         updatedAt: new Date(),
       },
@@ -127,7 +135,13 @@ export async function discoverStep(ctx: RunContext): Promise<StageResponse> {
         else duplicatesInRun += 1;
       }
       cursor = page.nextCursor;
-      await updateStageMetrics(db, run.id, "DISCOVERY", { pages, received, linked, invalid, duplicatesInRun });
+      await updateStageMetrics(db, run.id, "DISCOVERY", {
+        pages,
+        received,
+        linked,
+        invalid,
+        duplicatesInRun,
+      });
     } while (cursor && pages < MAX_PAGES && !truncated);
   } catch (error) {
     if (error instanceof SourceNotAuthorizedError) {
@@ -152,7 +166,14 @@ export async function discoverStep(ctx: RunContext): Promise<StageResponse> {
       message: `Discovery stopped at the safety limit (${MAX_PAGES} pages / ${MAX_JOBS} jobs)`,
     });
   }
-  await completeStage(db, run.id, "DISCOVERY", { pages, received, linked, invalid, duplicatesInRun, truncated });
+  await completeStage(db, run.id, "DISCOVERY", {
+    pages,
+    received,
+    linked,
+    invalid,
+    duplicatesInRun,
+    truncated,
+  });
   await refreshRunCounters(db, run.id);
   return respond(ctx, "discover", "filter");
 }
@@ -193,7 +214,9 @@ async function reconcileInterruptedSends(ctx: RunContext): Promise<void> {
     await db
       .update(notificationAttempts)
       .set({ outcome: "UNCERTAIN", error: "Executor stopped during send", finishedAt: new Date() })
-      .where(and(eq(notificationAttempts.notificationId, row.id), eq(notificationAttempts.outcome, "SENDING")));
+      .where(
+        and(eq(notificationAttempts.notificationId, row.id), eq(notificationAttempts.outcome, "SENDING")),
+      );
   }
   if (stuck.length > 0) {
     await addWarning(db, run.id, {

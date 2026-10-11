@@ -18,7 +18,10 @@ export interface LeadMessageInput {
 
 /** WhatsApp template parameters cannot contain newlines/tabs or more than 4 consecutive spaces. */
 export function templateParam(text: string, max = 200): string {
-  const clean = text.replace(/[\r\n\t]+/g, " ").replace(/ {2,}/g, " ").trim();
+  const clean = text
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/ {2,}/g, " ")
+    .trim();
   return (clean.length > max ? `${clean.slice(0, max - 1)}…` : clean) || "-";
 }
 
@@ -31,10 +34,13 @@ export function buildLeadMessage(input: LeadMessageInput, format: "STANDARD" | "
     input.budgetMax && input.budgetMax !== input.budgetAmount
       ? `${formatMoney(input.budgetAmount, input.currency)} - ${formatMoney(input.budgetMax, input.currency)}`
       : formatMoney(input.budgetAmount, input.currency);
-  const jobType = input.budgetType === "FIXED" ? "Fixed price" : input.budgetType === "HOURLY" ? "Hourly" : "Unknown";
-  const verified = input.paymentVerified === true ? "Yes" : input.paymentVerified === false ? "No" : "Unknown";
+  const jobType =
+    input.budgetType === "FIXED" ? "Fixed price" : input.budgetType === "HOURLY" ? "Hourly" : "Unknown";
+  const verified =
+    input.paymentVerified === true ? "Yes" : input.paymentVerified === false ? "No" : "Unknown";
   const skills = input.skills.length > 0 ? input.skills.join(", ") : "-";
-  const risks = input.riskFlags.length > 0 ? input.riskFlags.map((r) => `${r.code} (${r.severity})`).join(", ") : "None";
+  const risks =
+    input.riskFlags.length > 0 ? input.riskFlags.map((r) => `${r.code} (${r.severity})`).join(", ") : "None";
 
   const params = [
     templateParam(input.title),

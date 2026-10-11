@@ -14,7 +14,15 @@ import { RUN_TRANSITIONS } from "../transitions";
 export type RunRow = typeof agentRuns.$inferSelect;
 
 /** Stage names exposed to executors, in pipeline order. */
-export const STAGE_STEPS = ["start", "discover", "filter", "evaluate", "select", "notify", "finalize"] as const;
+export const STAGE_STEPS = [
+  "start",
+  "discover",
+  "filter",
+  "evaluate",
+  "select",
+  "notify",
+  "finalize",
+] as const;
 export type StageStep = (typeof STAGE_STEPS)[number];
 
 export const STEP_TO_STAGE: Record<StageStep, RunStage> = {
@@ -162,10 +170,20 @@ export async function completeStage(
     .where(and(eq(runStages.runId, runId), eq(runStages.stage, stage)));
 }
 
-export async function failStage(db: DbExecutor, runId: string, stage: RunStage, error: unknown): Promise<void> {
+export async function failStage(
+  db: DbExecutor,
+  runId: string,
+  stage: RunStage,
+  error: unknown,
+): Promise<void> {
   await db
     .update(runStages)
-    .set({ status: "FAILED", error: sanitizeErrorMessage(error), finishedAt: new Date(), updatedAt: new Date() })
+    .set({
+      status: "FAILED",
+      error: sanitizeErrorMessage(error),
+      finishedAt: new Date(),
+      updatedAt: new Date(),
+    })
     .where(and(eq(runStages.runId, runId), eq(runStages.stage, stage)));
 }
 
@@ -189,7 +207,11 @@ export interface RunWarning {
   at: string;
 }
 
-export async function addWarning(db: DbExecutor, runId: string, warning: Omit<RunWarning, "at">): Promise<void> {
+export async function addWarning(
+  db: DbExecutor,
+  runId: string,
+  warning: Omit<RunWarning, "at">,
+): Promise<void> {
   const entry: RunWarning = { ...warning, at: new Date().toISOString() };
   await db
     .update(agentRuns)

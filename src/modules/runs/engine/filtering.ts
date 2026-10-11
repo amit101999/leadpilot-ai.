@@ -78,7 +78,8 @@ export async function filterStep(ctx: RunContext): Promise<StageResponse> {
     if (cap !== null && passing.length > cap) {
       const ordered = [...passing].sort(
         (a, b) =>
-          (b.postedAt?.getTime() ?? 0) - (a.postedAt?.getTime() ?? 0) || a.sourceJobId.localeCompare(b.sourceJobId),
+          (b.postedAt?.getTime() ?? 0) - (a.postedAt?.getTime() ?? 0) ||
+          a.sourceJobId.localeCompare(b.sourceJobId),
       );
       const overflow = ordered.slice(cap).map((p) => p.runJobId);
       counts.capped = overflow.length;

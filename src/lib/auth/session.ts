@@ -52,7 +52,9 @@ export async function resolveSession(db: DbExecutor, token: string | undefined):
     })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
-    .where(and(eq(sessions.tokenHash, hashToken(token)), gt(sessions.expiresAt, now), eq(users.status, "ACTIVE")))
+    .where(
+      and(eq(sessions.tokenHash, hashToken(token)), gt(sessions.expiresAt, now), eq(users.status, "ACTIVE")),
+    )
     .limit(1);
   const row = rows[0];
   if (!row) return null;

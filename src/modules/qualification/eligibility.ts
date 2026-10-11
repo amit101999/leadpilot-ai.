@@ -35,7 +35,11 @@ export function decideEligibility(input: EligibilityInput, config: ProfileConfig
     };
   }
   if (!input.ai || input.authoritativeScore === null) {
-    return { decision: "AI_ERROR", reasons: ["AI output was invalid; job not notified"], blockingRiskFlags: [] };
+    return {
+      decision: "AI_ERROR",
+      reasons: ["AI output was invalid; job not notified"],
+      blockingRiskFlags: [],
+    };
   }
   if (input.alreadyNotified) {
     return { decision: "REJECTED", reasons: ["Already notified to this recipient"], blockingRiskFlags: [] };

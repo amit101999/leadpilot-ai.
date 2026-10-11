@@ -234,7 +234,9 @@ export const agentRuns = pgTable(
     rejectedCount: integer("rejected_count").notNull().default(0),
     notifiedCount: integer("notified_count").notNull().default(0),
     failedNotificationCount: integer("failed_notification_count").notNull().default(0),
-    warnings: jsonb("warnings").notNull().default(sql`'[]'::jsonb`),
+    warnings: jsonb("warnings")
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     errorSummary: jsonb("error_summary"),
     summaryNotification: jsonb("summary_notification"),
     createdAt: createdAt(),
@@ -263,7 +265,9 @@ export const runStages = pgTable(
     stage: runStage("stage").notNull(),
     status: stageStatus("status").notNull().default("PENDING"),
     attempts: integer("attempts").notNull().default(0),
-    metrics: jsonb("metrics").notNull().default(sql`'{}'::jsonb`),
+    metrics: jsonb("metrics")
+      .notNull()
+      .default(sql`'{}'::jsonb`),
     error: text("error"),
     startedAt: timestamp("started_at", { withTimezone: true }),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
@@ -294,10 +298,14 @@ export const jobs = pgTable(
     clientHires: integer("client_hires"),
     clientTotalSpent: numeric("client_total_spent", { precision: 14, scale: 2 }),
     clientCountry: text("client_country"),
-    skills: jsonb("skills").notNull().default(sql`'[]'::jsonb`),
+    skills: jsonb("skills")
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     category: text("category"),
     postedAt: timestamp("posted_at", { withTimezone: true }),
-    sourceMetadata: jsonb("source_metadata").notNull().default(sql`'{}'::jsonb`),
+    sourceMetadata: jsonb("source_metadata")
+      .notNull()
+      .default(sql`'{}'::jsonb`),
     contentHash: text("content_hash").notNull(),
     firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
@@ -319,8 +327,12 @@ export const runJobs = pgTable(
       .notNull()
       .references(() => jobs.id, { onDelete: "restrict" }),
     processingStatus: jobProcessingStatus("processing_status").notNull().default("NEW"),
-    hardCheckResults: jsonb("hard_check_results").notNull().default(sql`'[]'::jsonb`),
-    rejectionReasons: jsonb("rejection_reasons").notNull().default(sql`'[]'::jsonb`),
+    hardCheckResults: jsonb("hard_check_results")
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    rejectionReasons: jsonb("rejection_reasons")
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     previouslySeen: boolean("previously_seen").notNull().default(false),
     passedHardFilters: boolean("passed_hard_filters").notNull().default(false),
     aiAttempts: integer("ai_attempts").notNull().default(0),
@@ -352,14 +364,22 @@ export const qualifications = pgTable(
     modelReportedScore: integer("model_reported_score"),
     dimensionScores: jsonb("dimension_scores"),
     decision: qualificationDecision("decision").notNull(),
-    decisionReasons: jsonb("decision_reasons").notNull().default(sql`'[]'::jsonb`),
+    decisionReasons: jsonb("decision_reasons")
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     promptVersion: text("prompt_version").notNull(),
     rubricVersion: text("rubric_version").notNull(),
     modelIdentifier: text("model_identifier").notNull(),
     inputHash: text("input_hash").notNull(),
-    evidence: jsonb("evidence").notNull().default(sql`'{}'::jsonb`),
-    riskFlags: jsonb("risk_flags").notNull().default(sql`'[]'::jsonb`),
-    missingInformation: jsonb("missing_information").notNull().default(sql`'[]'::jsonb`),
+    evidence: jsonb("evidence")
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    riskFlags: jsonb("risk_flags")
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    missingInformation: jsonb("missing_information")
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     attempts: integer("attempts").notNull().default(1),
     error: text("error"),
     evaluatedAt: timestamp("evaluated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -470,7 +490,9 @@ export const integrationStatus = pgTable("integration_status", {
   lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
   sanitizedError: text("sanitized_error"),
   /** Non-secret metadata only (mode, capabilities, versions). */
-  metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+  metadata: jsonb("metadata")
+    .notNull()
+    .default(sql`'{}'::jsonb`),
   updatedAt: updatedAt(),
 });
 

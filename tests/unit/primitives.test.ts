@@ -71,7 +71,7 @@ describe("HMAC signing", () => {
 
 describe("CSV export", () => {
   it("neutralizes formula injection and quotes special characters", () => {
-    expect(escapeCsvCell("=HYPERLINK(\"x\")")).toBe("\"'=HYPERLINK(\"\"x\"\")\"");
+    expect(escapeCsvCell('=HYPERLINK("x")')).toBe('"\'=HYPERLINK(""x"")"');
     expect(escapeCsvCell("+1")).toBe("'+1");
     expect(escapeCsvCell("@SUM")).toBe("'@SUM");
     expect(escapeCsvCell("a,b")).toBe('"a,b"');

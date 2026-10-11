@@ -51,9 +51,7 @@ export function matchSkill(job: SearchableJob, skill: SkillTerm): TermMatch {
 export function containsTerm(job: SearchableJob, termText: string): boolean {
   const pattern = termPattern(termText);
   if (!pattern) return false;
-  return (
-    pattern.test(job.title) || pattern.test(job.description) || job.skills.some((s) => pattern.test(s))
-  );
+  return pattern.test(job.title) || pattern.test(job.description) || job.skills.some((s) => pattern.test(s));
 }
 
 function matchVariant(job: SearchableJob, name: string, variant: string): TermMatch {

@@ -85,7 +85,10 @@ export function errorResponse(error: unknown, requestId: string, req?: NextReque
   } else if (error instanceof ZodError) {
     appError = new AppError("VALIDATION_ERROR", "Request validation failed", formatZodIssues(error));
   } else if (error instanceof InvalidTransitionError) {
-    appError = new AppError("INVALID_STATE", `This ${error.entity} cannot move from ${error.from} to ${error.to}`);
+    appError = new AppError(
+      "INVALID_STATE",
+      `This ${error.entity} cannot move from ${error.from} to ${error.to}`,
+    );
   } else if (isUniqueViolation(error)) {
     appError = new AppError("CONFLICT", "The resource was modified concurrently or already exists");
   } else {
@@ -136,14 +139,17 @@ export function parseQuery<S extends z.ZodType>(req: NextRequest, schema: S): z.
   const raw: Record<string, string | string[]> = {};
   for (const [key, value] of req.nextUrl.searchParams.entries()) {
     const existing = raw[key];
-    raw[key] = existing === undefined ? value : Array.isArray(existing) ? [...existing, value] : [existing, value];
+    raw[key] =
+      existing === undefined ? value : Array.isArray(existing) ? [...existing, value] : [existing, value];
   }
   return schema.parse(raw);
 }
 
 export function clientIp(req: NextRequest): string {
   // X-Forwarded-For is trusted only because production runs behind our own reverse proxy (Caddy).
-  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
+  return (
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown"
+  );
 }
 
 export function paginated<T>(items: T[], meta: { page: number; pageSize: number; total: number }) {

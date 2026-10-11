@@ -30,7 +30,8 @@ export interface NormalizedJob {
   sourceMetadata: Record<string, unknown>;
 }
 
-export type SourceConnectionState = "CONNECTED" | "NOT_CONFIGURED" | "NOT_AUTHORIZED" | "UNAVAILABLE" | "MOCK";
+export type SourceConnectionState =
+  "CONNECTED" | "NOT_CONFIGURED" | "NOT_AUTHORIZED" | "UNAVAILABLE" | "MOCK";
 
 export interface SourceConnectionResult {
   state: SourceConnectionState;

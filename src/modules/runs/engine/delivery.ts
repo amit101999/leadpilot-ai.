@@ -53,7 +53,9 @@ export async function notifyStep(ctx: RunContext): Promise<StageResponse> {
   const [pending] = await db
     .select({ count: sql<number>`count(*)::int`, nextAt: min(notifications.nextAttemptAt) })
     .from(notifications)
-    .where(and(eq(notifications.runId, run.id), inArray(notifications.status, ["RESERVED", "FAILED_RETRYABLE"])));
+    .where(
+      and(eq(notifications.runId, run.id), inArray(notifications.status, ["RESERVED", "FAILED_RETRYABLE"])),
+    );
   const remaining = pending?.count ?? 0;
   const counters = await refreshRunCounters(db, run.id);
   const metrics = {
@@ -110,7 +112,12 @@ export async function deliverNotification(
   const recipient = await getRecipientForSend(db, claimed.recipientId);
   let outcome: SendOutcome;
   if (!recipient || recipient.archivedAt || !recipient.optInConfirmedAt) {
-    outcome = { kind: "rejected", retryable: false, httpStatus: null, error: "Recipient unavailable or not opted in" };
+    outcome = {
+      kind: "rejected",
+      retryable: false,
+      httpStatus: null,
+      error: "Recipient unavailable or not opted in",
+    };
   } else {
     const payload = claimed.payload as { templateParams?: string[] };
     try {
@@ -157,10 +164,18 @@ function applyOutcome(
     case "accepted":
       return {
         status: "SENT",
-        update: { providerMessageId: outcome.providerMessageId, sentAt: new Date(), lastError: null, nextAttemptAt: null },
+        update: {
+          providerMessageId: outcome.providerMessageId,
+          sentAt: new Date(),
+          lastError: null,
+          nextAttemptAt: null,
+        },
       };
     case "uncertain":
-      return { status: "UNCERTAIN", update: { lastError: sanitizeErrorMessage(outcome.error), nextAttemptAt: null } };
+      return {
+        status: "UNCERTAIN",
+        update: { lastError: sanitizeErrorMessage(outcome.error), nextAttemptAt: null },
+      };
     case "rejected": {
       const error = sanitizeErrorMessage(outcome.error);
       if (outcome.retryable && row.attempts < MAX_SEND_ATTEMPTS) {

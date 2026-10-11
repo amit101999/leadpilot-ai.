@@ -59,7 +59,8 @@ export class OpenAiEvaluator implements AiEvaluator {
       if (error instanceof OpenAI.APIConnectionTimeoutError) {
         throw new AiProviderError("OpenAI request timed out", "TIMEOUT");
       }
-      if (error instanceof OpenAI.RateLimitError) throw new AiProviderError("OpenAI rate limit", "RATE_LIMIT");
+      if (error instanceof OpenAI.RateLimitError)
+        throw new AiProviderError("OpenAI rate limit", "RATE_LIMIT");
       if (error instanceof OpenAI.APIError) {
         throw new AiProviderError(`OpenAI API error (status ${error.status ?? "n/a"})`, "PROVIDER");
       }

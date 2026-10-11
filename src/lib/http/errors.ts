@@ -46,10 +46,14 @@ export const forbidden = (message = "You do not have permission to perform this 
 /** Postgres unique-violation detection (SQLSTATE 23505), optionally for a specific constraint. */
 export function isUniqueViolation(error: unknown, constraint?: string): boolean {
   const pg = findPgError(error);
-  return pg?.code === "23505" && (!constraint || pg.constraint_name === constraint || pg.constraint === constraint);
+  return (
+    pg?.code === "23505" && (!constraint || pg.constraint_name === constraint || pg.constraint === constraint)
+  );
 }
 
-function findPgError(error: unknown): { code?: string; constraint_name?: string; constraint?: string } | null {
+function findPgError(
+  error: unknown,
+): { code?: string; constraint_name?: string; constraint?: string } | null {
   let current: unknown = error;
   for (let depth = 0; depth < 4 && current && typeof current === "object"; depth++) {
     const candidate = current as { code?: unknown; cause?: unknown };

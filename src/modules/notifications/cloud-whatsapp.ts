@@ -1,4 +1,10 @@
-import type { MessageKind, OutboundMessage, ProviderConnection, SendOutcome, WhatsAppProvider } from "./provider";
+import type {
+  MessageKind,
+  OutboundMessage,
+  ProviderConnection,
+  SendOutcome,
+  WhatsAppProvider,
+} from "./provider";
 
 export interface CloudWhatsAppConfig {
   accessToken?: string;
@@ -51,7 +57,10 @@ export class CloudWhatsAppProvider implements WhatsAppProvider {
       );
       if (response.ok) return { state: "CONNECTED", message: "WhatsApp Cloud API credentials accepted" };
       if (response.status === 401 || response.status === 403) {
-        return { state: "NOT_AUTHORIZED", message: `WhatsApp Cloud API rejected the credentials (HTTP ${response.status})` };
+        return {
+          state: "NOT_AUTHORIZED",
+          message: `WhatsApp Cloud API rejected the credentials (HTTP ${response.status})`,
+        };
       }
       return { state: "UNAVAILABLE", message: `WhatsApp Cloud API returned HTTP ${response.status}` };
     } catch {
@@ -62,11 +71,21 @@ export class CloudWhatsAppProvider implements WhatsAppProvider {
   async send(message: OutboundMessage): Promise<SendOutcome> {
     const missing = this.missingConfig();
     if (missing.length > 0) {
-      return { kind: "rejected", retryable: false, httpStatus: null, error: `Not configured: ${missing.join(", ")}` };
+      return {
+        kind: "rejected",
+        retryable: false,
+        httpStatus: null,
+        error: `Not configured: ${missing.join(", ")}`,
+      };
     }
     const template = this.config.templates[message.kind];
     if (!template) {
-      return { kind: "rejected", retryable: false, httpStatus: null, error: `No template configured for ${message.kind} messages` };
+      return {
+        kind: "rejected",
+        retryable: false,
+        httpStatus: null,
+        error: `No template configured for ${message.kind} messages`,
+      };
     }
     const body = {
       messaging_product: "whatsapp",
@@ -126,11 +145,19 @@ export class CloudWhatsAppProvider implements WhatsAppProvider {
 function classifyTransportError(error: unknown): SendOutcome {
   const code = (error as { cause?: { code?: string } })?.cause?.code;
   if (code === "ENOTFOUND" || code === "ECONNREFUSED" || code === "EAI_AGAIN") {
-    return { kind: "rejected", retryable: true, httpStatus: null, error: `Connection failed before sending (${code})` };
+    return {
+      kind: "rejected",
+      retryable: true,
+      httpStatus: null,
+      error: `Connection failed before sending (${code})`,
+    };
   }
   const name = (error as { name?: string })?.name;
   if (name === "TimeoutError" || name === "AbortError") {
     return { kind: "uncertain", error: "Request timed out; the message may have been sent" };
   }
-  return { kind: "uncertain", error: `Connection interrupted (${code ?? name ?? "unknown"}); the message may have been sent` };
+  return {
+    kind: "uncertain",
+    error: `Connection interrupted (${code ?? name ?? "unknown"}); the message may have been sent`,
+  };
 }

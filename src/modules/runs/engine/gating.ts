@@ -10,7 +10,11 @@ const STAGE_TO_STEP = Object.fromEntries(STAGE_STEPS.map((step) => [STEP_TO_STAG
 >;
 
 export async function firstIncompleteStep(db: DbExecutor, runId: string): Promise<StageStep> {
-  const rows = await db.select().from(runStages).where(eq(runStages.runId, runId)).orderBy(asc(runStages.stage));
+  const rows = await db
+    .select()
+    .from(runStages)
+    .where(eq(runStages.runId, runId))
+    .orderBy(asc(runStages.stage));
   const byStage = new Map(rows.map((r) => [r.stage, r.status]));
   for (const stage of RUN_STAGES) {
     const status = byStage.get(stage);
@@ -19,7 +23,12 @@ export async function firstIncompleteStep(db: DbExecutor, runId: string): Promis
   return "finalize";
 }
 
-export function respond(ctx: RunContext, step: StageStep, next: StageStep, extra: Partial<StageResponse> = {}) {
+export function respond(
+  ctx: RunContext,
+  step: StageStep,
+  next: StageStep,
+  extra: Partial<StageResponse> = {},
+) {
   return {
     runId: ctx.run.id,
     step,
