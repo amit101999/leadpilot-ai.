@@ -3,7 +3,8 @@ import { z } from "zod";
 export const uuidParam = z.uuid({ message: "Invalid id" });
 
 /** Query-string helpers: values arrive as strings (or arrays when repeated). */
-const single = (schema: z.ZodType) =>
+// Generic so the inner schema's output type survives (a plain z.ZodType parameter widens it to unknown).
+const single = <S extends z.ZodType>(schema: S) =>
   z.preprocess((v) => (Array.isArray(v) ? v[0] : v === "" ? undefined : v), schema);
 
 export const q = {

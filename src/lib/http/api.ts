@@ -40,15 +40,20 @@ type Handler<C> = (ctx: C) => Promise<Response | unknown>;
  */
 export function userRoute(minRole: UserRole, handler: Handler<UserContext>) {
   return wrap(async (req, params, requestId, db) => {
-    if (!isAllowedRequestOrigin(req.method, req.headers.get("origin"), env().APP_BASE_URL)) {
-      throw new AppError("CSRF_REJECTED", "Request origin not allowed");
-    }
+    assertSameOrigin(req);
     const user = await resolveSession(db, req.cookies.get(SESSION_COOKIE)?.value);
     if (!user) throw new AppError("UNAUTHENTICATED", "Please sign in");
     const actor: Actor = { id: user.id, role: user.role };
     requireRole(actor, minRole);
     return handler({ req, params, requestId, db, actor, user });
   });
+}
+
+/** CSRF defence for cookie-based routes, including public ones such as login and logout. */
+export function assertSameOrigin(req: NextRequest): void {
+  if (!isAllowedRequestOrigin(req.method, req.headers.get("origin"), env().APP_BASE_URL)) {
+    throw new AppError("CSRF_REJECTED", "Request origin not allowed");
+  }
 }
 
 /** Server-to-server route signed with INTERNAL_API_SECRET (used by n8n). */
