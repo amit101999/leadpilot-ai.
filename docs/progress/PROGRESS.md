@@ -10,20 +10,20 @@ Last updated: 2026-10-12
 
 Plan: `C:\Users\ACER\.claude\plans\clever-noodling-finch.md`.
 
-| Phase                    | Scope                                                                     | Status                                                                  |
-| ------------------------ | ------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Baseline                 | Pre-existing backend core committed                                       | ✅ Done (`703761f`)                                                     |
-| A. Foundation            | Seed, `.env.example`, page auth proxy, CSRF check                         | ✅ Merged to `main` (`ab4b7e1`); seed verified during B1                |
-| B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                     | ✅ Merged to `main` (`0bed021`); Turbopack build verified on main       |
-| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook      | ✅ Merged to `main` (`41e8d95`); Turbopack build verified on main       |
-| C1. UI (part 1)          | Design system, app shell, login, Dashboard, Run Agent                     | ✅ Merged to `main` (`71a0b50`); Turbopack build verified on main       |
-| C2. UI (part 2)          | Search History and run detail, Qualified Leads, All Jobs                  | ✅ Merged to `main` (`d742e0a`); Turbopack build verified on main       |
-| C3a. UI (part 3a)        | Search Profiles list, editor, version history                             | ✅ Committed `e650286` on `worktree-phase-c3a-profiles`; not merged yet |
-| C3b. UI (part 3b)        | Notifications, Integrations, Settings (incl. change password), Audit Logs | ⏳ Not started                                                          |
-| D. n8n                   | Run and error workflows calling the app's internal step API               | ⏳ Not started                                                          |
-| E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                                | ⏳ Not started                                                          |
-| F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                       | ⏳ Not started                                                          |
-| G. Docs and final review | README, `docs/*.md`, full verification                                    | ⏳ Not started                                                          |
+| Phase                    | Scope                                                                     | Status                                                             |
+| ------------------------ | ------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Baseline                 | Pre-existing backend core committed                                       | ✅ Done (`703761f`)                                                |
+| A. Foundation            | Seed, `.env.example`, page auth proxy, CSRF check                         | ✅ Merged to `main` (`ab4b7e1`); seed verified during B1           |
+| B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                     | ✅ Merged to `main` (`0bed021`); Turbopack build verified on main  |
+| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook      | ✅ Merged to `main` (`41e8d95`); Turbopack build verified on main  |
+| C1. UI (part 1)          | Design system, app shell, login, Dashboard, Run Agent                     | ✅ Merged to `main` (`71a0b50`); Turbopack build verified on main  |
+| C2. UI (part 2)          | Search History and run detail, Qualified Leads, All Jobs                  | ✅ Merged to `main` (`d742e0a`); Turbopack build verified on main  |
+| C3a. UI (part 3a)        | Search Profiles list, editor, version history                             | ✅ Merged to `main` (fast-forward, `e650286` + docs `a82ddab`)     |
+| C3b. UI (part 3b)        | Notifications, Integrations, Settings (incl. change password), Audit Logs | ✅ Committed `d18e5f8` on `worktree-phase-c3b-ops`; not merged yet |
+| D. n8n                   | Run and error workflows calling the app's internal step API               | ⏳ Not started                                                     |
+| E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                                | ⏳ Not started                                                     |
+| F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                       | ⏳ Not started                                                     |
+| G. Docs and final review | README, `docs/*.md`, full verification                                    | ⏳ Not started                                                     |
 
 ## Baseline (pre-existing work, committed 2026-10-11 as `703761f`)
 
@@ -346,7 +346,7 @@ reasons (budget below minimum, payment unverified/unknown, EUR without exchange 
 ### Open items
 
 - ~~C3 (Profiles editor, Notifications, Integrations, Settings, Audit Logs) not started~~: split into C3a (profiles,
-  committed `e650286`) and C3b (not started).
+  merged `e650286`) and C3b (committed `d18e5f8`).
 - The run detail notification list shows at most 100 alerts per run (no paging there yet).
 - The breadcrumb on `/jobs/[id]` always says "All Jobs", even when opened from Qualified Leads.
 
@@ -371,7 +371,7 @@ reasons (budget below minimum, payment unverified/unknown, EUR without exchange 
    connection" (OPERATOR and above), setup instructions naming environment variables only; WhatsApp test message with
    a recipient choice and confirmation; Upwork explains why live search is blocked.
 
-## Phase C3a (`e650286` on `worktree-phase-c3a-profiles`, not yet merged)
+## Phase C3a (`e650286`, merged to `main` by fast-forward, docs `a82ddab`)
 
 ### Implemented
 
@@ -413,7 +413,7 @@ reasons (budget below minimum, payment unverified/unknown, EUR without exchange 
 | Playwright                       | ✅ 13/13 (1 setup + 12 tests), 4.4 min on the final run                               |
 | Visual review (screenshots)      | ✅ list; General, Skills, Budget, AI, Notifications tabs; invalid weights; phone list |
 | Browser console                  | ✅ no errors                                                                          |
-| `next build` (Turbopack)         | ⏳ To run on `main` after merge                                                       |
+| `next build` (Turbopack)         | ⏳ Not recorded as run on `main` after the C3a merge; see C3b                         |
 
 New profile e2e tests: create, edit budget, history shows $500 → $750, restore as version 3; invalid weights
 (115/100) blocked with a tab marker and the API still at version 1; a stale save from a second tab gets the conflict
@@ -437,9 +437,62 @@ duplicate / archive / restore.
 
 ### Open items
 
-- C3b (Notifications, Integrations, Settings, Audit Logs) not started.
+- ~~C3b (Notifications, Integrations, Settings, Audit Logs) not started~~: committed `d18e5f8` (see below).
 - The unsaved-changes guard does not catch browser back/forward within the app (only tab close and link clicks).
-- The Settings page referenced by the Notifications tab hint arrives in C3b.
+- ~~The Settings page referenced by the Notifications tab hint arrives in C3b~~: `/settings` added in C3b.
+
+## Phase C3b (`d18e5f8` on `worktree-phase-c3b-ops`, not yet merged)
+
+Decisions: Phase C3 decisions 4 to 8 above, confirmed in the C3b grilling (accepted by the developer, "accept all").
+
+### Implemented
+
+- `/notifications` (`src/app/(app)/notifications/page.tsx`, `src/components/notifications/{notifications-table,retry-button}.tsx`):
+  status filter groups, message preview, Retry. `FAILED_*` can be retried any time; `UNCERTAIN` only after 15 minutes
+  and a required "recipient did not receive it" confirmation (`src/modules/notifications/retry-policy.ts`).
+- `/integrations` (`src/app/(app)/integrations/page.tsx`, `src/components/integrations/integration-actions.tsx`):
+  stored status per provider, per-provider "Test connection", WhatsApp test message to an opted-in recipient, setup
+  instructions listing environment variable names only, Upwork live search shown as blocked.
+- `/settings` (`src/app/(app)/settings/page.tsx`, `src/components/settings/{change-password-form,recipients-manager,theme-choice}.tsx`):
+  - Change password: new `POST /api/auth/password` (`src/app/api/auth/password/route.ts`, `src/modules/auth/service.ts`),
+    VIEWER and above, current password required, new password at least 12 characters and different from the current one,
+    rate limited to 5 per 15 minutes per user (`passwordChange` in `src/lib/security/rate-limit.ts`), ends the user's
+    other sessions, audited as `auth.password_change`.
+  - WhatsApp recipients manager: opt-in confirm / withdraw, archive.
+  - Theme choice.
+- `/audit` (`src/app/(app)/audit/page.tsx`, `src/components/audit/audit-table.tsx`): ADMIN only (other roles get
+  not-found), filters by action, entity type, user and dates, before/after diff via `src/lib/ui/json-diff.ts`.
+- Navigation: every item enabled; the "Soon" branch removed (`src/components/layout/{nav.ts,app-shell.tsx}`).
+- Tests: `tests/unit/json-diff.test.ts` (4 new), `tests/integration/password.test.ts` (5 new), a regression test in
+  `tests/integration/platform.test.ts`, `tests/e2e/operations.spec.ts` (5 new); `tests/e2e/smoke.spec.ts` phone
+  no-scroll test now covers 8 list pages.
+
+### Bugs found during review and fixed
+
+- The run pipeline's `job_source` `integration_status` upsert wrote no message and never refreshed `last_success_at`.
+  Fixed in `src/modules/runs/engine/discovery.ts`, with an integration regression test.
+- `/notifications` scrolled horizontally on phones (`scrollWidth` 955 at 390 px): absolutely positioned cell content
+  escaped the unpositioned `overflow-x-auto` wrapper. Fixed with `relative overflow-x-auto` in
+  `src/components/table/data-table.tsx`, `src/app/(app)/dashboard/page.tsx` and `src/app/(app)/history/[id]/page.tsx`.
+- Stale webpack cache crash (`WasmHash`, as seen on `main` in C2): browser tests now build into `.next-e2e`
+  (`NEXT_DIST_DIR`, read as `distDir` in `next.config.ts`, set in `playwright.config.ts`); the folder is ignored by git,
+  Prettier and ESLint and excluded in `tsconfig.json`.
+
+### Verification (actual results, in the worktree)
+
+| Check                            | Result                                                                                  |
+| -------------------------------- | --------------------------------------------------------------------------------------- |
+| Prettier, ESLint, `tsc --noEmit` | ✅ clean                                                                                |
+| Unit tests                       | ✅ 101/101 (4 new in `tests/unit/json-diff.test.ts`)                                    |
+| Integration tests                | ✅ 52/52 (incl. 5 new in `tests/integration/password.test.ts`)                          |
+| Playwright                       | ✅ 18/18 (5 new in `tests/e2e/operations.spec.ts`; phone no-scroll covers 8 list pages) |
+| `next build --webpack`           | ✅ (the build used by the e2e run)                                                      |
+| `next build` (Turbopack)         | ⏳ To run on `main` after merge                                                         |
+
+### Open items
+
+- Merge C3b to `main` when the developer asks, then run the Turbopack build there.
+- Next phases: D (n8n workflows), E (Docker), F (tests), G (docs).
 
 ## Environment notes
 
