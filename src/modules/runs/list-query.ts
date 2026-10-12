@@ -9,7 +9,7 @@ export const runListQuery = z.object({
   profileId: q.uuid(),
   status: q.enumList(runStatus.enumValues),
   from: q.date(),
-  to: q.date(),
+  to: q.endDate(),
   minQualified: q.int(0, 100_000),
   failedOnly: q.bool(),
   notificationFailures: q.bool(),

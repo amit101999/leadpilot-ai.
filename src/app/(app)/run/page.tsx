@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
+import { ProfileSummary } from "@/components/profiles/profile-summary";
 import { toLaunchable } from "@/components/runs/launchable";
 import { UrlRunLauncher } from "@/components/runs/url-run-launcher";
-import { Badge } from "@/components/ui/badge";
 import { EmptyState, Panel } from "@/components/ui/panel";
 import { hasRole } from "@/lib/auth/authorization";
 import { requireUser } from "@/lib/auth/current-user";
 import { getDb } from "@/lib/database/client";
-import { formatMoney } from "@/lib/ui/format";
-import type { ProfileConfig } from "@/modules/profiles/config-schema";
 import { listProfiles, parseStoredConfig } from "@/modules/profiles/service";
 
 export const metadata: Metadata = { title: "Run Agent" };
@@ -62,58 +60,5 @@ export default async function RunAgentPage({
         </Panel>
       )}
     </div>
-  );
-}
-
-function ProfileSummary({ config }: { config: ProfileConfig }) {
-  const jobType = { FIXED: "Fixed-price only", HOURLY: "Hourly only", BOTH: "Fixed-price and hourly" }[
-    config.budget.jobType
-  ];
-  const matchMode = {
-    ANY: "at least one of",
-    ALL: "all of",
-    AT_LEAST: `at least ${config.skills.minRequiredMatches} of`,
-  }[config.skills.requiredMatchMode];
-  const rows: Array<[string, React.ReactNode]> = [
-    ["Job type", jobType],
-    [
-      "Minimum budget",
-      config.budget.fixedMin
-        ? `${formatMoney(config.budget.fixedMin, config.budget.currency)} (fixed-price)`
-        : "No minimum",
-    ],
-    ["Payment verification", config.client.paymentVerificationRequired ? "Required" : "Not required"],
-    ["Minimum AI score", `${config.ai.minScore}/100`],
-    [
-      "Required skills",
-      config.skills.required.length ? (
-        <span>
-          Must mention {matchMode}:{" "}
-          <span className="inline-flex flex-wrap gap-1 align-middle">
-            {config.skills.required.map((s) => (
-              <Badge key={s.name}>{s.name}</Badge>
-            ))}
-          </span>
-        </span>
-      ) : (
-        "None"
-      ),
-    ],
-    [
-      "WhatsApp alerts",
-      config.notifications.whatsappEnabled
-        ? `On, up to ${config.notifications.maxPerRun} per run`
-        : "Off for this profile",
-    ],
-  ];
-  return (
-    <dl className="grid gap-x-8 gap-y-3 px-4 py-4 text-sm sm:grid-cols-[180px_1fr]">
-      {rows.map(([label, value]) => (
-        <div key={label} className="contents">
-          <dt className="text-muted">{label}</dt>
-          <dd>{value}</dd>
-        </div>
-      ))}
-    </dl>
   );
 }

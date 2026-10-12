@@ -192,9 +192,13 @@ export default async function DashboardPage() {
                   className="flex items-start justify-between gap-4 px-4 py-3"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium" title={lead.title}>
+                    <Link
+                      href={`/jobs/${lead.id}`}
+                      className="block truncate text-sm font-medium hover:text-accent hover:underline"
+                      title={lead.title}
+                    >
                       {lead.title}
-                    </p>
+                    </Link>
                     <p className="tabular text-[13px] text-muted">
                       {formatMoney(lead.budgetAmount, lead.currency)}, {lead.profileName}
                     </p>

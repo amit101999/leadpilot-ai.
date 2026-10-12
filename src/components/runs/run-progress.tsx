@@ -217,10 +217,9 @@ export function RunProgress({
 
       {terminal && (
         <p className="text-sm text-muted">
-          This run has finished. Per-job results and qualification reasons will be on the Search History page,
-          which arrives in the next release.{" "}
-          <Link href="/dashboard" className="text-accent hover:underline">
-            Back to the dashboard
+          This run has finished.{" "}
+          <Link href={`/history/${run.id}`} className="font-medium text-accent hover:underline">
+            See every job and why it passed or failed
           </Link>
           .
         </p>

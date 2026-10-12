@@ -12,6 +12,14 @@ export const q = {
   string: (max = 200) => single(z.string().trim().max(max).optional()),
   uuid: () => single(z.uuid().optional()),
   date: () => single(z.coerce.date().optional()),
+  /** Upper bound of a date range: a bare YYYY-MM-DD means "through the end of that UTC day". */
+  endDate: () =>
+    single(
+      z.preprocess(
+        (v) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v}T23:59:59.999Z` : v),
+        z.coerce.date().optional(),
+      ),
+    ),
   bool: () =>
     single(
       z

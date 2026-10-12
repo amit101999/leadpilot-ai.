@@ -17,7 +17,7 @@ export const leadListQuery = z.object({
   skill: q.string(80),
   paymentVerified: q.enumOf(["true", "false", "unknown"] as const),
   discoveredFrom: q.date(),
-  discoveredTo: q.date(),
+  discoveredTo: q.endDate(),
   notificationStatus: q.enumList([...notificationStatus.enumValues, "NONE"] as const),
   search: q.string(200),
   sort: q.enumOf(["score", "firstSeen", "lastChecked", "budget"] as const),
