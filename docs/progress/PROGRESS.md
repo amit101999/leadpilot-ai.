@@ -10,19 +10,20 @@ Last updated: 2026-10-12
 
 Plan: `C:\Users\ACER\.claude\plans\clever-noodling-finch.md`.
 
-| Phase                    | Scope                                                                | Status                                                            |
-| ------------------------ | -------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| Baseline                 | Pre-existing backend core committed                                  | ✅ Done (`703761f`)                                               |
-| A. Foundation            | Seed, `.env.example`, page auth proxy, CSRF check                    | ✅ Merged to `main` (`ab4b7e1`); seed verified during B1          |
-| B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                | ✅ Merged to `main` (`0bed021`); Turbopack build verified on main |
-| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook | ✅ Merged to `main` (`41e8d95`); Turbopack build verified on main |
-| C1. UI (part 1)          | Design system, app shell, login, Dashboard, Run Agent                | ✅ Merged to `main` (`71a0b50`); Turbopack build verified on main |
-| C2. UI (part 2)          | Search History and run detail, Qualified Leads, All Jobs             | ✅ Committed `880601c` on `worktree-phase-c2-ui`; not merged yet  |
-| C3. UI (part 3)          | Profiles editor, Notifications, Integrations, Settings, Audit Logs   | ⏳ Not started                                                    |
-| D. n8n                   | Run and error workflows calling the app's internal step API          | ⏳ Not started                                                    |
-| E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                           | ⏳ Not started                                                    |
-| F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                  | ⏳ Not started                                                    |
-| G. Docs and final review | README, `docs/*.md`, full verification                               | ⏳ Not started                                                    |
+| Phase                    | Scope                                                                     | Status                                                                  |
+| ------------------------ | ------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Baseline                 | Pre-existing backend core committed                                       | ✅ Done (`703761f`)                                                     |
+| A. Foundation            | Seed, `.env.example`, page auth proxy, CSRF check                         | ✅ Merged to `main` (`ab4b7e1`); seed verified during B1                |
+| B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                     | ✅ Merged to `main` (`0bed021`); Turbopack build verified on main       |
+| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook      | ✅ Merged to `main` (`41e8d95`); Turbopack build verified on main       |
+| C1. UI (part 1)          | Design system, app shell, login, Dashboard, Run Agent                     | ✅ Merged to `main` (`71a0b50`); Turbopack build verified on main       |
+| C2. UI (part 2)          | Search History and run detail, Qualified Leads, All Jobs                  | ✅ Merged to `main` (`d742e0a`); Turbopack build verified on main       |
+| C3a. UI (part 3a)        | Search Profiles list, editor, version history                             | ✅ Committed `e650286` on `worktree-phase-c3a-profiles`; not merged yet |
+| C3b. UI (part 3b)        | Notifications, Integrations, Settings (incl. change password), Audit Logs | ⏳ Not started                                                          |
+| D. n8n                   | Run and error workflows calling the app's internal step API               | ⏳ Not started                                                          |
+| E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                                | ⏳ Not started                                                          |
+| F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                       | ⏳ Not started                                                          |
+| G. Docs and final review | README, `docs/*.md`, full verification                                    | ⏳ Not started                                                          |
 
 ## Baseline (pre-existing work, committed 2026-10-11 as `703761f`)
 
@@ -271,7 +272,7 @@ Finding during testing: run summaries (`alertOnFailure`) are separate messages a
 - E2E tests run against `next dev` stalled for about 49 minutes once (on-demand compile); they now use a production build.
 - Times render in the viewer's local zone; the 30-day chart uses UTC days and says so.
 
-## Phase C2 (`880601c` on `worktree-phase-c2-ui`, not yet merged)
+## Phase C2 (`880601c`, merged to `main` as `d742e0a`)
 
 ### Decisions (grilled, accepted by the developer 2026-10-12, "accept all")
 
@@ -313,16 +314,20 @@ Finding during testing: run summaries (`alertOnFailure`) are separate messages a
 
 ### Verification (actual results)
 
-| Check                            | Result                                                                                                   |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Unit tests                       | ✅ 93/93 (7 new in `tests/unit/list-params.test.ts`)                                                     |
-| Integration tests                | ✅ 46/46                                                                                                 |
-| Prettier, ESLint, `tsc --noEmit` | ✅ clean                                                                                                 |
-| Playwright smoke tests           | ✅ 7/7 against a production build, run twice in a row (2.8 min, then 1.2 min) at the developer's request |
-| Visual review (screenshots)      | ✅ against a production server (details below)                                                           |
-| Browser console                  | ✅ no errors                                                                                             |
-| Leads CSV export                 | ✅ 200, 5 rows, not truncated                                                                            |
-| `next build` (Turbopack)         | ⏳ To run on `main` after merge                                                                          |
+| Check                            | Result                                                                                                            |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Unit tests                       | ✅ 93/93 (7 new in `tests/unit/list-params.test.ts`)                                                              |
+| Integration tests                | ✅ 46/46                                                                                                          |
+| Prettier, ESLint, `tsc --noEmit` | ✅ clean                                                                                                          |
+| Playwright smoke tests           | ✅ 7/7 against a production build, run twice in a row (2.8 min, then 1.2 min) at the developer's request          |
+| Visual review (screenshots)      | ✅ against a production server (details below)                                                                    |
+| Browser console                  | ✅ no errors                                                                                                      |
+| Leads CSV export                 | ✅ 200, 5 rows, not truncated                                                                                     |
+| On `main` after merge            | ✅ `next build` (Turbopack), unit 93/93, integration 46/46; Playwright 7/7 on the second attempt (see note below) |
+
+Playwright on `main`: the first attempt crashed during the webpack build (`WasmHash._updateWithBuffer ... reading 'length'`)
+because of a stale webpack cache in the main checkout's `.next/cache/webpack`. Only that cache folder (275 MB) was
+deleted; the second attempt passed 7/7.
 
 New smoke tests: history → run detail Rejected tab → job detail → leads (any status) → jobs filtered by
 `FILTERED_OUT`; and no horizontal scroll at 390 px on `/history`, `/leads`, `/jobs`.
@@ -340,9 +345,101 @@ reasons (budget below minimum, payment unverified/unknown, EUR without exchange 
 
 ### Open items
 
-- C3 (Profiles editor, Notifications, Integrations, Settings, Audit Logs) not started.
+- ~~C3 (Profiles editor, Notifications, Integrations, Settings, Audit Logs) not started~~: split into C3a (profiles,
+  committed `e650286`) and C3b (not started).
 - The run detail notification list shows at most 100 alerts per run (no paging there yet).
 - The breadcrumb on `/jobs/[id]` always says "All Jobs", even when opened from Qualified Leads.
+
+## Phase C3: grilled decisions (accepted by the developer 2026-10-12, "accept all")
+
+1. Split into C3a (Search Profiles list, full editor, version history) and C3b (Notifications, Integrations,
+   Settings, Audit Logs), merged separately.
+2. Version history shows, per version, plain-language differences from the previous version, the author, the time
+   and the change note. "Restore this version" saves the old settings as a **new** version (audited); history is
+   never rewritten.
+3. Keyword and country lists use chip inputs (Enter to add, × to remove); skills are rows of a name plus alias chips;
+   everything is keyboard usable.
+4. Only recipients with confirmed opt-in can be selected in a profile; opt-in is confirmed in Settings with an
+   explicit, audited statement (C3b).
+5. New `POST /api/auth/password` in C3b: current password required, new password at least 12 characters, rate
+   limited, signs out other sessions, audited.
+6. Notifications page (C3b): Retry for failed sends; "delivery unknown" shows a disabled button with a countdown to
+   15 minutes, then a dialog with a required "recipient did not receive it" checkbox; never for sent/delivered/read.
+7. Audit Logs (C3b): ADMIN only, filters (action, entity type, user, dates), each entry expands to a before/after
+   diff; hidden from other roles, which get not-found.
+8. Integrations page (C3b): one panel per integration with status, last checked / last successful, message, "Test
+   connection" (OPERATOR and above), setup instructions naming environment variables only; WhatsApp test message with
+   a recipient choice and confirmation; Upwork explains why live search is blocked.
+
+## Phase C3a (`e650286` on `worktree-phase-c3a-profiles`, not yet merged)
+
+### Implemented
+
+- `/profiles` list (`src/app/(app)/profiles/page.tsx`, `src/components/profiles/profile-actions.tsx`): default and
+  archived badges, a one-line rule summary, "Show archived" toggle, Duplicate / Set as default / Archive (with
+  confirmation) / Restore.
+- `/profiles/new` and `/profiles/[id]` (`src/app/(app)/profiles/{new,[id]}/page.tsx`,
+  `src/components/profiles/profile-editor.tsx`): tabbed editor (General, Skills & keywords, Budget & job type,
+  Client, AI scoring, Notifications) validated with the server's `profileConfigSchema` via `zodResolver`.
+  - Tabs containing errors get a red marker; server 400 field errors are mapped onto the fields.
+  - Live weight total; one save = one version, with an optional change note.
+  - 409 `VERSION_CONFLICT` dialog: keep editing, or discard and load the latest version; never overwrites.
+  - Unsaved-changes guard on tab close and on in-app link clicks (`window.confirm`).
+  - Read-only for VIEWERs and for archived profiles.
+  - Only opted-in, non-archived recipients are selectable (`src/components/profiles/recipient-options.ts`).
+- Version history (`src/components/profiles/version-history.tsx`): diffs from `src/modules/profiles/diff.ts`
+  (`diffConfigs`; money shown with currency, recipients by masked label), author e-mail via
+  `listVersionsWithAuthors` in `src/modules/profiles/service.ts`; "Restore" saves as a new version.
+- New accessible primitives: `src/components/ui/{tabs,chip-input,checkbox}.tsx` (WAI-ARIA tabs with arrow keys,
+  Home and End); list editors in `src/components/profiles/list-editors.tsx`.
+- Navigation: Profiles enabled in `src/components/layout/nav.ts`.
+- Tests: `tests/unit/profile-diff.test.ts` (4 new), `tests/e2e/profiles.spec.ts` (5 new), `tests/e2e/auth.setup.ts`
+  and `tests/e2e/helpers.ts`; `tests/e2e/smoke.spec.ts` and `playwright.config.ts` changed to reuse one session;
+  `.gitignore` ignores `tests/e2e/.auth/`.
+
+### Implementation choices made during the build (not grilled)
+
+- New profiles start from `defaultProfileConfig(null)` (the initial business defaults, editable).
+- A "Run this profile" link on the profile page, in the style of the run page.
+- The unsaved-changes guard intercepts in-app anchor clicks because the App Router has no route-change events.
+
+### Verification (actual results)
+
+| Check                            | Result                                                                                |
+| -------------------------------- | ------------------------------------------------------------------------------------- |
+| Unit tests                       | ✅ 97/97 (4 new in `tests/unit/profile-diff.test.ts`)                                 |
+| Integration tests                | ✅ 46/46                                                                              |
+| Prettier, ESLint, `tsc --noEmit` | ✅ clean                                                                              |
+| Playwright                       | ✅ 13/13 (1 setup + 12 tests), 4.4 min on the final run                               |
+| Visual review (screenshots)      | ✅ list; General, Skills, Budget, AI, Notifications tabs; invalid weights; phone list |
+| Browser console                  | ✅ no errors                                                                          |
+| `next build` (Turbopack)         | ⏳ To run on `main` after merge                                                       |
+
+New profile e2e tests: create, edit budget, history shows $500 → $750, restore as version 3; invalid weights
+(115/100) blocked with a tab marker and the API still at version 1; a stale save from a second tab gets the conflict
+dialog and the other tab's version 2 is kept; the unsaved-changes prompt keeps the user on the page;
+duplicate / archive / restore.
+
+### Bugs found during review and fixed
+
+- React Hook Form submits disabled registered fields as `undefined`. The recipient select, the WhatsApp checkbox and
+  a form-wide disabled fieldset during submit would have made saves fail validation; fields are no longer disabled
+  except in read-only mode.
+- "Load the latest version" after a conflict would have triggered the browser's leave-page prompt; a guard flag now
+  skips it.
+- Exchange-rate rows are a map keyed by currency, so a second blank row would overwrite the first; adding is
+  disabled while a blank row exists.
+- Version diffs showed "500.00 → 750.00"; money now shows with its currency.
+- The browser suite signed in 12 times per run and tripped the real login rate limit (10 per e-mail per 15
+  minutes) on the 11th. Tests now sign in once in a Playwright setup project and reuse the session
+  (`tests/e2e/auth.setup.ts`, saved state gitignored at `tests/e2e/.auth/`); only the sign-in/sign-out tests log in
+  fresh.
+
+### Open items
+
+- C3b (Notifications, Integrations, Settings, Audit Logs) not started.
+- The unsaved-changes guard does not catch browser back/forward within the app (only tab close and link clicks).
+- The Settings page referenced by the Notifications tab hint arrives in C3b.
 
 ## Environment notes
 
