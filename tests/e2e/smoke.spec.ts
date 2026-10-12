@@ -1,45 +1,43 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { E2E_ADMIN } from "../../playwright.config";
+import { openApp, signIn, waitForLoginForm } from "./helpers";
 
-/** Waits until React has hydrated the login form, so the submit goes through the app's handler. */
-async function waitForLoginForm(page: Page) {
-  await page.waitForFunction(() => {
-    const form = document.querySelector("form");
-    return Boolean(form && Object.keys(form).some((key) => key.startsWith("__react")));
+test.describe("signed out", () => {
+  // These tests are about signing in and out, so they start without the saved session.
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test("redirects to sign-in and rejects a wrong password", async ({ page }) => {
+    await page.goto("/run");
+    await expect(page).toHaveURL(/\/login\?next=%2Frun$/);
+    await waitForLoginForm(page);
+    await page.getByLabel("Email").fill(E2E_ADMIN.email);
+    await page.getByLabel("Password").fill("definitely-wrong");
+    await page.getByRole("button", { name: "Sign in" }).click();
+    // Next.js also renders an (empty) role="alert" route announcer, so match by text.
+    await expect(page.getByText("Invalid email or password.")).toBeVisible();
+    expect(page.url()).not.toContain("password");
   });
-}
 
-async function signIn(page: Page) {
-  await page.goto("/login");
-  await waitForLoginForm(page);
-  await page.getByLabel("Email").fill(E2E_ADMIN.email);
-  await page.getByLabel("Password").fill(E2E_ADMIN.password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
-}
+  test("never puts credentials in the URL, even if submitted before the page is interactive", async ({
+    page,
+  }) => {
+    await page.goto("/login");
+    const method = await page.locator("form").getAttribute("method");
+    expect(method).toBe("post");
+  });
 
-test("redirects to sign-in and rejects a wrong password", async ({ page }) => {
-  await page.goto("/run");
-  await expect(page).toHaveURL(/\/login\?next=%2Frun$/);
-  await waitForLoginForm(page);
-  await page.getByLabel("Email").fill(E2E_ADMIN.email);
-  await page.getByLabel("Password").fill("definitely-wrong");
-  await page.getByRole("button", { name: "Sign in" }).click();
-  // Next.js also renders an (empty) role="alert" route announcer, so match by text.
-  await expect(page.getByText("Invalid email or password.")).toBeVisible();
-  expect(page.url()).not.toContain("password");
+  test("signs in and out", async ({ page }) => {
+    // Its own session, so signing out does not end the session other tests share.
+    await signIn(page);
+    await page.getByRole("button", { name: "Sign out" }).dispatchEvent("click");
+    await expect(page).toHaveURL(/\/login/);
+    await page.goto("/dashboard");
+    await expect(page).toHaveURL(/\/login/);
+  });
 });
 
-test("never puts credentials in the URL, even if submitted before the page is interactive", async ({
-  page,
-}) => {
-  await page.goto("/login");
-  const method = await page.locator("form").getAttribute("method");
-  expect(method).toBe("post");
-});
-
-test("signs in, starts a run and watches it finish (mock providers)", async ({ page }) => {
-  await signIn(page);
+test("starts a run and watches it finish (mock providers)", async ({ page }) => {
+  await openApp(page);
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   await expect(page.getByRole("note")).toContainText("Demo mode");
 
@@ -63,7 +61,7 @@ test("signs in, starts a run and watches it finish (mock providers)", async ({ p
 });
 
 test("search history, run detail, job detail, leads and all jobs (after a run)", async ({ page }) => {
-  await signIn(page);
+  await openApp(page);
   // A finished run is needed; the previous test may not have run first in isolation.
   await page.goto("/run");
   await page.getByRole("button", { name: "Run agent" }).click();
@@ -99,28 +97,20 @@ test("search history, run detail, job detail, leads and all jobs (after a run)",
 
 test("list pages have no horizontal page scroll on a phone", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await signIn(page);
-  for (const path of ["/history", "/leads", "/jobs"]) {
+  for (const path of ["/history", "/leads", "/jobs", "/profiles"]) {
     await page.goto(path);
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
     expect(scrollWidth, path).toBeLessThanOrEqual(390);
   }
+  await page.goto("/leads");
   await expect(page.getByRole("button", { name: /^Filters/ })).toBeVisible();
 });
 
 test("has no horizontal page scroll on a phone and opens the navigation drawer", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await signIn(page);
+  await openApp(page);
   const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(scrollWidth).toBeLessThanOrEqual(390);
   await page.getByRole("button", { name: "Open navigation" }).click();
   await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible();
-});
-
-test("signs out", async ({ page }) => {
-  await signIn(page);
-  await page.getByRole("button", { name: "Sign out" }).dispatchEvent("click");
-  await expect(page).toHaveURL(/\/login/);
-  await page.goto("/dashboard");
-  await expect(page).toHaveURL(/\/login/);
 });

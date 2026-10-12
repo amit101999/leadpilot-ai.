@@ -15,6 +15,8 @@ const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 if (!testDatabaseUrl) throw new Error("TEST_DATABASE_URL is required for e2e tests (see .env.example)");
 
 export const E2E_ADMIN = { email: "e2e-admin@leadpilot.local", password: "e2e-password-not-secret" };
+/** Saved signed-in session (gitignored), created by tests/e2e/auth.setup.ts. */
+export const ADMIN_STATE = "tests/e2e/.auth/admin.json";
 
 export default defineConfig({
   testDir: "tests/e2e",
@@ -26,7 +28,14 @@ export default defineConfig({
   expect: { timeout: 30_000 },
   reporter: [["list"]],
   use: { baseURL: BASE_URL, trace: "retain-on-failure", navigationTimeout: 90_000 },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "setup", testMatch: /auth\.setup\.ts/ },
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"], storageState: ADMIN_STATE },
+      dependencies: ["setup"],
+    },
+  ],
   webServer: {
     command: `npx next build --webpack && npx next start --port ${PORT}`,
     url: `${BASE_URL}/api/health`,

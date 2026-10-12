@@ -1,7 +1,7 @@
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { ownerFilter, requireRole, type Actor } from "@/lib/auth/authorization";
 import type { Database, DbExecutor } from "@/lib/database/client";
-import { notificationRecipients, profileVersions, searchProfiles } from "@/lib/database/schema";
+import { notificationRecipients, profileVersions, searchProfiles, users } from "@/lib/database/schema";
 import { AppError, notFound } from "@/lib/http/errors";
 import { recordAudit, userActor } from "@/modules/audit/service";
 import { profileConfigSchema, type ProfileConfig } from "./config-schema";
@@ -274,6 +274,17 @@ export async function listVersions(db: Database, actor: Actor, id: string): Prom
   return db
     .select()
     .from(profileVersions)
+    .where(eq(profileVersions.profileId, id))
+    .orderBy(desc(profileVersions.versionNumber));
+}
+
+/** Version history with the e-mail of the user who saved each version (newest first). */
+export async function listVersionsWithAuthors(db: Database, actor: Actor, id: string) {
+  await getProfile(db, actor, id);
+  return db
+    .select({ version: profileVersions, authorEmail: users.email })
+    .from(profileVersions)
+    .leftJoin(users, eq(users.id, profileVersions.createdBy))
     .where(eq(profileVersions.profileId, id))
     .orderBy(desc(profileVersions.versionNumber));
 }

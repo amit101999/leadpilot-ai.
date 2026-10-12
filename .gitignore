@@ -18,3 +18,6 @@ backups/
 # Progress tracker: auto-generated activity log and its state (local only)
 docs/progress/activity-log.md
 docs/progress/.activity-state.json
+
+# Playwright saved sessions (contain a session cookie)
+tests/e2e/.auth/

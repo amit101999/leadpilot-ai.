@@ -28,7 +28,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/history", label: "Search History", icon: History },
   { href: "/leads", label: "Qualified Leads", icon: Activity },
   { href: "/jobs", label: "All Jobs", icon: Briefcase },
-  { href: "/profiles", label: "Search Profiles", icon: SlidersHorizontal, availableIn: "C3" },
+  { href: "/profiles", label: "Search Profiles", icon: SlidersHorizontal },
   { href: "/notifications", label: "Notifications", icon: Bell, availableIn: "C3" },
   { href: "/integrations", label: "Integrations", icon: Plug, availableIn: "C3" },
   { href: "/settings", label: "Settings", icon: Settings, availableIn: "C3" },
