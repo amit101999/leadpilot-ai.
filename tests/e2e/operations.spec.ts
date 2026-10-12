@@ -1,0 +1,138 @@
+import { randomUUID } from "node:crypto";
+import { expect, test, type Page } from "@playwright/test";
+import { E2E_OPERATOR } from "../../playwright.config";
+import { openApp, signIn, waitForHydrated, waitForHydratedForm } from "./helpers";
+
+const BASE_URL = "http://localhost:3100";
+
+/** A unique valid E.164 number so reruns never collide. */
+function uniquePhone(): string {
+  return `+1415${String(Math.floor(Math.random() * 10_000_000)).padStart(7, "0")}`;
+}
+
+/** Creates an opted-in recipient through the API (same-origin request with the shared session). */
+async function createOptedInRecipient(page: Page, label: string) {
+  const response = await page.request.post("/api/recipients", {
+    headers: { origin: BASE_URL },
+    data: { label, phoneE164: uniquePhone(), optInConfirmed: true },
+  });
+  expect(response.status()).toBe(200);
+  return (await response.json()).data as { id: string };
+}
+
+test("recipient opt-in, WhatsApp on a profile, a run, and the alerts on the Notifications page", async ({
+  page,
+}) => {
+  await openApp(page);
+  const label = `E2E phone ${randomUUID().slice(0, 4)}`;
+
+  // Settings: add a recipient without opt-in, then confirm it with the explicit statement.
+  await page.goto("/settings");
+  await waitForHydratedForm(page);
+  await page.getByRole("button", { name: "Add recipient" }).click();
+  await page.getByLabel("Name").fill(label);
+  await page.getByLabel("WhatsApp number").fill(uniquePhone());
+  await page.getByRole("button", { name: "Save recipient" }).click();
+  const row = page.locator("#recipients li").filter({ hasText: label });
+  await expect(row.getByText("Opt-in not confirmed")).toBeVisible();
+  await row.getByRole("button", { name: "Confirm opt-in" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("button", { name: "Confirm opt-in" })).toBeDisabled();
+  await dialog.getByLabel("This person agreed to receive WhatsApp messages from us").check();
+  await dialog.getByRole("button", { name: "Confirm opt-in" }).click();
+  await expect(row.getByText("Opt-in confirmed")).toBeVisible();
+
+  // A new profile that sends alerts to that recipient.
+  await page.goto("/profiles/new");
+  await waitForHydratedForm(page);
+  await page.getByLabel("Profile name").fill(`E2E alerts ${randomUUID().slice(0, 6)}`);
+  await page.getByRole("tab", { name: "Notifications" }).click();
+  const recipientSelect = page.getByLabel("WhatsApp recipient");
+  const recipientValue = await recipientSelect.locator("option", { hasText: label }).getAttribute("value");
+  await recipientSelect.selectOption(recipientValue!);
+  await page.getByLabel("Send WhatsApp alerts for qualified leads").check();
+  await page.getByRole("button", { name: "Create profile" }).click();
+  await expect(page).toHaveURL(/\/profiles\/[0-9a-f-]{36}$/);
+  const profileId = page.url().split("/").pop();
+
+  // Run it and wait for the result.
+  await page.goto(`/run?profileId=${profileId}`);
+  await page.getByRole("button", { name: "Run agent" }).click();
+  await expect(page.getByRole("dialog", { name: "Start a run?" })).toContainText("Up to 10 qualified leads");
+  await page.getByRole("dialog").getByRole("button", { name: "Start run" }).click();
+  await expect(page.getByText("This run has finished")).toBeVisible({ timeout: 90_000 });
+
+  // The alerts are listed, marked sent (mock provider), never with the full phone number.
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Notifications" }).click();
+  const table = page.getByRole("table", { name: "WhatsApp alerts" });
+  await expect(table.getByText(label).first()).toBeVisible();
+  await expect(table.getByText("Sent", { exact: true }).first()).toBeVisible();
+  await page.getByLabel("Status").selectOption({ label: "Failed" });
+  await expect(page).toHaveURL(
+    /status=FAILED_PERMANENT%2CFAILED_RETRYABLE|status=FAILED_PERMANENT,FAILED_RETRYABLE/,
+  );
+});
+
+test("integrations: test the database connection and send a WhatsApp test message", async ({ page }) => {
+  await openApp(page);
+  await createOptedInRecipient(page, `E2E test target ${randomUUID().slice(0, 4)}`);
+  await page.goto("/integrations");
+  await waitForHydrated(page, "#integration-database button");
+
+  const database = page.locator("#integration-database");
+  await database.getByRole("button", { name: "Test connection" }).click();
+  await expect(database.getByText("Connected")).toBeVisible();
+
+  const upwork = page.locator("#integration-job_source");
+  await expect(upwork).toContainText("Live Upwork search is blocked");
+
+  const whatsapp = page.locator("#integration-whatsapp");
+  await whatsapp.getByRole("button", { name: "Send test message" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Send test message" }).click();
+  await expect(page.getByText("Mock provider: the test message was recorded, not sent.")).toBeVisible();
+});
+
+test("audit log lists entries and filters them by action", async ({ page }) => {
+  await openApp(page);
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Audit Logs" }).click();
+  const table = page.getByRole("table", { name: "Audit log" });
+  await expect(table.getByRole("row")).not.toHaveCount(1);
+  await page.getByLabel("Action").selectOption("auth.login");
+  await expect(page).toHaveURL(/action=auth\.login/);
+  const actions = await table.locator("tbody tr td:nth-child(3)").allTextContents();
+  expect(actions.length).toBeGreaterThan(0);
+  expect(actions.every((a) => a.trim() === "auth.login")).toBe(true);
+});
+
+test.describe("as an operator", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test("cannot see or open the audit log", async ({ page }) => {
+    await signIn(page, E2E_OPERATOR);
+    await expect(
+      page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Audit Logs" }),
+    ).toHaveCount(0);
+    await page.goto("/audit");
+    await expect(page.getByText(/could not be found|404/i).first()).toBeVisible();
+  });
+
+  test("changes their own password and signs in with the new one", async ({ page }) => {
+    const newPassword = `operator-new-${randomUUID().slice(0, 8)}`;
+    await signIn(page, E2E_OPERATOR);
+    await page.goto("/settings");
+    await waitForHydratedForm(page);
+    await page.getByLabel("Current password").fill("wrong-current-password");
+    await page.getByLabel("New password", { exact: true }).fill(newPassword);
+    await page.getByLabel("Repeat the new password").fill(newPassword);
+    await page.getByRole("button", { name: "Change password" }).click();
+    await expect(page.getByText("The current password is not correct")).toBeVisible();
+
+    await page.getByLabel("Current password").fill(E2E_OPERATOR.password);
+    await page.getByRole("button", { name: "Change password" }).click();
+    await expect(page.getByText("Password changed.")).toBeVisible();
+
+    await page.getByRole("button", { name: "Sign out" }).dispatchEvent("click");
+    await expect(page).toHaveURL(/\/login/);
+    await signIn(page, { email: E2E_OPERATOR.email, password: newPassword });
+  });
+});

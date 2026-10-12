@@ -140,7 +140,7 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
         {notifications.items.length === 0 ? (
           <EmptyState title="No alerts were reserved in this run" />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="tabular w-full text-left text-[13px]">
               <caption className="sr-only">WhatsApp alerts for this run</caption>
               <thead className="text-muted">

@@ -103,21 +103,6 @@ function Navigation({ role, onNavigate }: { role: UserRole; onNavigate?: () => v
         {items.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-          if (item.availableIn) {
-            return (
-              <li key={item.href}>
-                <span
-                  aria-disabled="true"
-                  className="flex items-center gap-2.5 rounded-control px-2.5 py-1.5 text-sm text-muted/70"
-                  title={`Available in phase ${item.availableIn}`}
-                >
-                  <Icon aria-hidden className="size-4" />
-                  <span className="flex-1">{item.label}</span>
-                  <span className="text-[11px]">Soon</span>
-                </span>
-              </li>
-            );
-          }
           return (
             <li key={item.href}>
               <Link

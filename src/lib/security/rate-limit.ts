@@ -12,6 +12,7 @@ export interface RateLimitRule {
 
 export const RATE_LIMITS = {
   login: { name: "login", limit: 10, windowSeconds: 15 * 60 },
+  passwordChange: { name: "password-change", limit: 5, windowSeconds: 15 * 60 },
   runCreate: { name: "run-create", limit: 10, windowSeconds: 60 },
   notificationRetry: { name: "notification-retry", limit: 20, windowSeconds: 60 },
   whatsappTest: { name: "whatsapp-test", limit: 3, windowSeconds: 10 * 60 },

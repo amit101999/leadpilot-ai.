@@ -97,7 +97,16 @@ test("search history, run detail, job detail, leads and all jobs (after a run)",
 
 test("list pages have no horizontal page scroll on a phone", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const path of ["/history", "/leads", "/jobs", "/profiles"]) {
+  for (const path of [
+    "/history",
+    "/leads",
+    "/jobs",
+    "/profiles",
+    "/notifications",
+    "/integrations",
+    "/settings",
+    "/audit",
+  ]) {
     await page.goto(path);
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
     expect(scrollWidth, path).toBeLessThanOrEqual(390);

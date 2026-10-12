@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   integrationStatus,
   notificationAttempts,
@@ -48,26 +48,30 @@ export async function startStep(ctx: RunContext): Promise<StageResponse> {
   }
 
   const connection = await provider.checkConnection();
+  const healthy = connection.state === "CONNECTED" || connection.state === "MOCK";
+  const now = new Date();
+  // Same shape as the Integrations page's own checks (message shown as the result).
+  const metadata = { provider: provider.id, missing: connection.missing ?? [], message: connection.message };
   await db
     .insert(integrationStatus)
     .values({
       provider: "job_source",
       status: connection.state,
-      lastCheckedAt: new Date(),
-      lastSuccessAt: connection.state === "CONNECTED" || connection.state === "MOCK" ? new Date() : null,
-      sanitizedError:
-        connection.state === "CONNECTED" || connection.state === "MOCK" ? null : connection.message,
-      metadata: { provider: provider.id, missing: connection.missing ?? [] },
+      lastCheckedAt: now,
+      lastSuccessAt: healthy ? now : null,
+      sanitizedError: healthy ? null : connection.message,
+      metadata,
     })
     .onConflictDoUpdate({
       target: integrationStatus.provider,
       set: {
         status: connection.state,
-        lastCheckedAt: new Date(),
-        sanitizedError:
-          connection.state === "CONNECTED" || connection.state === "MOCK" ? null : connection.message,
-        metadata: { provider: provider.id, missing: connection.missing ?? [] },
-        updatedAt: new Date(),
+        lastCheckedAt: now,
+        // Previously never refreshed on update, so "last success" stayed at the first run.
+        lastSuccessAt: healthy ? now : sql`${integrationStatus.lastSuccessAt}`,
+        sanitizedError: healthy ? null : connection.message,
+        metadata,
+        updatedAt: now,
       },
     });
 

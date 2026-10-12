@@ -74,7 +74,9 @@ export function DataTable<T>({
 
   return (
     <div className={cn("min-w-0", url.pending && "opacity-70 transition-opacity")} aria-busy={url.pending}>
-      <div className="overflow-x-auto">
+      {/* `relative` makes this the containing block for absolutely positioned cell content
+          (sr-only text, hidden inputs) so it is clipped here instead of widening the page. */}
+      <div className="relative overflow-x-auto">
         <table className="tabular w-full text-left text-[13px]">
           <caption className="sr-only">{caption}</caption>
           <thead className="text-muted">

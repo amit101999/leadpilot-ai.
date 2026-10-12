@@ -17,8 +17,6 @@ export interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
-  /** Pages that are not built yet are shown disabled instead of linking to a 404. */
-  availableIn?: string;
   minRole?: UserRole;
 }
 
@@ -29,8 +27,8 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/leads", label: "Qualified Leads", icon: Activity },
   { href: "/jobs", label: "All Jobs", icon: Briefcase },
   { href: "/profiles", label: "Search Profiles", icon: SlidersHorizontal },
-  { href: "/notifications", label: "Notifications", icon: Bell, availableIn: "C3" },
-  { href: "/integrations", label: "Integrations", icon: Plug, availableIn: "C3" },
-  { href: "/settings", label: "Settings", icon: Settings, availableIn: "C3" },
-  { href: "/audit", label: "Audit Logs", icon: ClipboardList, availableIn: "C3", minRole: "ADMIN" },
+  { href: "/notifications", label: "Notifications", icon: Bell },
+  { href: "/integrations", label: "Integrations", icon: Plug },
+  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/audit", label: "Audit Logs", icon: ClipboardList, minRole: "ADMIN" },
 ];

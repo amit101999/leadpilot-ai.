@@ -3,7 +3,8 @@ import { execFileSync } from "node:child_process";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
-import { E2E_ADMIN } from "../../playwright.config";
+import { hash } from "@node-rs/argon2";
+import { E2E_ADMIN, E2E_OPERATOR } from "../../playwright.config";
 
 /** Fresh schema and a known admin in the test database before the browser tests run. */
 export default async function globalSetup(): Promise<void> {
@@ -33,4 +34,19 @@ export default async function globalSetup(): Promise<void> {
       WHATSAPP_DEFAULT_RECIPIENT: "",
     },
   });
+
+  // A second, non-admin user (the seed only creates the admin).
+  const db = postgres(url, { max: 1, onnotice: () => undefined });
+  try {
+    const passwordHash = await hash(E2E_OPERATOR.password, {
+      memoryCost: 19456,
+      timeCost: 2,
+      parallelism: 1,
+      outputLen: 32,
+    });
+    await db`insert into users (email, name, password_hash, role)
+             values (${E2E_OPERATOR.email}, 'E2E Operator', ${passwordHash}, 'OPERATOR')`;
+  } finally {
+    await db.end();
+  }
 }

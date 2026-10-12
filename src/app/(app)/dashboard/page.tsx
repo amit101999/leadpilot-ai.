@@ -132,7 +132,7 @@ export default async function DashboardPage() {
           {data.recentRuns.length === 0 ? (
             <EmptyState title="No runs yet">Runs you start appear here with their results.</EmptyState>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               <table className="tabular w-full text-left text-[13px]">
                 <caption className="sr-only">Most recent runs</caption>
                 <thead className="text-muted">

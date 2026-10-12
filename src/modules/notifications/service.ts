@@ -18,9 +18,9 @@ import { deliverNotification } from "@/modules/runs/engine/delivery";
 import { escapeLike } from "@/modules/runs/service";
 import type { NotificationStatus } from "@/types/domain";
 import { getRecipient } from "./recipients";
+import { uncertainRetryEligibleAt } from "./retry-policy";
 
-/** An UNCERTAIN send may still arrive; a manual retry must wait this long for a status webhook first. */
-export const UNCERTAIN_RETRY_WAIT_MS = 15 * 60_000;
+export { UNCERTAIN_RETRY_WAIT_MS } from "./retry-policy";
 
 const VIEW_COLUMNS = {
   id: notifications.id,
@@ -124,8 +124,8 @@ export async function retryNotification(
   if (current.status === "FAILED_RETRYABLE") {
     claimFrom = "FAILED_RETRYABLE";
   } else if (current.status === "UNCERTAIN") {
-    const since = current.lastAttemptAt ?? current.updatedAt;
-    const waitLeftMs = since.getTime() + UNCERTAIN_RETRY_WAIT_MS - Date.now();
+    const waitLeftMs =
+      uncertainRetryEligibleAt(current.lastAttemptAt, current.updatedAt).getTime() - Date.now();
     if (waitLeftMs > 0) {
       throw new AppError(
         "INVALID_STATE",

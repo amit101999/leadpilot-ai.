@@ -7,6 +7,7 @@ const config = [
   {
     ignores: [
       ".next/**",
+      ".next-e2e/**",
       "node_modules/**",
       "database/migrations/**",
       "playwright-report/**",

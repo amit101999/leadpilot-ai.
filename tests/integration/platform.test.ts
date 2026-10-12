@@ -20,7 +20,11 @@ import { POST as createRecipient } from "@/app/api/recipients/route";
 import { GET as getRun } from "@/app/api/runs/[id]/route";
 import { POST as createRun } from "@/app/api/runs/route";
 import { getDb } from "@/lib/database/client";
-import { auditLogs as auditTable, jobs } from "@/lib/database/schema";
+import {
+  auditLogs as auditTable,
+  integrationStatus as integrationStatusTable,
+  jobs,
+} from "@/lib/database/schema";
 import { signPayload, SIGNATURE_HEADER } from "@/lib/security/hmac";
 import { defaultProfileConfig } from "@/modules/profiles/config-schema";
 import { getProviders } from "@/modules/providers";
@@ -83,6 +87,29 @@ describe("integrations", () => {
     }
     const after = await call(integrationStatus, { user });
     expect(JSON.stringify(after.json)).not.toMatch(/secret|token|password/i);
+  });
+
+  it("records the job source check from every run with a message and a fresh last-success time", async () => {
+    const user = await createUser("OPERATOR");
+    const firstRun = await newRun(user);
+    await runInProcess(getDb(), getProviders(), firstRun, { sleep: async () => {} });
+    const [first] = await getDb()
+      .select()
+      .from(integrationStatusTable)
+      .where(eq(integrationStatusTable.provider, "job_source"));
+    expect(first!.status).toBe("MOCK");
+    expect((first!.metadata as { message?: string }).message).toMatch(/Mock job source/);
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const secondRun = await newRun(user);
+    await runInProcess(getDb(), getProviders(), secondRun, { sleep: async () => {} });
+    const [second] = await getDb()
+      .select()
+      .from(integrationStatusTable)
+      .where(eq(integrationStatusTable.provider, "job_source"));
+    // Regression: the update branch used to leave last_success_at at the first run's time.
+    expect(second!.lastSuccessAt!.getTime()).toBeGreaterThan(first!.lastSuccessAt!.getTime());
+    expect(second!.lastSuccessAt!.getTime()).toBe(second!.lastCheckedAt!.getTime());
   });
 
   it("rejects unknown integrations and VIEWER checks", async () => {

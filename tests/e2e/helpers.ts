@@ -9,11 +9,11 @@ export async function waitForLoginForm(page: Page) {
   });
 }
 
-export async function signIn(page: Page) {
+export async function signIn(page: Page, user: { email: string; password: string } = E2E_ADMIN) {
   await page.goto("/login");
   await waitForLoginForm(page);
-  await page.getByLabel("Email").fill(E2E_ADMIN.email);
-  await page.getByLabel("Password").fill(E2E_ADMIN.password);
+  await page.getByLabel("Email").fill(user.email);
+  await page.getByLabel("Password").fill(user.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
 }
@@ -22,6 +22,14 @@ export async function signIn(page: Page) {
 export async function openApp(page: Page) {
   await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/dashboard$/);
+}
+
+/** Waits until the element matching `selector` has been hydrated by React (clicks would otherwise be lost). */
+export async function waitForHydrated(page: Page, selector: string) {
+  await page.waitForFunction((sel) => {
+    const el = document.querySelector(sel);
+    return Boolean(el && Object.keys(el).some((k) => k.startsWith("__react")));
+  }, selector);
 }
 
 /** Waits until a client component's form is interactive (hydrated). */
