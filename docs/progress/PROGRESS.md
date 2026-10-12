@@ -4,7 +4,7 @@ Curated record of what has been built, decided and verified. Maintained by the
 `project-tracker` subagent (`.claude/agents/project-tracker.md`). The raw,
 automatic history is in `activity-log.md` (local, gitignored).
 
-Last updated: 2026-10-11
+Last updated: 2026-10-12
 
 ## Phase status
 
@@ -16,8 +16,8 @@ Plan: `C:\Users\ACER\.claude\plans\clever-noodling-finch.md`.
 | A. Foundation            | Seed, `.env.example`, page auth proxy, CSRF check                    | ✅ Merged to `main` (`ab4b7e1`); seed verified during B1          |
 | B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                | ✅ Merged to `main` (`0bed021`); Turbopack build verified on main |
 | B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook | ✅ Merged to `main` (`41e8d95`); Turbopack build verified on main |
-| C1. UI (part 1)          | Design system, app shell, login, Dashboard, Run Agent                | ✅ Committed `f894985` on `worktree-phase-c1-ui`; not merged yet  |
-| C2. UI (part 2)          | Search History and run detail, Qualified Leads, All Jobs             | ⏳ Not started                                                    |
+| C1. UI (part 1)          | Design system, app shell, login, Dashboard, Run Agent                | ✅ Merged to `main` (`71a0b50`); Turbopack build verified on main |
+| C2. UI (part 2)          | Search History and run detail, Qualified Leads, All Jobs             | ✅ Committed `880601c` on `worktree-phase-c2-ui`; not merged yet  |
 | C3. UI (part 3)          | Profiles editor, Notifications, Integrations, Settings, Audit Logs   | ⏳ Not started                                                    |
 | D. n8n                   | Run and error workflows calling the app's internal step API          | ⏳ Not started                                                    |
 | E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                           | ⏳ Not started                                                    |
@@ -109,7 +109,7 @@ Existed before this tracking started. Commit authorship of that earlier work: ne
 Defaults stated without objection: Postgres 16 in `docker-compose.yml` bound to `127.0.0.1`, a separate
 `leadpilot_test` database, and host port 55432 (something already listens on 5432 on the developer's machine).
 
-## Phase B1 (`5c37353` on `worktree-phase-b1-api`, not yet merged)
+## Phase B1 (`5c37353`, merged to `main` as `0bed021`)
 
 ### Implemented
 
@@ -153,7 +153,7 @@ end in which every qualified lead scores at least 75, is fixed-price and has ver
 - `GET /api/runs/:id` returns `leaseOwner` (an internal executor id). Low sensitivity.
 - The main checkout needs its own `.env` (copy `.env.example`); the generated one exists only in the worktrees.
 
-## Phase B2 (`2e1ea54` on `worktree-phase-b2-api`, not yet merged)
+## Phase B2 (`2e1ea54`, merged to `main` as `41e8d95`)
 
 ### Decisions (grilling round 2, accepted by the developer 2026-10-11, "accept all")
 
@@ -226,7 +226,7 @@ Finding during testing: run summaries (`alertOnFailure`) are separate messages a
 6. Playwright Chromium downloaded; smoke tests per part, full e2e in Phase F.
 7. WCAG 2.2 AA target, tables scroll inside their panel on phones, English only.
 
-## Phase C1 (`f894985` on `worktree-phase-c1-ui`, not yet merged)
+## Phase C1 (`f894985`, merged to `main` as `71a0b50`)
 
 ### Implemented
 
@@ -252,6 +252,7 @@ Finding during testing: run summaries (`alertOnFailure`) are separate messages a
 | Prettier, ESLint, `tsc --noEmit` | ✅ clean                                                                                     |
 | Visual review (screenshots)      | ✅ login, dashboard light/dark, run page, confirm dialog, live and finished run, phone width |
 | Browser console                  | ✅ no errors in the final screenshot run                                                     |
+| On `main` after merge            | ✅ `next build` (Turbopack), unit 86/86, integration 46/46, Playwright smoke 5/5             |
 
 ### Bugs found during review and fixed
 
@@ -265,12 +266,89 @@ Finding during testing: run summaries (`alertOnFailure`) are separate messages a
 
 ### Open items
 
-- Run detail with per-job results and qualification reasons arrives with Search History (C2); finished runs say so.
+- ~~Run detail with per-job results and qualification reasons arrives with Search History (C2)~~: done in C2
+  (`/history/[id]`; `/run/[id]` links there when finished).
 - E2E tests run against `next dev` stalled for about 49 minutes once (on-demand compile); they now use a production build.
 - Times render in the viewer's local zone; the 30-day chart uses UTC days and says so.
+
+## Phase C2 (`880601c` on `worktree-phase-c2-ui`, not yet merged)
+
+### Decisions (grilled, accepted by the developer 2026-10-12, "accept all")
+
+1. Server-side filtering, sorting and paging with all table state in the URL; one shared `DataTable`
+   (TanStack Table, manual mode).
+2. Full run detail at `/history/[id]` (summary, frozen snapshot, Qualified/Rejected/Uncertain/All tabs with reasons
+   and scores, alerts, stages); `/run/[id]` stays the live view and links there when the run is finished.
+3. Job detail is a dedicated page `/jobs/[id]` (not a drawer), shared by Qualified Leads and All Jobs.
+4. Filter bar above each table: immediate apply, 300 ms debounced search, native date inputs, "Clear filters",
+   CSV export with the current filters.
+5. Snapshot shown as a readable summary plus a collapsible raw JSON view.
+6. "Uncertain" = Needs review, AI error, Pending AI (plus New / Source error).
+
+### Implementation choices made during the build (not grilled)
+
+- Date-range upper bounds: a bare `YYYY-MM-DD` "to" means the end of that UTC day (`q.endDate()` in
+  `src/lib/validation/common.ts`), applied in the shared list schemas (`src/modules/{runs,jobs}/list-query.ts`) so
+  pages, `/api/runs`, `/api/leads` and the CSV exports agree.
+- Export links are built server-side from validated filters (`src/lib/ui/export-href.ts`), so the export endpoint
+  never receives UI-only values such as `decision=any`.
+- Page search params that fail validation are dropped instead of producing an error (`src/lib/validation/search-params.ts`).
+- Qualified Leads defaults to decision `QUALIFIED`; "Any status" (`decision=any`) lifts the filter.
+- The outcome selector on the run detail page uses toggle buttons with `aria-pressed` rather than ARIA tabs
+  (tabs would also require arrow-key navigation).
+- On small screens the filter bar collapses behind a "Filters (n active)" button.
+- `ProfileSummary` moved to `src/components/profiles/profile-summary.tsx`, with a detailed mode used for the run snapshot.
+
+### Implemented
+
+- Pages: `src/app/(app)/history/page.tsx`, `history/[id]/page.tsx`, `leads/page.tsx`, `jobs/page.tsx`,
+  `jobs/[id]/page.tsx`; small changes to `dashboard/page.tsx` and `run/page.tsx`.
+- Components: `src/components/table/{data-table,filters}.tsx`, `src/components/history/{runs-table,run-jobs-tabs}.tsx`,
+  `src/components/leads/leads-table.tsx`, `src/components/jobs/jobs-table.tsx`,
+  `src/components/profiles/profile-summary.tsx`, `src/components/ui/copy-button.tsx`; `src/components/runs/run-progress.tsx`
+  links to run detail; `src/components/layout/nav.ts` enables the C2 navigation items.
+- Helpers: `src/lib/ui/use-url-state.ts`, `src/lib/ui/export-href.ts`, `src/lib/validation/search-params.ts`,
+  `q.endDate()` in `src/lib/validation/common.ts`.
+- Tests: `tests/unit/list-params.test.ts` (7 new), 2 new smoke tests in `tests/e2e/smoke.spec.ts`.
+
+### Verification (actual results)
+
+| Check                            | Result                                                                                                   |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Unit tests                       | ✅ 93/93 (7 new in `tests/unit/list-params.test.ts`)                                                     |
+| Integration tests                | ✅ 46/46                                                                                                 |
+| Prettier, ESLint, `tsc --noEmit` | ✅ clean                                                                                                 |
+| Playwright smoke tests           | ✅ 7/7 against a production build, run twice in a row (2.8 min, then 1.2 min) at the developer's request |
+| Visual review (screenshots)      | ✅ against a production server (details below)                                                           |
+| Browser console                  | ✅ no errors                                                                                             |
+| Leads CSV export                 | ✅ 200, 5 rows, not truncated                                                                            |
+| `next build` (Turbopack)         | ⏳ To run on `main` after merge                                                                          |
+
+New smoke tests: history → run detail Rejected tab → job detail → leads (any status) → jobs filtered by
+`FILTERED_OUT`; and no horizontal scroll at 390 px on `/history`, `/leads`, `/jobs`.
+
+Screens reviewed: history; run detail on a mock run (Qualified 5 / Rejected 10 / Uncertain 3 / All 18); rejected
+reasons (budget below minimum, payment unverified/unknown, EUR without exchange rate, hourly excluded, score 74 below
+75); job detail; leads; filtered jobs; phone width.
+
+### Bugs found during review and fixed
+
+- ESLint `react-hooks/set-state-in-effect` in the search filter: switched to adjusting state during render.
+- Job detail repeated a dimension's explanation as its evidence bullet; duplicates are now hidden.
+- On phones the 12 lead filters pushed results below the fold; the filters now collapse.
+- The runs/leads "to" date excluded the selected day in the API and CSV export; fixed with `q.endDate()`.
+
+### Open items
+
+- C3 (Profiles editor, Notifications, Integrations, Settings, Audit Logs) not started.
+- The run detail notification list shows at most 100 alerts per run (no paging there yet).
+- The breadcrumb on `/jobs/[id]` always says "All Jobs", even when opened from Qualified Leads.
 
 ## Environment notes
 
 - Windows 11, Node 22.17.0, Next.js 16.4.0, PostgreSQL 16 via Docker (`127.0.0.1:55432`).
 - No git remote configured; nothing has been pushed.
 - No OpenAI, WhatsApp or Upwork credentials; those integrations run in mock mode.
+- Port 3000 on the developer's machine was in use by the developer's own `next` server (started from the main
+  checkout on 2026-10-11 22:11) and was left running. C2 previews used port 3200 with `APP_BASE_URL` overridden to
+  match, because the Origin check requires it.
