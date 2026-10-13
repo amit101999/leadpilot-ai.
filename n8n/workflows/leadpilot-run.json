@@ -1,0 +1,703 @@
+{
+  "id": "leadpilotRunFlow",
+  "name": "LeadPilot – run pipeline",
+  "nodes": [
+    {
+      "id": "6b0f1d2e-0001-4c55-9a10-000000000001",
+      "name": "Run requested",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "2f7c9a52-6a1e-4d39-8f0e-5b1c3d4e6f70",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "leadpilot-run",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "leadpilotWebhookAuth",
+          "name": "LeadPilot webhook secret"
+        }
+      }
+    },
+    {
+      "id": "6b0f1d2e-0002-4c55-9a10-000000000002",
+      "name": "Valid run id?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [220, 300],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ String($json.body?.runId ?? '') }}",
+              "rightValue": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "6b0f1d2e-0003-4c55-9a10-000000000003",
+      "name": "Ignore invalid request",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [440, 480],
+      "parameters": {}
+    },
+    {
+      "id": "6b0f1d2e-0004-4c55-9a10-000000000004",
+      "name": "Prepare run",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [440, 300],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "runId",
+              "value": "={{ $json.body.runId }}",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "step",
+              "value": "start",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "iteration",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "a4",
+              "name": "executionId",
+              "value": "={{ String($execution.id) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "6b0f1d2e-0005-4c55-9a10-000000000005",
+      "name": "Build step request",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [660, 300],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b1",
+              "name": "runId",
+              "value": "={{ $json.runId }}",
+              "type": "string"
+            },
+            {
+              "id": "b2",
+              "name": "step",
+              "value": "={{ $json.step }}",
+              "type": "string"
+            },
+            {
+              "id": "b3",
+              "name": "iteration",
+              "value": "={{ $json.iteration }}",
+              "type": "number"
+            },
+            {
+              "id": "b4",
+              "name": "executionId",
+              "value": "={{ $json.executionId }}",
+              "type": "string"
+            },
+            {
+              "id": "b5",
+              "name": "url",
+              "value": "={{ $env.LEADPILOT_APP_URL.replace(/\\/+$/, '') }}/api/internal/runs/{{ $json.runId }}/steps/{{ $json.step }}",
+              "type": "string"
+            },
+            {
+              "id": "b6",
+              "name": "body",
+              "value": "={{ JSON.stringify({ executionId: $json.executionId }) }}",
+              "type": "string"
+            },
+            {
+              "id": "b7",
+              "name": "timestamp",
+              "value": "={{ Math.floor(Date.now() / 1000) }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "6b0f1d2e-0006-4c55-9a10-000000000006",
+      "name": "Sign step request",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [880, 300],
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.timestamp }}.{{ $json.body }}",
+        "dataPropertyName": "signature",
+        "secret": "={{ $env.LEADPILOT_INTERNAL_API_SECRET }}",
+        "encoding": "hex"
+      }
+    },
+    {
+      "id": "6b0f1d2e-0007-4c55-9a10-000000000007",
+      "name": "Run step",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 300],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-leadpilot-signature",
+              "value": "=t={{ $json.timestamp }},v1={{ $json.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 300000
+        }
+      }
+    },
+    {
+      "id": "6b0f1d2e-0008-4c55-9a10-000000000008",
+      "name": "Read step result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1320, 200],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "runId",
+              "value": "={{ $('Build step request').last().json.runId }}",
+              "type": "string"
+            },
+            {
+              "id": "c2",
+              "name": "executionId",
+              "value": "={{ $('Build step request').last().json.executionId }}",
+              "type": "string"
+            },
+            {
+              "id": "c3",
+              "name": "iteration",
+              "value": "={{ $('Build step request').last().json.iteration + 1 }}",
+              "type": "number"
+            },
+            {
+              "id": "c4",
+              "name": "step",
+              "value": "={{ $json.data.next ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "c5",
+              "name": "terminal",
+              "value": "={{ $json.data.terminal === true || !$json.data.next }}",
+              "type": "boolean"
+            },
+            {
+              "id": "c6",
+              "name": "runStatus",
+              "value": "={{ $json.data.runStatus }}",
+              "type": "string"
+            },
+            {
+              "id": "c7",
+              "name": "retryAfterMs",
+              "value": "={{ $json.data.retryAfterMs ?? 0 }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "6b0f1d2e-0009-4c55-9a10-000000000009",
+      "name": "Run finished?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1540, 200],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d1",
+              "leftValue": "={{ $json.terminal }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "6b0f1d2e-0010-4c55-9a10-000000000010",
+      "name": "Done",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1760, 80],
+      "parameters": {}
+    },
+    {
+      "id": "6b0f1d2e-0011-4c55-9a10-000000000011",
+      "name": "Too many steps?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1760, 300],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e1",
+              "leftValue": "={{ $json.iteration }}",
+              "rightValue": 500,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "6b0f1d2e-0012-4c55-9a10-000000000012",
+      "name": "Wait requested?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1980, 400],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f1",
+              "leftValue": "={{ $json.retryAfterMs }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "6b0f1d2e-0013-4c55-9a10-000000000013",
+      "name": "Wait before next step",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2200, 340],
+      "webhookId": "8a1d4c7e-2b3f-4e5a-9c6d-7e8f9a0b1c2d",
+      "parameters": {
+        "amount": "={{ Math.min(60, Math.max(1, Math.ceil($json.retryAfterMs / 1000))) }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "6b0f1d2e-0014-4c55-9a10-000000000014",
+      "name": "Describe failure",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1540, 600],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "g1",
+              "name": "runId",
+              "value": "={{ $('Build step request').last().json.runId }}",
+              "type": "string"
+            },
+            {
+              "id": "g2",
+              "name": "url",
+              "value": "={{ $env.LEADPILOT_APP_URL.replace(/\\/+$/, '') }}/api/internal/runs/{{ $('Build step request').last().json.runId }}/fail",
+              "type": "string"
+            },
+            {
+              "id": "g3",
+              "name": "body",
+              "value": "={{ JSON.stringify({ stage: { start: 'SOURCE_CHECK', discover: 'DISCOVERY', filter: 'HARD_FILTERS', evaluate: 'AI_EVALUATION', select: 'SELECTION', notify: 'NOTIFICATION', finalize: 'FINALIZATION' }[$('Build step request').last().json.step] ?? null, error: ($json.error ? String($json.error.message ?? $json.error.description ?? JSON.stringify($json.error)) : 'The run did not finish within 500 steps').slice(0, 500), executionId: $('Build step request').last().json.executionId }) }}",
+              "type": "string"
+            },
+            {
+              "id": "g4",
+              "name": "timestamp",
+              "value": "={{ Math.floor(Date.now() / 1000) }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "6b0f1d2e-0015-4c55-9a10-000000000015",
+      "name": "Sign failure report",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [1760, 600],
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.timestamp }}.{{ $json.body }}",
+        "dataPropertyName": "signature",
+        "secret": "={{ $env.LEADPILOT_INTERNAL_API_SECRET }}",
+        "encoding": "hex"
+      }
+    },
+    {
+      "id": "6b0f1d2e-0016-4c55-9a10-000000000016",
+      "name": "Report failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1980, 600],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-leadpilot-signature",
+              "value": "=t={{ $json.timestamp }},v1={{ $json.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 30000
+        }
+      }
+    },
+    {
+      "id": "6b0f1d2e-0017-4c55-9a10-000000000017",
+      "name": "Run owned elsewhere?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1320, 480],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "h1",
+              "leftValue": "={{ JSON.stringify($json.error ?? {}) }}",
+              "rightValue": "LEASE_HELD",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "6b0f1d2e-0018-4c55-9a10-000000000018",
+      "name": "Leave run to its owner",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1540, 420],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "Run requested": {
+      "main": [
+        [
+          {
+            "node": "Valid run id?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid run id?": {
+      "main": [
+        [
+          {
+            "node": "Prepare run",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ignore invalid request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare run": {
+      "main": [
+        [
+          {
+            "node": "Build step request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build step request": {
+      "main": [
+        [
+          {
+            "node": "Sign step request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign step request": {
+      "main": [
+        [
+          {
+            "node": "Run step",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run step": {
+      "main": [
+        [
+          {
+            "node": "Read step result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Run owned elsewhere?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read step result": {
+      "main": [
+        [
+          {
+            "node": "Run finished?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run finished?": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Too many steps?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Too many steps?": {
+      "main": [
+        [
+          {
+            "node": "Describe failure",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait requested?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait requested?": {
+      "main": [
+        [
+          {
+            "node": "Wait before next step",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build step request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait before next step": {
+      "main": [
+        [
+          {
+            "node": "Build step request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Describe failure": {
+      "main": [
+        [
+          {
+            "node": "Sign failure report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign failure report": {
+      "main": [
+        [
+          {
+            "node": "Report failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run owned elsewhere?": {
+      "main": [
+        [
+          {
+            "node": "Leave run to its owner",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Describe failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all"
+  },
+  "pinData": {},
+  "active": false
+}

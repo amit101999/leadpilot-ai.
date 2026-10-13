@@ -21,6 +21,7 @@ import { GET as getRun } from "@/app/api/runs/[id]/route";
 import { POST as createRun } from "@/app/api/runs/route";
 import { getDb } from "@/lib/database/client";
 import {
+  agentRuns,
   auditLogs as auditTable,
   integrationStatus as integrationStatusTable,
   jobs,
@@ -267,6 +268,45 @@ describe("internal n8n endpoints", () => {
     expect(last?.terminal).toBe(true);
     const run = await call(getRun, { user, params: { id: runId } });
     expect(["COMPLETED", "COMPLETED_WITH_ERRORS"]).toContain(run.json.data.status);
+  });
+
+  it("does not let a duplicate execution fail a run another execution is driving", async () => {
+    const user = await createUser("OPERATOR");
+    const runId = await newRun(user);
+    const owner = await internalCall(runStepRoute, { id: runId, step: "start" }, { executionId: "exec-A" });
+    expect(owner.status).toBe(200);
+
+    const duplicate = await internalCall(
+      runStepRoute,
+      { id: runId, step: "start" },
+      { executionId: "exec-B" },
+    );
+    expect(duplicate.status).toBe(409);
+    expect(duplicate.json.error.code).toBe("LEASE_HELD");
+
+    for (const executionId of ["exec-B", undefined]) {
+      const res = await internalCall(failStep, { id: runId }, { error: "lease held", executionId });
+      expect(res.status).toBe(409);
+    }
+    const stillRunning = await call(getRun, { user, params: { id: runId } });
+    expect(stillRunning.json.data.status).not.toBe("FAILED");
+
+    const own = await internalCall(failStep, { id: runId }, { error: "own failure", executionId: "exec-A" });
+    expect(own.status).toBe(200);
+    expect(own.json.data.status).toBe("FAILED");
+  });
+
+  it("lets any execution fail a run once the previous lease has expired", async () => {
+    const user = await createUser("OPERATOR");
+    const runId = await newRun(user);
+    await internalCall(runStepRoute, { id: runId, step: "start" }, { executionId: "exec-A" });
+    await getDb()
+      .update(agentRuns)
+      .set({ leaseExpiresAt: new Date(Date.now() - 60_000) })
+      .where(eq(agentRuns.id, runId));
+    const res = await internalCall(failStep, { id: runId }, { error: "crashed", executionId: "exec-B" });
+    expect(res.status).toBe(200);
+    expect(res.json.data.status).toBe("FAILED");
   });
 
   it("marks a run FAILED from the error workflow and sanitises the message", async () => {

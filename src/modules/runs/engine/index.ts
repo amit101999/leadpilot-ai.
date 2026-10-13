@@ -11,7 +11,7 @@ import { filterStep } from "./filtering";
 import { selectStep } from "./selection";
 
 export { failRun } from "./finalization";
-export { STAGE_STEPS, type StageResponse, type StageStep } from "./context";
+export { assertNoOtherLeaseHolder, STAGE_STEPS, type StageResponse, type StageStep } from "./context";
 
 const STEPS = {
   start: startStep,

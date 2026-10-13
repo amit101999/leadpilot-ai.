@@ -3,7 +3,7 @@ import { runStage } from "@/lib/database/schema";
 import { internalRoute, parseJsonText } from "@/lib/http/api";
 import { uuidParam } from "@/lib/validation/common";
 import { getProviders } from "@/modules/providers";
-import { failRun } from "@/modules/runs/engine";
+import { assertNoOtherLeaseHolder, failRun } from "@/modules/runs/engine";
 
 const body = z.object({
   stage: z.enum(runStage.enumValues).nullable().optional(),
@@ -21,6 +21,8 @@ const body = z.object({
 export const POST = internalRoute(async ({ db, params, rawBody }) => {
   const runId = uuidParam.parse(params.id);
   const input = parseJsonText(rawBody, body);
+  // Same executor id format as the steps endpoint, so the lease owner can fail its own run.
+  await assertNoOtherLeaseHolder(db, runId, input.executionId ? `n8n:${input.executionId}` : null);
   const run = await failRun(db, getProviders(), runId, {
     stage: input.stage ?? null,
     error: input.error,

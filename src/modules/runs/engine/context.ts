@@ -92,6 +92,32 @@ export async function acquireLease(db: Database, runId: string, executorId: stri
   throw new AppError("LEASE_HELD", "Another executor is currently processing this run");
 }
 
+/**
+ * Refuses when a different executor holds an unexpired lease, so a duplicate
+ * n8n execution cannot fail a run that another execution is still driving.
+ * Without an executor id ownership cannot be proven, so any live lease blocks.
+ */
+export async function assertNoOtherLeaseHolder(
+  db: DbExecutor,
+  runId: string,
+  executorId: string | null,
+): Promise<void> {
+  await loadRun(db, runId);
+  const [held] = await db
+    .select({ id: agentRuns.id })
+    .from(agentRuns)
+    .where(
+      and(
+        eq(agentRuns.id, runId),
+        sql`${agentRuns.leaseOwner} is not null`,
+        sql`${agentRuns.leaseExpiresAt} > now()`,
+        executorId === null ? sql`true` : sql`${agentRuns.leaseOwner} <> ${executorId}`,
+      ),
+    )
+    .limit(1);
+  if (held) throw new AppError("LEASE_HELD", "Another executor is currently processing this run");
+}
+
 export async function enterRun(
   db: Database,
   runId: string,
