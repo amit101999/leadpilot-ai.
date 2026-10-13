@@ -1,0 +1,19 @@
+# Keep the build context small and free of secrets and local state.
+.git
+.claude
+node_modules
+.next
+.next-e2e
+out
+coverage
+playwright-report
+test-results
+tests/e2e/.auth
+backups
+*.tsbuildinfo
+*.log
+.env
+.env.*
+!.env.example
+docs/progress/activity-log.md
+docs/progress/.activity-state.json

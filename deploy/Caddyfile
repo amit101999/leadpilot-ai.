@@ -1,0 +1,23 @@
+# LeadPilot reverse proxy. APP_DOMAIN and ACME_EMAIL come from the environment
+# (docker-compose.prod.yml). Caddy obtains and renews the HTTPS certificate itself.
+{
+	email {$ACME_EMAIL}
+}
+
+{$APP_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	# Step and failure endpoints are for n8n on the Docker network only. They are also
+	# HMAC-signed, so this is a second layer, not the only protection.
+	@internal path /api/internal/*
+	respond @internal 404
+
+	# No trusted_proxies: Caddy discards any X-Forwarded-For sent by the client and sets the
+	# real peer address, which the app uses for login rate limiting (src/lib/http/api.ts).
+	reverse_proxy web:3000
+}

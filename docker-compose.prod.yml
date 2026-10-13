@@ -1,0 +1,41 @@
+# Production override: adds Caddy (HTTPS) and removes every other published port.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile stack up -d --build
+#
+# Only Caddy listens publicly. Postgres, the web app and n8n are reachable on the Docker
+# network only. Reach the n8n editor with an SSH tunnel instead (docs/deployment.md).
+services:
+  postgres:
+    ports: !reset []
+
+  web:
+    ports: !reset []
+    environment:
+      # Must be the public origin: the CSRF check compares the browser's Origin with it.
+      APP_BASE_URL: https://${APP_DOMAIN:?Set APP_DOMAIN in .env}
+
+  n8n:
+    ports: !reset []
+
+  caddy:
+    profiles: [stack]
+    image: caddy:2.11.7-alpine
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      web:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  caddy-data:
+  caddy-config:
