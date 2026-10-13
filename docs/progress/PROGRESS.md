@@ -4,26 +4,26 @@ Curated record of what has been built, decided and verified. Maintained by the
 `project-tracker` subagent (`.claude/agents/project-tracker.md`). The raw,
 automatic history is in `activity-log.md` (local, gitignored).
 
-Last updated: 2026-10-12
+Last updated: 2026-10-13
 
 ## Phase status
 
 Plan: `C:\Users\ACER\.claude\plans\clever-noodling-finch.md`.
 
-| Phase                    | Scope                                                                     | Status                                                             |
-| ------------------------ | ------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Baseline                 | Pre-existing backend core committed                                       | ✅ Done (`703761f`)                                                |
-| A. Foundation            | Seed, `.env.example`, page auth proxy, CSRF check                         | ✅ Merged to `main` (`ab4b7e1`); seed verified during B1           |
-| B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                     | ✅ Merged to `main` (`0bed021`); Turbopack build verified on main  |
-| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook      | ✅ Merged to `main` (`41e8d95`); Turbopack build verified on main  |
-| C1. UI (part 1)          | Design system, app shell, login, Dashboard, Run Agent                     | ✅ Merged to `main` (`71a0b50`); Turbopack build verified on main  |
-| C2. UI (part 2)          | Search History and run detail, Qualified Leads, All Jobs                  | ✅ Merged to `main` (`d742e0a`); Turbopack build verified on main  |
-| C3a. UI (part 3a)        | Search Profiles list, editor, version history                             | ✅ Merged to `main` (fast-forward, `e650286` + docs `a82ddab`)     |
-| C3b. UI (part 3b)        | Notifications, Integrations, Settings (incl. change password), Audit Logs | ✅ Committed `d18e5f8` on `worktree-phase-c3b-ops`; not merged yet |
-| D. n8n                   | Run and error workflows calling the app's internal step API               | ⏳ Not started                                                     |
-| E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                                | ⏳ Not started                                                     |
-| F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                       | ⏳ Not started                                                     |
-| G. Docs and final review | README, `docs/*.md`, full verification                                    | ⏳ Not started                                                     |
+| Phase                    | Scope                                                                     | Status                                                                                                                |
+| ------------------------ | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Baseline                 | Pre-existing backend core committed                                       | ✅ Done (`703761f`)                                                                                                   |
+| A. Foundation            | Seed, `.env.example`, page auth proxy, CSRF check                         | ✅ Merged to `main` (`ab4b7e1`); seed verified during B1                                                              |
+| B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                     | ✅ Merged to `main` (`0bed021`); Turbopack build verified on main                                                     |
+| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook      | ✅ Merged to `main` (`41e8d95`); Turbopack build verified on main                                                     |
+| C1. UI (part 1)          | Design system, app shell, login, Dashboard, Run Agent                     | ✅ Merged to `main` (`71a0b50`); Turbopack build verified on main                                                     |
+| C2. UI (part 2)          | Search History and run detail, Qualified Leads, All Jobs                  | ✅ Merged to `main` (`d742e0a`); Turbopack build verified on main                                                     |
+| C3a. UI (part 3a)        | Search Profiles list, editor, version history                             | ✅ Merged to `main` (fast-forward, `e650286` + docs `a82ddab`)                                                        |
+| C3b. UI (part 3b)        | Notifications, Integrations, Settings (incl. change password), Audit Logs | ✅ Committed `d18e5f8` + docs `3730daf` on `worktree-phase-c3b-ops`; merge to `main` requested but not done (blocked) |
+| D. n8n                   | Run workflow calling the app's internal step API, lease-safe `/fail`      | ✅ Committed `9cf72ad` on `phase-d-n8n` (stacked on C3b); not merged                                                  |
+| E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                                | ⏳ Not started                                                                                                        |
+| F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                       | ⏳ Not started                                                                                                        |
+| G. Docs and final review | README, `docs/*.md`, full verification                                    | ⏳ Not started                                                                                                        |
 
 ## Baseline (pre-existing work, committed 2026-10-11 as `703761f`)
 
@@ -441,7 +441,7 @@ duplicate / archive / restore.
 - The unsaved-changes guard does not catch browser back/forward within the app (only tab close and link clicks).
 - ~~The Settings page referenced by the Notifications tab hint arrives in C3b~~: `/settings` added in C3b.
 
-## Phase C3b (`d18e5f8` on `worktree-phase-c3b-ops`, not yet merged)
+## Phase C3b (`d18e5f8` + docs `3730daf` on `worktree-phase-c3b-ops`, not merged)
 
 Decisions: Phase C3 decisions 4 to 8 above, confirmed in the C3b grilling (accepted by the developer, "accept all").
 
@@ -491,8 +491,84 @@ Decisions: Phase C3 decisions 4 to 8 above, confirmed in the C3b grilling (accep
 
 ### Open items
 
-- Merge C3b to `main` when the developer asks, then run the Turbopack build there.
-- Next phases: D (n8n workflows), E (Docker), F (tests), G (docs).
+- Merge to `main`: requested by the developer on 2026-10-13 but **not done**. The session's isolation guard blocked
+  git operations on the shared main checkout, so `main` is still `a82ddab`. The developer has to run the merge; Phase D
+  was stacked on this branch instead (see below). Turbopack build on `main` still to run after the merge.
+- Next phases: ~~D (n8n workflows)~~ committed `9cf72ad`, E (Docker), F (tests), G (docs).
+
+## Phase D: n8n run workflow (`9cf72ad` on `phase-d-n8n`, stacked on `worktree-phase-c3b-ops`, not merged)
+
+### Decisions (grilled, accepted by the developer 2026-10-13, "accept all")
+
+1. Merge C3b into `main` first. Blocked (see C3b open items), so D was built on a branch stacked on C3b.
+2. One orchestration-only workflow that loops over the app's signed internal step endpoint; all business logic stays
+   in the app.
+3. Inbound webhook protected by an n8n Header Auth credential only; no HMAC check inside n8n. Reason: a replayed
+   trigger is harmless because steps are idempotent and the run lease prevents parallel execution.
+4. Outbound calls signed in n8n with the Crypto node (HMAC-SHA256) over the raw body, matching the app's verification.
+5. Secrets reach n8n through environment variables (`$env`, which needs `N8N_BLOCK_ENV_ACCESS_IN_NODE=false`). Trade-off
+   documented in `n8n/documentation/README.md`: every workflow on that n8n instance can read those variables.
+6. Each step call retries on failure (3 tries, 5 s apart); an in-workflow error branch reports to `/fail`; a 500-step
+   guard stops runaway loops. No separate Error Trigger workflow, because it does not receive the run id.
+7. Verify end to end in a temporary `n8nio/n8n:2.42.7` container, plus a static JSON test of the workflow, plus docs.
+
+### Implemented
+
+- `n8n/workflows/leadpilot-run.json` ("LeadPilot – run pipeline"): webhook "Run requested" (Header Auth credential
+  "LeadPilot webhook secret") → "Valid run id?" (UUID check before any URL is built; otherwise "Ignore invalid
+  request") → loop "Build step request" → "Sign step request" (Crypto) → "Run step" → "Read step result" →
+  "Run finished?" / "Too many steps?" / "Wait requested?" ("Wait before next step" honours `retryAfterMs`) → "Done".
+  Error branch: "Run owned elsewhere?" (`LEASE_HELD`) → "Leave run to its owner"; otherwise "Describe failure" →
+  "Sign failure report" → "Report failure" (`/api/internal/runs/:id/fail`).
+- `n8n/documentation/README.md`: run flow, security, failure handling, setup (n8n env vars, app vars, credential,
+  import and publish), verified behaviour.
+- `.env.example`: comment naming the n8n-side variables (`LEADPILOT_APP_URL`, `LEADPILOT_INTERNAL_API_SECRET`,
+  `N8N_BLOCK_ENV_ACCESS_IN_NODE`) and the webhook credential; names only.
+- `assertNoOtherLeaseHolder()` in `src/modules/runs/engine/context.ts` (exported from `engine/index.ts`), called by
+  `src/app/api/internal/runs/[id]/fail/route.ts` (see bug below).
+- Tests: `tests/unit/n8n-workflow.test.ts` (9 new: graph connectivity, webhook path and credential, UUID check, signing,
+  only step/fail endpoints, step-to-stage map, retry and error branches, loop and wait, no secrets in the JSON);
+  `tests/integration/platform.test.ts` (2 new: a duplicate execution cannot fail a run another execution is driving;
+  any execution may fail once the previous lease expired).
+
+### Bug found and fixed during D
+
+- A duplicate n8n execution for the same run gets `LEASE_HELD` from the step endpoint, took the error branch and called
+  `/fail`, and `failRun` had no ownership check, so it marked a healthy run `FAILED`. Fix: `/fail` now returns 409
+  `LEASE_HELD` while a different executor (`n8n:<executionId>`) holds a live lease; without an `executionId` any live
+  lease blocks. The workflow also routes `LEASE_HELD` to "Leave run to its owner" instead of reporting failure.
+
+### Verification (actual results)
+
+| Check                            | Result                                                   |
+| -------------------------------- | -------------------------------------------------------- |
+| Prettier, ESLint, `tsc --noEmit` | ✅ clean                                                 |
+| Unit tests                       | ✅ 110/110 (9 new in `tests/unit/n8n-workflow.test.ts`)  |
+| Integration tests                | ✅ 54/54 (2 new in `tests/integration/platform.test.ts`) |
+| Playwright                       | ✅ 18/18                                                 |
+| Live n8n (see below)             | ✅ with the caveat below                                 |
+| `next build` (Turbopack)         | ⏳ To run on `main` after merge                          |
+
+Live checks on 2026-10-13 against a temporary `n8nio/n8n:2.42.7` container, the app as a production build on the test
+database, mock providers:
+
+- Run started from the app → `COMPLETED_WITH_ERRORS` in about 2–3 s through 8 step calls (with-errors is expected from
+  the mock fixtures' scripted AI errors).
+- Wrong webhook secret → 403. Non-UUID run id → ignored.
+- Unknown run id → error branch → signed `/fail` passed the signature check (404 run not found).
+- Duplicate trigger after completion → stops on the terminal status.
+- Duplicate trigger while the lease is held → "Leave run to its owner"; the run stays `RUNNING`.
+
+Caveat: the app build used for the live checks predates the `/fail` lease guard; the guard itself is covered by the
+integration tests only.
+
+### Open items
+
+- Not verified: n8n crashing mid-run followed by Resume; live providers; behaviour with a wrong internal API secret.
+- Known quirk: the webhook answers 200 instead of 202 in n8n 2.42.7; the app accepts any 2xx.
+- Merge C3b and D into `main` (fast-forward `main` to `phase-d-n8n`), done by the developer; then the Turbopack build on `main`.
+- Next: Phase E (Dockerfile, compose, Caddy, backups; will add the n8n container, its env vars and the credential
+  import), then F and G.
 
 ## Environment notes
 
