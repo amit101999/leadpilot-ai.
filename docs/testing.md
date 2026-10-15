@@ -6,7 +6,7 @@ WhatsApp number without an explicit opt-in.
 | Suite       | Command                    | Runner                        | Needs                                | Count (2026-10-15)          |
 | ----------- | -------------------------- | ----------------------------- | ------------------------------------ | --------------------------- |
 | Unit        | `npm run test:unit`        | Vitest, project `unit`        | nothing                              | 130 tests                   |
-| Integration | `npm run test:integration` | Vitest, project `integration` | Postgres and `TEST_DATABASE_URL`     | 61 tests                    |
+| Integration | `npm run test:integration` | Vitest, project `integration` | Postgres and `TEST_DATABASE_URL`     | 62 tests                    |
 | End to end  | `npm run test:e2e`         | Playwright (Chromium)         | Postgres and `TEST_DATABASE_URL`     | 19 tests                    |
 | Live        | `npm run test:live`        | Vitest, project `live`        | `LIVE_TESTS=1` plus real credentials | 3 tests, skipped by default |
 

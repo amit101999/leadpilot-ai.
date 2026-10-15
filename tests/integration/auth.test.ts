@@ -1,9 +1,12 @@
+import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { POST as login } from "@/app/api/auth/login/route";
 import { POST as logout } from "@/app/api/auth/logout/route";
 import { GET as me } from "@/app/api/auth/me/route";
 import { GET as health } from "@/app/api/health/route";
 import { SESSION_COOKIE } from "@/lib/auth/session";
+import { getDb } from "@/lib/database/client";
+import { sessions } from "@/lib/database/schema";
 import { call, createUser, TEST_PASSWORD } from "./helpers";
 
 function sessionCookieFrom(headers: Headers): string | null {
@@ -86,6 +89,19 @@ describe("auth API", () => {
     const res = await call(logout, { method: "POST", user });
     expect(res.status).toBe(200);
     expect((await call(me, { user })).status).toBe(401);
+  });
+
+  it("purges expired sessions on the next successful login", async () => {
+    const user = await createUser("VIEWER");
+    await getDb()
+      .update(sessions)
+      .set({ expiresAt: new Date(Date.now() - 60_000) })
+      .where(eq(sessions.userId, user.id));
+    const res = await call(login, { method: "POST", body: { email: user.email, password: TEST_PASSWORD } });
+    expect(res.status).toBe(200);
+    const left = await getDb().select().from(sessions).where(eq(sessions.userId, user.id));
+    expect(left).toHaveLength(1);
+    expect(left[0]!.expiresAt.getTime()).toBeGreaterThan(Date.now());
   });
 
   it("rejects requests without a session", async () => {

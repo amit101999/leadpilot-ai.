@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { and, eq, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { hashPassword, MIN_PASSWORD_LENGTH, verifyAgainstDummy, verifyPassword } from "@/lib/auth/password";
-import { createSession, deleteSession } from "@/lib/auth/session";
+import { createSession, deleteExpiredSessions, deleteSession } from "@/lib/auth/session";
 import type { Database } from "@/lib/database/client";
 import { sessions, users } from "@/lib/database/schema";
 import { AppError } from "@/lib/http/errors";
@@ -51,6 +51,8 @@ export async function login(
   }
 
   const session = await createSession(db, user.id, { ipAddress: meta.ipAddress, userAgent: meta.userAgent });
+  // Expired sessions are already rejected on lookup; purging them here keeps the table small without a scheduler.
+  await deleteExpiredSessions(db);
   await recordAudit(db, {
     actor: userActor(user.id),
     action: "auth.login",
