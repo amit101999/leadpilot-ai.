@@ -10,20 +10,20 @@ Last updated: 2026-10-15
 
 Plan: `C:\Users\ACER\.claude\plans\clever-noodling-finch.md`.
 
-| Phase                    | Scope                                                                     | Status                                                                                                                |
-| ------------------------ | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Baseline                 | Pre-existing backend core committed                                       | ✅ Done (`703761f`)                                                                                                   |
-| A. Foundation            | Seed, `.env.example`, page auth proxy, CSRF check                         | ✅ Merged to `main` (`ab4b7e1`); seed verified during B1                                                              |
-| B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                     | ✅ Merged to `main` (`0bed021`); Turbopack build verified on main                                                     |
-| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook      | ✅ Merged to `main` (`41e8d95`); Turbopack build verified on main                                                     |
-| C1. UI (part 1)          | Design system, app shell, login, Dashboard, Run Agent                     | ✅ Merged to `main` (`71a0b50`); Turbopack build verified on main                                                     |
-| C2. UI (part 2)          | Search History and run detail, Qualified Leads, All Jobs                  | ✅ Merged to `main` (`d742e0a`); Turbopack build verified on main                                                     |
-| C3a. UI (part 3a)        | Search Profiles list, editor, version history                             | ✅ Merged to `main` (fast-forward, `e650286` + docs `a82ddab`)                                                        |
-| C3b. UI (part 3b)        | Notifications, Integrations, Settings (incl. change password), Audit Logs | ✅ Committed `d18e5f8` + docs `3730daf` on `worktree-phase-c3b-ops`; merge to `main` requested but not done (blocked) |
-| D. n8n                   | Run workflow calling the app's internal step API, lease-safe `/fail`      | ✅ Committed `9cf72ad` on `phase-d-n8n` (stacked on C3b); not merged                                                  |
-| E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                                | ✅ Committed `62d69cc` + `7e34456` on `phase-e-docker` (stacked on D); not merged                                     |
-| F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                       | ✅ Committed `b806b52` on `phase-f-tests` (stacked on E); not merged (fast-forward pending, by the developer)         |
-| G. Docs and final review | README, `docs/*.md`, full verification                                    | ⏳ Not started                                                                                                        |
+| Phase                    | Scope                                                                     | Status                                                                                           |
+| ------------------------ | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Baseline                 | Pre-existing backend core committed                                       | ✅ Done (`703761f`)                                                                              |
+| A. Foundation            | Seed, `.env.example`, page auth proxy, CSRF check                         | ✅ Merged to `main` (`ab4b7e1`); seed verified during B1                                         |
+| B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                     | ✅ Merged to `main` (`0bed021`); Turbopack build verified on main                                |
+| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook      | ✅ Merged to `main` (`41e8d95`); Turbopack build verified on main                                |
+| C1. UI (part 1)          | Design system, app shell, login, Dashboard, Run Agent                     | ✅ Merged to `main` (`71a0b50`); Turbopack build verified on main                                |
+| C2. UI (part 2)          | Search History and run detail, Qualified Leads, All Jobs                  | ✅ Merged to `main` (`d742e0a`); Turbopack build verified on main                                |
+| C3a. UI (part 3a)        | Search Profiles list, editor, version history                             | ✅ Merged to `main` (fast-forward, `e650286` + docs `a82ddab`)                                   |
+| C3b. UI (part 3b)        | Notifications, Integrations, Settings (incl. change password), Audit Logs | ✅ Merged to `main` (fast-forward `a82ddab` → `727c19b`, 2026-10-15); `d18e5f8` + docs `3730daf` |
+| D. n8n                   | Run workflow calling the app's internal step API, lease-safe `/fail`      | ✅ Merged to `main` (same fast-forward); `9cf72ad`                                               |
+| E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                                | ✅ Merged to `main` (same fast-forward); `62d69cc` + `7e34456`                                   |
+| F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                       | ✅ Merged to `main` (same fast-forward); `b806b52` + docs `727c19b`                              |
+| G. Docs and final review | README, `docs/*.md`, full verification                                    | ✅ Committed `9b7b102` on `worktree-phase-g-docs`; merge to `main` pending at time of writing    |
 
 ## Baseline (pre-existing work, committed 2026-10-11 as `703761f`)
 
@@ -87,7 +87,9 @@ Existed before this tracking started. Commit authorship of that earlier work: ne
 - ~~Run the seed against Postgres~~: done in B1, run twice, idempotent.
 - ~~Login route must check Origin~~: done in B1 (`assertSameOrigin`).
 - Dev-only `npm audit`: 9 findings (5 high, 4 moderate) in `braces` and an old `esbuild` used by
-  `drizzle-kit`; not in production code; the only fix offered is `--force` (breaking).
+  `drizzle-kit`; not in production code; the only fix offered is `--force` (breaking). Still 9 dev-only findings in
+  Phase G (now attributed to the `eslint-config-next` and `drizzle-kit` chains), 0 in production dependencies; not
+  fixed, documented in `docs/security.md`.
 - `.claude/skills/*` are directory links to `.agents/skills/*` and both are committed, so
   `git status` shows 4 phantom modifications. The content is identical.
 
@@ -443,7 +445,7 @@ duplicate / archive / restore.
 - The unsaved-changes guard does not catch browser back/forward within the app (only tab close and link clicks).
 - ~~The Settings page referenced by the Notifications tab hint arrives in C3b~~: `/settings` added in C3b.
 
-## Phase C3b (`d18e5f8` + docs `3730daf` on `worktree-phase-c3b-ops`, not merged)
+## Phase C3b (`d18e5f8` + docs `3730daf`, merged to `main` by fast-forward on 2026-10-15)
 
 Decisions: Phase C3 decisions 4 to 8 above, confirmed in the C3b grilling (accepted by the developer, "accept all").
 
@@ -493,12 +495,12 @@ Decisions: Phase C3 decisions 4 to 8 above, confirmed in the C3b grilling (accep
 
 ### Open items
 
-- Merge to `main`: requested by the developer on 2026-10-13 but **not done**. The session's isolation guard blocked
-  git operations on the shared main checkout, so `main` is still `a82ddab`. The developer has to run the merge; Phase D
-  was stacked on this branch instead (see below). Turbopack build on `main` still to run after the merge.
+- ~~Merge to `main`: requested by the developer on 2026-10-13 but not done (isolation guard blocked git on the main
+  checkout); Phase D was stacked on this branch instead~~: `main` fast-forwarded `a82ddab` → `727c19b` on 2026-10-15
+  (C3b, D, E, F together), at the developer's request. Turbopack build verified in Phase G.
 - Next phases: ~~D (n8n workflows)~~ committed `9cf72ad`, E (Docker), F (tests), G (docs).
 
-## Phase D: n8n run workflow (`9cf72ad` on `phase-d-n8n`, stacked on `worktree-phase-c3b-ops`, not merged)
+## Phase D: n8n run workflow (`9cf72ad` on `phase-d-n8n`, stacked on `worktree-phase-c3b-ops`; merged to `main` 2026-10-15)
 
 ### Decisions (grilled, accepted by the developer 2026-10-13, "accept all")
 
@@ -568,11 +570,11 @@ integration tests only.
 
 - Not verified: n8n crashing mid-run followed by Resume; live providers; behaviour with a wrong internal API secret.
 - Known quirk: the webhook answers 200 instead of 202 in n8n 2.42.7; the app accepts any 2xx.
-- Merge C3b and D into `main` (fast-forward `main` to `phase-d-n8n`), done by the developer; then the Turbopack build on `main`.
+- ~~Merge C3b and D into `main`; then the Turbopack build~~: merged 2026-10-15 (`727c19b`); Turbopack build verified in Phase G.
 - ~~Next: Phase E (Dockerfile, compose, Caddy, backups; will add the n8n container, its env vars and the credential
   import)~~: committed `7e34456` (see below). Then F and G.
 
-## Phase E: Infrastructure (`62d69cc` WIP 2026-10-13 + `7e34456` 2026-10-15 on `phase-e-docker`, stacked on D, not merged)
+## Phase E: Infrastructure (`62d69cc` WIP 2026-10-13 + `7e34456` 2026-10-15 on `phase-e-docker`, stacked on D; merged to `main` 2026-10-15)
 
 Full write-up, including the live verification table, in `docs/deployment.md`.
 
@@ -667,11 +669,11 @@ troubleshooting note in `docs/deployment.md`.
 - A restore brings back the sessions that existed at backup time; restoring a dump from a newer app version is not
   supported (documented in `docs/deployment.md`).
 - Delete `E:\docker-disk-backup\docker_data-2026-10-13.vhdx` when no longer needed (developer decision).
-- Merge C3b, D and E into `main` (fast-forward `main` to `phase-e-docker`), to be done by the developer; `main` is
-  still `a82ddab` as of this update. Then the Turbopack build on `main`.
+- ~~Merge C3b, D and E into `main`; then the Turbopack build~~: merged 2026-10-15 (`727c19b`); Turbopack build
+  verified in Phase G.
 - ~~Next: Phase F (tests)~~: committed `b806b52` (see below). Then Phase G (docs and final review).
 
-## Phase F: Tests (`b806b52` 2026-10-15 on `phase-f-tests`, stacked on E, not merged)
+## Phase F: Tests (`b806b52` 2026-10-15 on `phase-f-tests`, stacked on E; merged to `main` 2026-10-15)
 
 Full write-up, including the acceptance-scenario mapping, in `docs/testing.md`.
 
@@ -718,23 +720,89 @@ Full write-up, including the acceptance-scenario mapping, in `docs/testing.md`.
 | Integration tests                      | ✅ 61/61 (7 new)                                                                   |
 | Playwright e2e                         | ✅ 19/19 (1 new), against `next build --webpack` + `next start`                    |
 | Live project                           | ⏭️ 3 skipped: no credentials (also skipped with `LIVE_TESTS=1`, no keys in `.env`) |
-| `next build` (Turbopack), `npm audit`  | ⏳ Not run in this phase; planned for Phase G on `main`                            |
+| `next build` (Turbopack), `npm audit`  | ⏳ Not run in this phase; both run in Phase G (see below)                          |
 
 ### Open items
 
 - Confirm the numbering and wording of the ten inferred acceptance scenarios (developer).
 - Not covered: live OpenAI, WhatsApp and Upwork; n8n crashing mid-run followed by resume; production infrastructure.
 - Live tests have never run against real services (no credentials).
-- **Merge pending, to be done by the developer**: this session could not run git in the main checkout (isolated
-  worktree), so `main` is still `a82ddab`. Command handed over:
-  `git -C "E:\upwork agent" merge --ff-only phase-f-tests` (brings in C3b, D, E and F).
-- Next: Phase G (README, `docs/*.md`, full verification including the Turbopack build on `main` and `npm audit`).
+- ~~Merge pending, to be done by the developer~~: on 2026-10-15, at the developer's request, the Phase G session
+  fast-forwarded `main` from `a82ddab` to `727c19b` (C3b, D, E, F). The developer's 4 uncommitted `.claude/skills`
+  edits in the main checkout were left untouched.
+- ~~Next: Phase G~~: committed `9b7b102` (see below).
+
+## Phase G: Docs and final review (`9b7b102` 2026-10-15 on `worktree-phase-g-docs`, based on `main` `727c19b`)
+
+Merge to `main` (fast-forward) pending at time of writing.
+
+### Decisions (grilled; the developer pre-accepted every recommendation, "accept all the grill question ok")
+
+1. Write `README.md` plus `docs/architecture.md`, `database.md`, `api.md`, `security.md`, `whatsapp.md`,
+   `upwork-access.md` and `troubleshooting.md`. This also fixes existing links to `whatsapp.md` and `upwork-access.md`
+   that pointed to files that did not exist.
+2. Keep `n8n/documentation/README.md` as the single n8n document; no `docs/n8n-workflows.md`.
+3. API reference as hand-written endpoint tables; no OpenAPI specification.
+4. Upwork document built from Upwork's official sources with citations; anything not confirmed is flagged.
+5. Final review: full automated checks plus a manual security pass against CLAUDE.md §4; fix only real defects.
+6. `npm audit`: non-breaking fixes only, no `--force`.
+7. Fast-forward `main` when done.
+
+### Implemented
+
+- `README.md` (new): what works today, development quick start, commands, stack, documentation index.
+- New documents, written from the code: `docs/architecture.md` (code layout, run lifecycle, qualification,
+  notification delivery guarantees, key design decisions, scalability and failure modes), `docs/database.md` (tables,
+  migrations, integrity and concurrency, retention and cleanup), `docs/api.md` (conventions, endpoint tables, rate
+  limits, not implemented), `docs/security.md` (trust boundaries, controls, known risks), `docs/whatsapp.md` (why
+  templates, setup, delivery lifecycle, not implemented), `docs/upwork-access.md` (what the code does, what would
+  unblock live discovery, what Upwork's documentation says, policy notes), `docs/troubleshooting.md`.
+- `docs/testing.md`: integration count 61 → 62.
+- Claims corrected in the new docs during review against the source: archive vs restore routes, the session cookie
+  name, retryable WhatsApp sends are retried automatically (3 attempts, 2 s doubling, max 30 s), and a dispatch failure
+  marks a new run `FAILED` with `EXECUTOR_UNAVAILABLE`.
+- Upwork: Upwork's official pages returned HTTP 403 to automated fetching, so the facts in `docs/upwork-access.md` come
+  from search excerpts of those official pages and are flagged as such. Live Upwork discovery remains BLOCKED.
+
+### Defect found and fixed
+
+- `deleteExpiredSessions` (`src/lib/auth/session.ts`) was never called, so expired session rows accumulated (they were
+  already rejected on lookup). `login()` in `src/modules/auth/service.ts` now calls it after each successful login;
+  new integration test "purges expired sessions on the next successful login" in `tests/integration/auth.test.ts`.
+
+### Verification (actual results, after the last change)
+
+| Check                               | Result                                                                                                                                  |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Prettier, ESLint, `tsc`             | ✅ clean                                                                                                                                |
+| Unit tests                          | ✅ 130/130                                                                                                                              |
+| Integration tests                   | ✅ 62/62 (1 new in `tests/integration/auth.test.ts`)                                                                                    |
+| Playwright e2e                      | ✅ 19/19                                                                                                                                |
+| `next build` (Turbopack)            | ✅ in the worktree with real `npm ci` `node_modules` (closes the long-standing "Turbopack build on `main`" item for C3b to F)           |
+| `npm audit`                         | ✅ 0 in production dependencies; ⚠️ 9 dev-only (5 high, 4 moderate, `eslint-config-next` and `drizzle-kit` chains), fix needs `--force` |
+| Manual security pass (CLAUDE.md §4) | ✅ done; one defect fixed (above); remaining risks recorded in `docs/security.md`. Not a penetration test or third-party audit          |
+
+### Known risks (recorded in `docs/security.md`)
+
+No Content-Security-Policy header; n8n environment access (`N8N_BLOCK_ENV_ACCESS_IN_NODE=false`); `clientIp()` trusts
+`X-Forwarded-For` when Caddy is not in front; the 9 dev-only advisories; no account lockout or MFA; no user-management
+UI or API; no data-retention policy; live OpenAI, WhatsApp and Upwork integrations never exercised.
+
+### Open items
+
+- Fast-forward `main` to `9b7b102` plus this PROGRESS commit (pending at time of writing).
+- Developer to confirm the numbering and wording of the ten inferred acceptance scenarios (Phase F).
+- Live OpenAI and WhatsApp: blocked on credentials. Live Upwork discovery: BLOCKED until an approved API key with
+  job-search scope, a confirmed data contract and a live adapter exist (`docs/upwork-access.md`).
+- Production on a real Linux host with a Let's Encrypt certificate: not verified.
 
 ## Environment notes
 
 - Windows 11, Node 22.17.0, Next.js 16.4.0, PostgreSQL 16 via Docker (`127.0.0.1:55432`).
 - Docker Desktop: Engine 29.7.2, Compose v5.4.0 (Phase E verification). Image builds need several GB free on C:.
 - No git remote configured; nothing has been pushed.
+- Phase G: the Turbopack build passed in the worktree because it had its own `npm ci` `node_modules` (earlier worktrees
+  used a junction outside the project root, which Turbopack rejects).
 - No OpenAI, WhatsApp or Upwork credentials; those integrations run in mock mode.
 - Port 3000 on the developer's machine was in use by the developer's own `next` server (started from the main
   checkout on 2026-10-11 22:11) and was left running. C2 previews used port 3200 with `APP_BASE_URL` overridden to
