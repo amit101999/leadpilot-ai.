@@ -4,7 +4,7 @@ Curated record of what has been built, decided and verified. Maintained by the
 `project-tracker` subagent (`.claude/agents/project-tracker.md`). The raw,
 automatic history is in `activity-log.md` (local, gitignored).
 
-Last updated: 2026-10-13
+Last updated: 2026-10-15
 
 ## Phase status
 
@@ -21,7 +21,7 @@ Plan: `C:\Users\ACER\.claude\plans\clever-noodling-finch.md`.
 | C3a. UI (part 3a)        | Search Profiles list, editor, version history                             | ✅ Merged to `main` (fast-forward, `e650286` + docs `a82ddab`)                                                        |
 | C3b. UI (part 3b)        | Notifications, Integrations, Settings (incl. change password), Audit Logs | ✅ Committed `d18e5f8` + docs `3730daf` on `worktree-phase-c3b-ops`; merge to `main` requested but not done (blocked) |
 | D. n8n                   | Run workflow calling the app's internal step API, lease-safe `/fail`      | ✅ Committed `9cf72ad` on `phase-d-n8n` (stacked on C3b); not merged                                                  |
-| E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                                | ⏳ Not started                                                                                                        |
+| E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                                | ✅ Committed `62d69cc` + `7e34456` on `phase-e-docker` (stacked on D); not merged                                     |
 | F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                       | ⏳ Not started                                                                                                        |
 | G. Docs and final review | README, `docs/*.md`, full verification                                    | ⏳ Not started                                                                                                        |
 
@@ -149,6 +149,8 @@ end in which every qualified lead scores at least 75, is fixed-price and has ver
 
 - `clientIp()` trusts `X-Forwarded-For`. That is correct behind the production reverse proxy, but without
   one the per-IP login limit can be bypassed; the per-e-mail limit still applies.
+  Phase E: in production Caddy discards client-sent `X-Forwarded-For` (verified live 2026-10-15); the local full
+  stack binds `web` to `127.0.0.1`.
 - The per-e-mail limit lets someone lock a known account out of login for up to 15 minutes (accepted
   trade-off of decision 4).
 - `GET /api/runs/:id` returns `leaseOwner` (an internal executor id). Low sensitivity.
@@ -567,12 +569,112 @@ integration tests only.
 - Not verified: n8n crashing mid-run followed by Resume; live providers; behaviour with a wrong internal API secret.
 - Known quirk: the webhook answers 200 instead of 202 in n8n 2.42.7; the app accepts any 2xx.
 - Merge C3b and D into `main` (fast-forward `main` to `phase-d-n8n`), done by the developer; then the Turbopack build on `main`.
-- Next: Phase E (Dockerfile, compose, Caddy, backups; will add the n8n container, its env vars and the credential
-  import), then F and G.
+- ~~Next: Phase E (Dockerfile, compose, Caddy, backups; will add the n8n container, its env vars and the credential
+  import)~~: committed `7e34456` (see below). Then F and G.
+
+## Phase E: Infrastructure (`62d69cc` WIP 2026-10-13 + `7e34456` 2026-10-15 on `phase-e-docker`, stacked on D, not merged)
+
+Full write-up, including the live verification table, in `docs/deployment.md`.
+
+### Decisions and reasons
+
+1. The production override (`docker-compose.prod.yml`) removes every published port except Caddy's, using Compose's
+   `!reset` tag (needs Compose v2.24+; verified with v5.4.0). Postgres, web and n8n are reachable on the Docker
+   network only.
+2. The n8n editor is not published in production; the operator reaches it through an SSH tunnel to the container
+   address. Reason: with `N8N_BLOCK_ENV_ACCESS_IN_NODE=false` (Phase D decision 5) anyone who can edit workflows can
+   read n8n's environment, including `N8N_ENCRYPTION_KEY` and `LEADPILOT_INTERNAL_API_SECRET`.
+3. HSTS `max-age=31536000` **without** `includeSubDomains`, because `APP_DOMAIN` may be an apex domain whose other
+   subdomains are not served by LeadPilot.
+4. Restore loads the dump into a scratch database first (a bad file changes nothing), then stops `web` and swaps the
+   databases by rename in one transaction, keeping `<db>_pre_restore_<timestamp>` for rollback.
+5. `n8n-data` and `caddy-data` are not backed up: the workflow and credential are re-imported by `n8n-import` on every
+   start, and Caddy re-issues certificates. `.env` must be backed up separately by the operator (without
+   `AUTH_SECRET` and `N8N_ENCRYPTION_KEY` a restored server cannot work as before).
+6. Off-site copying of dumps is **not implemented**; documented as an operator responsibility.
+
+### Implemented
+
+- `Dockerfile`: stages `deps` → `build` (`npm run build`, no secrets needed at build time) → `runner` (default target;
+  Next `output: "standalone"` bundle + static assets, non-root `node` user, `HEALTHCHECK` on `/api/health`) and
+  `migrator` (dependencies + sources, `npm run db:migrate`, also used for the seed). Base image `node:22.23.3-alpine3.24`.
+- `.dockerignore`: excludes `.git`, `.claude`, `node_modules`, build output, test artefacts, `backups`, `.env*` (except
+  `.env.example`) and the local progress log/state.
+- `docker-compose.yml` (project `leadpilot`): `postgres` (16.6-alpine, `127.0.0.1:${POSTGRES_PORT:-55432}`) always; with
+  `--profile stack`: one-shot `migrate`, `web` (`127.0.0.1:${WEB_PORT:-3000}`, starts after `migrate` exits 0), one-shot
+  `n8n-import` (builds the Header Auth credential from `N8N_WEBHOOK_SECRET` in a mode-600 temp file, imports and
+  publishes `n8n/workflows/leadpilot-run.json`), and `n8n` (`n8nio/n8n:2.42.7`, `127.0.0.1:${N8N_PORT:-5678}`,
+  health check on `/healthz`). Shared app variables in the `x-app-env` anchor with defaults mirroring `env.ts`.
+- `docker-compose.prod.yml`: `!reset` ports on postgres/web/n8n, `APP_BASE_URL=https://${APP_DOMAIN}` for web, and
+  `caddy` (`caddy:2.11.7-alpine`, ports 80/443/443-udp, volumes `caddy-data`, `caddy-config`).
+- `deploy/Caddyfile`: automatic Let's Encrypt (`ACME_EMAIL`), zstd/gzip, HSTS, `Server` header removed,
+  `/api/internal/*` answered 404 (second layer on top of HMAC), `reverse_proxy web:3000` with no `trusted_proxies` so a
+  client-sent `X-Forwarded-For` is discarded (addresses the B1 open item about `clientIp()` trusting that header).
+- `scripts/backup-db.sh`: `pg_dump --format=custom` inside the postgres container, written to a `.partial` file,
+  rejected if empty, checked with `pg_restore --list`, then renamed; `umask 077`; deletes dumps older than
+  `BACKUP_KEEP_DAYS` (default 14, validated as a whole number); `BACKUP_DIR` default `backups`. Cron line documented.
+- `scripts/restore-db.sh`: requires `--yes`; scratch database `<db>_restore` loaded with
+  `pg_restore --single-transaction --exit-on-error`; stops `web` if running (restarted by an EXIT trap); swaps by
+  rename in one `psql --single-transaction`.
+- `.env.example`: `WEB_PORT`, `N8N_PORT`, `N8N_ENCRYPTION_KEY`, `APP_DOMAIN`, `ACME_EMAIL` (names and comments only).
+- `docs/deployment.md` (new): services, ports, production setup, updating, n8n editor access, backups and restore,
+  security notes, verification, troubleshooting. `n8n/documentation/README.md` points to it for the Docker setup.
+- `package-lock.json` changed in `62d69cc` (entries added/removed, for example nested `ajv`, `picomatch`, `@emnapi/*`).
+  Reason for the lockfile change: needs developer confirmation (commit message does not say).
+
+### Verification (actual results)
+
+| Check                                        | Result                                                                             |
+| -------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Prettier `format:check`, ESLint, `tsc`       | ✅ clean / exit 0 / exit 0 (after the last change)                                 |
+| Unit tests                                   | ✅ 110/110                                                                         |
+| Integration tests                            | ✅ 54/54                                                                           |
+| `sh -n` on both scripts                      | ✅ OK                                                                              |
+| ShellCheck                                   | ⏳ Not run (not installed)                                                         |
+| `next build`                                 | ✅ inside the Docker image build (`runner` target)                                 |
+| Live Docker stack (2026-10-15, listed below) | ✅ all checks in the `docs/deployment.md` "Verification (2026-10-15)" table passed |
+
+Live checks on Windows 11, Docker Desktop (Engine 29.7.2, Compose v5.4.0), isolated Compose project, throwaway secrets,
+mock providers, `RUN_EXECUTOR=n8n`; Caddy on `127.0.0.1:8080/8443` with `APP_DOMAIN=localhost` (Caddy local CA,
+because port 80 was taken):
+
+- Images build; `migrate` and `n8n-import` exit 0; `web`, `n8n`, `postgres` healthy. Seed via the `migrate` image works.
+- Run started over the API and executed by n8n: `COMPLETED_WITH_ERRORS` in 2–3 s, all 7 stages completed (expected with
+  mock fixtures).
+- Production override: only Caddy publishes ports (web and n8n host ports refuse connections).
+- HTTP → HTTPS 308; HSTS present, `Server` removed; `POST /api/internal/...` through Caddy → 404; login and run over
+  HTTPS with a `Secure` session cookie; spoofed `X-Forwarded-For` / `X-Real-IP` ignored (real peer address recorded).
+- Backup → change data → restore: data back to the backup state, app healthy, a run completed afterwards. Corrupt dump
+  rejected with live data unchanged; restore without `--yes` refused.
+
+Not run in this phase: Playwright.
+
+### Incident during the phase
+
+Drive C: filled up during image builds; Docker Desktop's data disk went read-only and the engine hung (this is why
+`62d69cc` was committed as unverified WIP). Recovered by freeing space, killing the Docker processes and running
+`wsl --shutdown`; data intact. A copy of Docker's data disk was saved at `E:\docker-disk-backup\docker_data-2026-10-13.vhdx`
+(8.43 GB) and **has not been deleted**; it can be removed once the developer no longer needs it. Recorded as a
+troubleshooting note in `docs/deployment.md`.
+
+### Open items
+
+- Not verified: a real Let's Encrypt certificate on a public domain, a Linux host, behaviour after a host reboot, the
+  cron schedule, n8n crashing in the middle of a run.
+- Off-site copy of backups not implemented.
+- On Docker Desktop all requests reach Caddy from the gateway address, so login rate limiting shares one per-IP bucket
+  there; on Linux clients keep their real addresses (documented, not verified on Linux).
+- A restore brings back the sessions that existed at backup time; restoring a dump from a newer app version is not
+  supported (documented in `docs/deployment.md`).
+- Delete `E:\docker-disk-backup\docker_data-2026-10-13.vhdx` when no longer needed (developer decision).
+- Merge C3b, D and E into `main` (fast-forward `main` to `phase-e-docker`), to be done by the developer; `main` is
+  still `a82ddab` as of this update. Then the Turbopack build on `main`.
+- Next: Phase F (tests) and Phase G (docs and final review).
 
 ## Environment notes
 
 - Windows 11, Node 22.17.0, Next.js 16.4.0, PostgreSQL 16 via Docker (`127.0.0.1:55432`).
+- Docker Desktop: Engine 29.7.2, Compose v5.4.0 (Phase E verification). Image builds need several GB free on C:.
 - No git remote configured; nothing has been pushed.
 - No OpenAI, WhatsApp or Upwork credentials; those integrations run in mock mode.
 - Port 3000 on the developer's machine was in use by the developer's own `next` server (started from the main
