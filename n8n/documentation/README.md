@@ -93,6 +93,11 @@ current step, so it can report the right stage.
 
 ## Setup
 
+With the Docker stack (`docker compose --profile stack up`), all of this is automatic: the
+`n8n-import` service creates the credential from `N8N_WEBHOOK_SECRET`, imports the workflow and
+publishes it on every start, and `docker-compose.yml` sets the variables below. See
+[`docs/deployment.md`](../../docs/deployment.md). The steps here are for an n8n you run yourself.
+
 ### 1. Environment variables for n8n
 
 | Variable                        | Value                                                                                                                       |

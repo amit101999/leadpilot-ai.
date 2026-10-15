@@ -7,8 +7,9 @@
 {$APP_DOMAIN} {
 	encode zstd gzip
 
+	# No includeSubDomains: APP_DOMAIN may be an apex domain whose other subdomains are not ours to force onto HTTPS.
 	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		Strict-Transport-Security "max-age=31536000"
 		-Server
 	}
 
