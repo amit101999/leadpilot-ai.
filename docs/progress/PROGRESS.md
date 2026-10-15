@@ -22,7 +22,7 @@ Plan: `C:\Users\ACER\.claude\plans\clever-noodling-finch.md`.
 | C3b. UI (part 3b)        | Notifications, Integrations, Settings (incl. change password), Audit Logs | ✅ Committed `d18e5f8` + docs `3730daf` on `worktree-phase-c3b-ops`; merge to `main` requested but not done (blocked) |
 | D. n8n                   | Run workflow calling the app's internal step API, lease-safe `/fail`      | ✅ Committed `9cf72ad` on `phase-d-n8n` (stacked on C3b); not merged                                                  |
 | E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                                | ✅ Committed `62d69cc` + `7e34456` on `phase-e-docker` (stacked on D); not merged                                     |
-| F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                       | ⏳ Not started                                                                                                        |
+| F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                       | ✅ Committed `b806b52` on `phase-f-tests` (stacked on E); not merged (fast-forward pending, by the developer)         |
 | G. Docs and final review | README, `docs/*.md`, full verification                                    | ⏳ Not started                                                                                                        |
 
 ## Baseline (pre-existing work, committed 2026-10-11 as `703761f`)
@@ -669,7 +669,66 @@ troubleshooting note in `docs/deployment.md`.
 - Delete `E:\docker-disk-backup\docker_data-2026-10-13.vhdx` when no longer needed (developer decision).
 - Merge C3b, D and E into `main` (fast-forward `main` to `phase-e-docker`), to be done by the developer; `main` is
   still `a82ddab` as of this update. Then the Turbopack build on `main`.
-- Next: Phase F (tests) and Phase G (docs and final review).
+- ~~Next: Phase F (tests)~~: committed `b806b52` (see below). Then Phase G (docs and final review).
+
+## Phase F: Tests (`b806b52` 2026-10-15 on `phase-f-tests`, stacked on E, not merged)
+
+Full write-up, including the acceptance-scenario mapping, in `docs/testing.md`.
+
+### Decisions and reasons
+
+1. **Acceptance-scenario list inferred.** The original specification's list of 17 acceptance scenarios is not in the
+   repository; the developer said "use your inferred list". Seven scenarios keep the numbers already used in earlier
+   test names (#7, #8, #11, #13, #14, #16, #17). The other ten were inferred from the plan and are listed by
+   behaviour with "?" as the number. **Their numbering and exact wording need developer confirmation.**
+2. **`OpenAiEvaluator` takes an optional injected `fetch`** (`src/modules/ai/openai-evaluator.ts`, new `getClient()`),
+   the same pattern as `CloudWhatsAppProvider`, so the adapter can be tested without the network. When it is
+   undefined the SDK falls back to its default fetch (checked in `node_modules/openai/client.js`:
+   `options.fetch ?? Shims.getDefaultFetch()`), so production behaviour is unchanged.
+3. **Concurrent-runs test asserts bounds, not an exact total**: each job is alerted at most once, each run stays
+   within its limit, and the total is between 10 and 15. Reason: which run wins each job depends on timing.
+4. **Live tests are a separate Vitest project (`live`)**, gated by `LIVE_TESTS=1` **and** per-service credentials
+   (`describe.skipIf`). They never send a WhatsApp message (token check only); the OpenAI test makes one small paid
+   request.
+
+### Implemented
+
+- Unit (20 new): `tests/unit/whatsapp-message.test.ts` (8, template parameters and previews),
+  `tests/unit/cloud-whatsapp.test.ts` (8, request shape, accepted / rejected / uncertain classification, no secrets in
+  errors), `tests/unit/openai-evaluator.test.ts` (4, `store: false`, strict JSON schema, rate limit / server error /
+  timeout classification, connection states).
+- Integration (7 new): `tests/integration/pipeline.test.ts` (`BLOCKED_SOURCE` without discovery; deduplication within
+  and across runs, unnormalizable records skipped), `tests/integration/notifications.test.ts` (reservation 15 eligible
+  / limit 10 → 10 sent; 3 eligible → 3 sent; two concurrent runs for one recipient never alert a job twice),
+  `tests/integration/database-guards.test.ts` (new file: saved profile versions cannot be updated or deleted; a run's
+  configuration snapshot cannot change but its status can).
+- E2E (1 new): `tests/e2e/operations.spec.ts`, "the alert limit holds, and a rerun of the same profile sends no
+  repeat alerts".
+- Live: `tests/live/providers.test.ts` (3 tests: OpenAI key/model and one schema-valid evaluation; WhatsApp token for
+  the phone number id), `vitest.config.ts` project `live`, `package.json` script `test:live`.
+- `docs/testing.md` (new): suites, commands, setup, what each suite covers, live-test opt-in, the acceptance-scenario
+  mapping table, and what is not covered.
+
+### Verification (actual results, after the last change)
+
+| Check                                  | Result                                                                             |
+| -------------------------------------- | ---------------------------------------------------------------------------------- |
+| Prettier `format:check`, ESLint, `tsc` | ✅ clean / exit 0 / exit 0                                                         |
+| Unit tests                             | ✅ 130/130 (20 new)                                                                |
+| Integration tests                      | ✅ 61/61 (7 new)                                                                   |
+| Playwright e2e                         | ✅ 19/19 (1 new), against `next build --webpack` + `next start`                    |
+| Live project                           | ⏭️ 3 skipped: no credentials (also skipped with `LIVE_TESTS=1`, no keys in `.env`) |
+| `next build` (Turbopack), `npm audit`  | ⏳ Not run in this phase; planned for Phase G on `main`                            |
+
+### Open items
+
+- Confirm the numbering and wording of the ten inferred acceptance scenarios (developer).
+- Not covered: live OpenAI, WhatsApp and Upwork; n8n crashing mid-run followed by resume; production infrastructure.
+- Live tests have never run against real services (no credentials).
+- **Merge pending, to be done by the developer**: this session could not run git in the main checkout (isolated
+  worktree), so `main` is still `a82ddab`. Command handed over:
+  `git -C "E:\upwork agent" merge --ff-only phase-f-tests` (brings in C3b, D, E and F).
+- Next: Phase G (README, `docs/*.md`, full verification including the Turbopack build on `main` and `npm audit`).
 
 ## Environment notes
 
