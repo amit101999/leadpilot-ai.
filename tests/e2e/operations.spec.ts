@@ -73,6 +73,58 @@ test("recipient opt-in, WhatsApp on a profile, a run, and the alerts on the Noti
   );
 });
 
+/** Starts a run of the profile from the Run Agent page, waits for it to finish and returns its id. */
+async function runProfile(page: Page, profileId: string, expectedLimit: number) {
+  await page.goto(`/run?profileId=${profileId}`);
+  await page.getByRole("button", { name: "Run agent" }).click();
+  const dialog = page.getByRole("dialog", { name: "Start a run?" });
+  await expect(dialog).toContainText(`Up to ${expectedLimit} qualified leads`);
+  await dialog.getByRole("button", { name: "Start run" }).click();
+  await expect(page).toHaveURL(/\/run\/[0-9a-f-]{36}$/);
+  await expect(page.getByText("This run has finished")).toBeVisible({ timeout: 90_000 });
+  return page.url().split("/").pop()!;
+}
+
+async function sentAlerts(page: Page, runId: string) {
+  const response = await page.request.get(`/api/runs/${runId}/notifications`);
+  expect(response.status()).toBe(200);
+  const alerts = (await response.json()).data as Array<{ status: string }>;
+  return alerts.filter((a) => a.status === "SENT").length;
+}
+
+test("the alert limit holds, and a rerun of the same profile sends no repeat alerts", async ({ page }) => {
+  await openApp(page);
+  const label = `E2E limit ${randomUUID().slice(0, 4)}`;
+  await createOptedInRecipient(page, label);
+
+  await page.goto("/profiles/new");
+  await waitForHydratedForm(page);
+  await page.getByLabel("Profile name").fill(`E2E limit ${randomUUID().slice(0, 6)}`);
+  await page.getByRole("tab", { name: "Notifications" }).click();
+  const recipientSelect = page.getByLabel("WhatsApp recipient");
+  const recipientValue = await recipientSelect.locator("option", { hasText: label }).getAttribute("value");
+  await recipientSelect.selectOption(recipientValue!);
+  await page.getByLabel("Send WhatsApp alerts for qualified leads").check();
+  await page.getByLabel("Maximum alerts per run").fill("2");
+  await page.getByRole("button", { name: "Create profile" }).click();
+  await expect(page).toHaveURL(/\/profiles\/[0-9a-f-]{36}$/);
+  const profileId = page.url().split("/").pop()!;
+
+  // The mock feed qualifies more than two leads, so the limit decides how many are sent.
+  const first = await runProfile(page, profileId, 2);
+  expect(await sentAlerts(page, first)).toBe(2);
+
+  // Same profile, same recipient: the next-best leads may be sent, but never one already alerted.
+  const second = await runProfile(page, profileId, 2);
+  expect(await sentAlerts(page, second)).toBeLessThanOrEqual(2);
+
+  const all = await page.request.get(`/api/notifications?pageSize=100`);
+  const rows = (await all.json()).data as Array<{ recipientLabel: string; jobId: string }>;
+  const jobIds = rows.filter((r) => r.recipientLabel === label).map((r) => r.jobId);
+  expect(jobIds.length).toBeGreaterThanOrEqual(2);
+  expect(new Set(jobIds).size).toBe(jobIds.length);
+});
+
 test("integrations: test the database connection and send a WhatsApp test message", async ({ page }) => {
   await openApp(page);
   await createOptedInRecipient(page, `E2E test target ${randomUUID().slice(0, 4)}`);

@@ -21,6 +21,7 @@
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
     "test:e2e": "playwright test",
+    "test:live": "vitest run --project live",
     "test:all": "vitest run && playwright test"
   },
   "dependencies": {

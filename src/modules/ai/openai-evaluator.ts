@@ -20,8 +20,15 @@ export class OpenAiEvaluator implements AiEvaluator {
     private readonly apiKey: string | undefined,
     model: string | undefined,
     private readonly timeoutMs: number,
+    /** Injected in tests; defaults to the global fetch. */
+    private readonly fetchImpl?: typeof fetch,
   ) {
     this.model = model ?? "";
+  }
+
+  private getClient(): OpenAI {
+    this.client ??= new OpenAI({ apiKey: this.apiKey, maxRetries: 0, fetch: this.fetchImpl });
+    return this.client;
   }
 
   checkConfiguration() {
@@ -34,9 +41,8 @@ export class OpenAiEvaluator implements AiEvaluator {
   async checkConnection(): Promise<AiConnection> {
     const config = this.checkConfiguration();
     if (!config.configured) return { state: "NOT_CONFIGURED", message: config.message };
-    this.client ??= new OpenAI({ apiKey: this.apiKey, maxRetries: 0 });
     try {
-      await this.client.models.retrieve(this.model, { timeout: Math.min(this.timeoutMs, 10_000) });
+      await this.getClient().models.retrieve(this.model, { timeout: Math.min(this.timeoutMs, 10_000) });
       return { state: "CONNECTED", message: `OpenAI key accepted; model ${this.model} is available` };
     } catch (error) {
       if (error instanceof OpenAI.AuthenticationError || error instanceof OpenAI.PermissionDeniedError) {
@@ -53,9 +59,8 @@ export class OpenAiEvaluator implements AiEvaluator {
     if (!this.checkConfiguration().configured) {
       throw new AiProviderError("OpenAI is not configured", "NOT_CONFIGURED");
     }
-    this.client ??= new OpenAI({ apiKey: this.apiKey, maxRetries: 0 });
     try {
-      const response = await this.client.responses.create(
+      const response = await this.getClient().responses.create(
         {
           model: this.model,
           instructions: SYSTEM_INSTRUCTIONS,

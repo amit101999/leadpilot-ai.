@@ -28,6 +28,16 @@ export default defineConfig({
           hookTimeout: 60_000,
         },
       },
+      {
+        resolve: { alias },
+        test: {
+          // Real external services. Every test is skipped unless LIVE_TESTS=1 (see docs/testing.md).
+          name: "live",
+          include: ["tests/live/**/*.test.ts"],
+          environment: "node",
+          testTimeout: 60_000,
+        },
+      },
     ],
   },
 });

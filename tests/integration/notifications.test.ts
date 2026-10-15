@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { eq, inArray } from "drizzle-orm";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/modules/runs/executor", () => ({ dispatchRun: vi.fn(async () => ({ ok: true })) }));
 
@@ -15,11 +15,12 @@ import { GET as runNotifications } from "@/app/api/runs/[id]/notifications/route
 import { POST as createRun } from "@/app/api/runs/route";
 import { GET as verifyWebhook, POST as webhook } from "@/app/api/webhooks/whatsapp/route";
 import { getDb } from "@/lib/database/client";
-import { auditLogs, notifications } from "@/lib/database/schema";
+import { agentRuns, auditLogs, notifications } from "@/lib/database/schema";
 import { createHmac } from "node:crypto";
 import { defaultProfileConfig } from "@/modules/profiles/config-schema";
+import { MockJobSourceProvider } from "@/modules/job-sources/mock-provider";
 import type { MockWhatsAppProvider } from "@/modules/notifications/mock-whatsapp";
-import { getProviders } from "@/modules/providers";
+import { getProviders, setProvidersForTesting } from "@/modules/providers";
 import { runInProcess } from "@/modules/runs/engine";
 import { call, createUser, type TestUser } from "./helpers";
 
@@ -34,25 +35,40 @@ async function setup(user: TestUser, maxPerRun = 10) {
     user,
     body: { label: "Me", phoneE164: PHONE, optInConfirmed: true },
   });
-  const config = defaultProfileConfig(recipient.json.data.id);
+  const recipientId = recipient.json.data.id as string;
+  return { recipientId, profileId: await addProfile(user, recipientId, maxPerRun) };
+}
+
+async function addProfile(user: TestUser, recipientId: string, maxPerRun: number) {
+  const config = defaultProfileConfig(recipientId);
   config.notifications.maxPerRun = maxPerRun;
   const profile = await call(createProfile, {
     method: "POST",
     user,
     body: { name: `P ${randomUUID().slice(0, 6)}`, configuration: config },
   });
-  return { profileId: profile.json.data.id as string };
+  return profile.json.data.id as string;
 }
 
-async function executeRun(user: TestUser, profileId: string) {
+/** Switches the job source to one of the scripted mock feeds (src/modules/job-sources/mock-fixtures.ts). */
+function useScenario(scenario: string) {
+  setProvidersForTesting({ ...getProviders(), jobSource: new MockJobSourceProvider(scenario) });
+}
+
+async function createRunFor(user: TestUser, profileId: string) {
   const run = await call(createRun, {
     method: "POST",
     user,
     body: { profileId },
     headers: { "idempotency-key": randomUUID() },
   });
-  await runInProcess(getDb(), getProviders(), run.json.data.id, { sleep: async () => {} });
   return run.json.data.id as string;
+}
+
+async function executeRun(user: TestUser, profileId: string) {
+  const runId = await createRunFor(user, profileId);
+  await runInProcess(getDb(), getProviders(), runId, { sleep: async () => {} });
+  return runId;
 }
 
 function signedWebhook(body: unknown, secret = "test-app-secret") {
@@ -79,6 +95,7 @@ function statusPayload(statuses: unknown[]) {
 }
 
 beforeEach(() => whatsapp().reset());
+afterEach(() => setProvidersForTesting(undefined));
 
 describe("notifications", () => {
   it("sends qualified leads once, never to the same recipient again on a rerun (acceptance #7)", async () => {
@@ -107,6 +124,61 @@ describe("notifications", () => {
     // The limit covers lead alerts only; a failure summary (alertOnFailure) is a separate message.
     const summaries = whatsapp().sent.filter((m) => m.kind === "summary");
     expect(summaries.length).toBeLessThanOrEqual(1);
+  });
+
+  it("reserves exactly the limit when more leads qualify: 15 eligible, limit 10, 10 sent", async () => {
+    useScenario("bulk-qualified");
+    const user = await createUser("OPERATOR");
+    const { profileId } = await setup(user, 10);
+    const runId = await executeRun(user, profileId);
+    const [run] = await getDb().select().from(agentRuns).where(eq(agentRuns.id, runId));
+    expect(run!.qualifiedCount).toBe(15);
+    const list = (await call(runNotifications, { user, params: { id: runId } })).json.data;
+    expect(list.filter((n: { status: string }) => n.status === "SENT")).toHaveLength(10);
+    expect(leadMessages()).toHaveLength(10);
+  });
+
+  it("sends every lead when fewer qualify than the limit: 3 eligible, limit 10, 3 sent", async () => {
+    useScenario("three-qualified");
+    const user = await createUser("OPERATOR");
+    const { profileId } = await setup(user, 10);
+    const runId = await executeRun(user, profileId);
+    const list = (await call(runNotifications, { user, params: { id: runId } })).json.data;
+    expect(list.filter((n: { status: string }) => n.status === "SENT")).toHaveLength(3);
+    expect(leadMessages()).toHaveLength(3);
+  });
+
+  it("never alerts the same job twice when two runs for one recipient execute concurrently", async () => {
+    useScenario("bulk-qualified");
+    const user = await createUser("OPERATOR");
+    const { recipientId, profileId } = await setup(user, 10);
+    const otherProfileId = await addProfile(user, recipientId, 10);
+    const [runA, runB] = await Promise.all([
+      createRunFor(user, profileId),
+      createRunFor(user, otherProfileId),
+    ]);
+    await Promise.all(
+      [runA, runB].map((id) => runInProcess(getDb(), getProviders(), id, { sleep: async () => {} })),
+    );
+
+    const rows = await getDb()
+      .select({ runId: notifications.runId, jobId: notifications.jobId })
+      .from(notifications)
+      .where(eq(notifications.recipientId, recipientId));
+    const jobIds = rows.map((r) => r.jobId);
+    expect(new Set(jobIds).size).toBe(jobIds.length);
+    for (const id of [runA, runB]) expect(rows.filter((r) => r.runId === id).length).toBeLessThanOrEqual(10);
+    // Which run wins each job depends on timing; the guarantees are "at most once per job" and the limits.
+    expect(rows.length).toBeGreaterThanOrEqual(10);
+    expect(rows.length).toBeLessThanOrEqual(15);
+    const previews = leadMessages().map((m) => m.previewText);
+    expect(new Set(previews).size).toBe(previews.length);
+
+    const runs = await getDb()
+      .select()
+      .from(agentRuns)
+      .where(inArray(agentRuns.id, [runA, runB]));
+    for (const run of runs) expect(["COMPLETED", "COMPLETED_WITH_ERRORS"]).toContain(run.status);
   });
 
   it("keeps the qualification when a send fails and allows a manual retry (acceptance #11)", async () => {
