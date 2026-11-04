@@ -40,7 +40,27 @@ interface Job {
   postedAt: Date | null;
   firstSeenAt: Date;
   lastSeenAt: Date;
+  sourceMetadata?: Record<string, unknown> | null;
 }
+
+/** Extra data stored by the Upwork import (src/modules/job-sources/upwork-import/normalize.ts). */
+interface UpworkImportMetadata {
+  origin?: string;
+  detailsFetched?: boolean;
+  experienceLevel?: string | null;
+  duration?: string | null;
+  proposalsTier?: string | null;
+  client?: {
+    totalPostedJobs?: number | null;
+    totalReviews?: number | null;
+    hireRatePercent?: number | null;
+    openJobs?: number | null;
+  };
+  job?: { totalHired?: number | null; invitesSent?: number | null; connectsCost?: number | null };
+}
+
+const known = (value: string | number | null | undefined, suffix = "") =>
+  value === null || value === undefined ? "Unknown" : `${value}${suffix}`;
 interface CheckResult {
   rule: string;
   outcome: string;
@@ -161,6 +181,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   const latestRun = runs[0];
   const latest = qualifications[0];
 
+  const upwork = (job.sourceMetadata ?? null) as UpworkImportMetadata | null;
   const budget =
     job.budgetType === "HOURLY"
       ? `${formatMoney(job.hourlyMin, job.currency)}–${formatMoney(job.hourlyMax, job.currency)} per hour`
@@ -252,6 +273,32 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           </p>
         </Panel>
       </div>
+
+      {upwork?.origin === "upwork-mcp" && (
+        <Panel
+          id="upwork-details"
+          title="Upwork details"
+          description={
+            upwork.detailsFetched
+              ? "Imported by the Upwork sync, including the client's full hiring record."
+              : "Imported by the Upwork sync from search results; the client's full hiring record was not fetched."
+          }
+        >
+          <Facts
+            rows={[
+              ["Experience level", known(upwork.experienceLevel)],
+              ["Expected duration", known(upwork.duration)],
+              ["Proposals so far", known(upwork.proposalsTier)],
+              ["Client jobs posted", known(upwork.client?.totalPostedJobs)],
+              ["Client reviews", known(upwork.client?.totalReviews)],
+              ["Client hire rate", known(upwork.client?.hireRatePercent, "%")],
+              ["Client open jobs", known(upwork.client?.openJobs)],
+              ["Hired on this job", known(upwork.job?.totalHired)],
+              ["Connects to apply", known(upwork.job?.connectsCost)],
+            ]}
+          />
+        </Panel>
+      )}
 
       <Panel
         id="assessment"

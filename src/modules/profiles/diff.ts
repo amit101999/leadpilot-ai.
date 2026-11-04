@@ -45,6 +45,15 @@ const LABELS: Array<[string, string]> = [
   ["ai.maxRetries", "AI retries on invalid output"],
   ["notifications.whatsappEnabled", "WhatsApp alerts"],
   ["notifications.recipientId", "Alert recipient"],
+  ["notifications.emailEnabled", "E-mail alerts"],
+  ["notifications.emailRecipientId", "E-mail recipient"],
+  ["search.keywords", "Search keywords"],
+  ["search.keywordCoveragePercent", "Keyword coverage required (%)"],
+  ["search.upworkSync.enabled", "Upwork sync"],
+  ["search.upworkSync.everyHours", "Sync every (hours)"],
+  ["search.upworkSync.activeFrom", "Sync active from"],
+  ["search.upworkSync.activeTo", "Sync active until"],
+  ["search.upworkSync.timezone", "Sync time zone"],
   ["notifications.maxPerRun", "Maximum alerts per run"],
   ["notifications.messageFormat", "Message format"],
   ["notifications.sendRunSummary", "Run summary message"],
@@ -92,7 +101,9 @@ export function describeValue(
   currency?: string,
 ): string {
   if (value === null || value === undefined || value === "") return "None";
-  if (path === "notifications.recipientId") return recipientName?.(String(value)) ?? "Selected recipient";
+  if (path === "notifications.recipientId" || path === "notifications.emailRecipientId") {
+    return recipientName?.(String(value)) ?? "Selected recipient";
+  }
   if (MONEY_PATHS.has(path)) return formatMoney(String(value), currency ?? "USD");
   if (typeof value === "boolean") {
     if (path === "client.paymentVerificationRequired") return value ? "Required" : "Not required";

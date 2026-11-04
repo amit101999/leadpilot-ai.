@@ -29,7 +29,9 @@ type EditorOutput = z.output<typeof editorSchema>;
 export interface RecipientOption {
   id: string;
   label: string;
-  phoneMasked: string;
+  channel: "WHATSAPP" | "EMAIL";
+  /** Masked phone number or e-mail address. */
+  address: string;
 }
 
 const nullableNumber = (v: unknown) => (v === "" || v === null || v === undefined ? null : Number(v));
@@ -159,7 +161,8 @@ export function ProfileEditor({
     (sum, v) => sum + (Number.isFinite(Number(v)) ? Number(v) : 0),
     0,
   );
-  const optedIn = recipients;
+  const optedIn = recipients.filter((r) => r.channel === "WHATSAPP");
+  const emailOptions = recipients.filter((r) => r.channel === "EMAIL");
 
   const section = (children: ReactNode) => (
     <div className="grid gap-5 px-4 py-5 lg:max-w-3xl">{children}</div>
@@ -609,6 +612,80 @@ export function ProfileEditor({
       ),
     },
     {
+      key: "search",
+      label: "Search & sync",
+      alert: sectionHasError("search"),
+      content: section(
+        <>
+          <Field
+            id={id("keywords")}
+            label="Search keywords"
+            hint="The Upwork sync searches for each keyword, newest jobs first. Up to 20."
+            error={err("search", "keywords")}
+          >
+            <Controller
+              control={control}
+              name="configuration.search.keywords"
+              render={({ field }) => (
+                <ChipInput
+                  id={id("keywords")}
+                  value={field.value ?? []}
+                  onChange={field.onChange}
+                  max={20}
+                  placeholder="Keyword, then Enter"
+                />
+              )}
+            />
+          </Field>
+          <Field
+            id={id("coverage")}
+            label="Keyword coverage required (%)"
+            hint="Reject jobs mentioning fewer of the keywords than this. Whole words, in the title, description or skills. Leave empty to turn off."
+            error={err("search", "keywordCoveragePercent")}
+          >
+            <Input
+              id={id("coverage")}
+              type="number"
+              min={1}
+              max={100}
+              className="w-24"
+              {...register("configuration.search.keywordCoveragePercent", { setValueAs: nullableNumber })}
+            />
+          </Field>
+          <Checkbox
+            label="Sync this profile from Upwork on a schedule"
+            hint="The Upwork sync agent (Claude + Upwork) imports new jobs when this profile is due. Manual syncs always work."
+            {...register("configuration.search.upworkSync.enabled")}
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              id={id("everyHours")}
+              label="Sync every (hours)"
+              error={(cfgErrors.search?.upworkSync as Record<string, { message?: string }> | undefined)?.everyHours?.message}
+            >
+              <Input
+                id={id("everyHours")}
+                type="number"
+                min={1}
+                max={24}
+                className="w-24"
+                {...register("configuration.search.upworkSync.everyHours", { valueAsNumber: true })}
+              />
+            </Field>
+            <Field id={id("timezone")} label="Time zone" hint="IANA name, e.g. Asia/Kolkata or UTC.">
+              <Input id={id("timezone")} {...register("configuration.search.upworkSync.timezone")} />
+            </Field>
+            <Field id={id("activeFrom")} label="Active from">
+              <Input id={id("activeFrom")} type="time" {...register("configuration.search.upworkSync.activeFrom")} />
+            </Field>
+            <Field id={id("activeTo")} label="Active until">
+              <Input id={id("activeTo")} type="time" {...register("configuration.search.upworkSync.activeTo")} />
+            </Field>
+          </div>
+        </>,
+      ),
+    },
+    {
       key: "notifications",
       label: "Notifications",
       alert: sectionHasError("notifications"),
@@ -631,7 +708,7 @@ export function ProfileEditor({
               <option value="">No recipient</option>
               {optedIn.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.label} ({r.phoneMasked})
+                  {r.label} ({r.address})
                 </option>
               ))}
             </Select>
@@ -640,6 +717,33 @@ export function ProfileEditor({
             label="Send WhatsApp alerts for qualified leads"
             hint="Requires a recipient above."
             {...register("configuration.notifications.whatsappEnabled")}
+          />
+          <Field
+            id={id("emailRecipient")}
+            label="E-mail recipient"
+            hint={
+              emailOptions.length === 0
+                ? "No e-mail recipient with confirmed opt-in yet. Add one in Settings."
+                : "Only recipients who agreed to receive alert e-mails are listed."
+            }
+            error={err("notifications", "emailRecipientId")}
+          >
+            <Select
+              id={id("emailRecipient")}
+              {...register("configuration.notifications.emailRecipientId", { setValueAs: nullableText })}
+            >
+              <option value="">No recipient</option>
+              {emailOptions.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.label} ({r.address})
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Checkbox
+            label="Send e-mail alerts for qualified leads"
+            hint="Requires an e-mail recipient above. The per-run limit applies to each channel."
+            {...register("configuration.notifications.emailEnabled")}
           />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field

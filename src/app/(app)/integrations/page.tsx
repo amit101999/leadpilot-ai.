@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { TestConnectionButton, WhatsAppTestButton } from "@/components/integrations/integration-actions";
+import { TestConnectionButton, TestMessageButton } from "@/components/integrations/integration-actions";
 import { toRecipientOptions } from "@/components/profiles/recipient-options";
 import { StatusBadge } from "@/components/ui/badge";
 import { Panel } from "@/components/ui/panel";
@@ -74,6 +74,23 @@ export default async function IntegrationsPage() {
             and, only once job-search access is granted,{" "}
             <Vars names={["UPWORK_JOB_SEARCH_SCOPE_CONFIRMED"]} />.
           </p>
+          <p className="mt-1">
+            Meanwhile, the Upwork sync agent (Claude with Upwork&apos;s official connector) can import jobs
+            through an import token from Settings. See <code className="text-xs">docs/upwork-sync.md</code>.
+          </p>
+        </>
+      ),
+    },
+    email: {
+      title: "E-mail (SMTP)",
+      setup: (
+        <>
+          Set{" "}
+          <Vars
+            names={["EMAIL_PROVIDER", "SMTP_HOST", "SMTP_PORT", "SMTP_SECURE", "SMTP_USER", "SMTP_PASSWORD", "EMAIL_FROM"]}
+          />
+          . Any SMTP mailbox works, e.g. a Gmail address with an app password. The test checks the login without
+          sending anything.
         </>
       ),
     },
@@ -180,11 +197,14 @@ export default async function IntegrationsPage() {
               </dl>
               <div className="flex flex-col gap-3 text-[13px] text-muted">
                 <div>{meta.setup}</div>
-                {status.name === "whatsapp" && canTest && (
+                {(status.name === "whatsapp" || status.name === "email") && canTest && (
                   <div className="flex flex-col items-start gap-1">
-                    <WhatsAppTestButton
-                      recipients={toRecipientOptions(recipients)}
-                      isMock={providers.whatsapp.isMock}
+                    <TestMessageButton
+                      channel={status.name}
+                      recipients={toRecipientOptions(recipients).filter(
+                        (r) => r.channel === (status.name === "email" ? "EMAIL" : "WHATSAPP"),
+                      )}
+                      isMock={providers[status.name].isMock}
                     />
                   </div>
                 )}

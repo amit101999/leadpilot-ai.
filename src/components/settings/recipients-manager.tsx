@@ -4,41 +4,57 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
-import { Field, Input } from "@/components/ui/field";
+import { Field, Input, Select } from "@/components/ui/field";
 import { EmptyState } from "@/components/ui/panel";
 import { Time } from "@/components/ui/time";
 import { ApiError, apiFetch } from "@/lib/http/client";
 
+type Channel = "WHATSAPP" | "EMAIL";
+
 export interface RecipientRow {
   id: string;
   label: string;
-  phoneMasked: string;
+  channel: Channel;
+  phoneMasked: string | null;
+  emailMasked: string | null;
   optInConfirmedAt: Date | string | null;
   archivedAt: Date | string | null;
 }
 
-const OPT_IN_STATEMENT = "This person agreed to receive WhatsApp messages from us";
+const OPT_IN_STATEMENT: Record<Channel, string> = {
+  WHATSAPP: "This person agreed to receive WhatsApp messages from us",
+  EMAIL: "This person agreed to receive lead alert e-mails from us",
+};
+const CHANNEL_NAME: Record<Channel, string> = { WHATSAPP: "WhatsApp", EMAIL: "E-mail" };
 
-const addSchema = z.object({
-  label: z.string().trim().min(1, "Enter a name").max(80),
-  phoneE164: z
-    .string()
-    .trim()
-    .regex(/^\+[1-9]\d{6,14}$/, "Use international format with +, e.g. +14155550123"),
-  optInConfirmed: z.boolean(),
-});
+const addSchema = z
+  .object({
+    channel: z.enum(["WHATSAPP", "EMAIL"]),
+    label: z.string().trim().min(1, "Enter a name").max(80),
+    phoneE164: z.string().trim(),
+    email: z.string().trim(),
+    optInConfirmed: z.boolean(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.channel === "WHATSAPP" && !/^\+[1-9]\d{6,14}$/.test(v.phoneE164)) {
+      ctx.addIssue({ code: "custom", path: ["phoneE164"], message: "Use international format with +, e.g. +14155550123" });
+    }
+    if (v.channel === "EMAIL" && !z.email().safeParse(v.email).success) {
+      ctx.addIssue({ code: "custom", path: ["email"], message: "Enter a valid e-mail address" });
+    }
+  });
 type AddValues = z.infer<typeof addSchema>;
 
 /**
- * WhatsApp recipients. Phone numbers are shown masked; opt-in is recorded only
- * through an explicit statement and every change is audited on the server.
+ * Alert recipients (WhatsApp numbers and e-mail addresses). Addresses are shown masked; opt-in is
+ * recorded only through an explicit statement and every change is audited on the server.
  */
 export function RecipientsManager({ recipients, canEdit }: { recipients: RecipientRow[]; canEdit: boolean }) {
   const router = useRouter();
@@ -48,8 +64,9 @@ export function RecipientsManager({ recipients, canEdit }: { recipients: Recipie
   const [busy, setBusy] = useState(false);
   const form = useForm<AddValues>({
     resolver: zodResolver(addSchema),
-    defaultValues: { label: "", phoneE164: "", optInConfirmed: false },
+    defaultValues: { channel: "WHATSAPP", label: "", phoneE164: "", email: "", optInConfirmed: false },
   });
+  const channel = useWatch({ control: form.control, name: "channel" });
 
   async function update(id: string, body: Record<string, unknown>, success: string) {
     setBusy(true);
@@ -67,15 +84,20 @@ export function RecipientsManager({ recipients, canEdit }: { recipients: Recipie
   }
 
   async function add(values: AddValues) {
+    const body =
+      values.channel === "EMAIL"
+        ? { channel: "EMAIL", label: values.label, email: values.email, optInConfirmed: values.optInConfirmed }
+        : { channel: "WHATSAPP", label: values.label, phoneE164: values.phoneE164, optInConfirmed: values.optInConfirmed };
     try {
-      await apiFetch("/api/recipients", { method: "POST", body: values });
+      await apiFetch("/api/recipients", { method: "POST", body });
       toast.success(`${values.label} added.`);
       form.reset();
       setAdding(false);
       router.refresh();
     } catch (error) {
       if (error instanceof ApiError && error.code === "CONFLICT") {
-        form.setError("phoneE164", { message: "This number is already a recipient" });
+        if (values.channel === "EMAIL") form.setError("email", { message: "This address is already a recipient" });
+        else form.setError("phoneE164", { message: "This number is already a recipient" });
       } else if (error instanceof ApiError && error.code === "VALIDATION_ERROR") {
         for (const [path, message] of Object.entries(error.fieldErrors())) {
           form.setError(path as keyof AddValues, { message });
@@ -90,8 +112,8 @@ export function RecipientsManager({ recipients, canEdit }: { recipients: Recipie
     <div>
       {recipients.length === 0 ? (
         <EmptyState title="No recipients yet">
-          Add the WhatsApp number that should receive lead alerts. Alerts are sent only after you confirm the
-          person agreed to receive them.
+          Add the WhatsApp number or e-mail address that should receive lead alerts. Alerts are sent only after
+          you confirm the person agreed to receive them.
         </EmptyState>
       ) : (
         <ul className="divide-y divide-line">
@@ -99,7 +121,9 @@ export function RecipientsManager({ recipients, canEdit }: { recipients: Recipie
             <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
               <div>
                 <p className="font-medium">
-                  {r.label} <span className="tabular font-normal text-muted">{r.phoneMasked}</span>
+                  {r.label}{" "}
+                  <span className="tabular font-normal text-muted">{r.phoneMasked ?? r.emailMasked}</span>{" "}
+                  <Badge>{CHANNEL_NAME[r.channel]}</Badge>
                 </p>
                 <p className="mt-0.5 flex flex-wrap items-center gap-2 text-[13px] text-muted">
                   {r.archivedAt ? (
@@ -181,6 +205,12 @@ export function RecipientsManager({ recipients, canEdit }: { recipients: Recipie
               noValidate
               className="grid gap-4 sm:max-w-xl"
             >
+              <Field id="recipient-channel" label="Channel">
+                <Select id="recipient-channel" className="sm:w-48" {...form.register("channel")}>
+                  <option value="WHATSAPP">WhatsApp</option>
+                  <option value="EMAIL">E-mail</option>
+                </Select>
+              </Field>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field id="recipient-label" label="Name" error={form.formState.errors.label?.message}>
                   <Input
@@ -189,23 +219,40 @@ export function RecipientsManager({ recipients, canEdit }: { recipients: Recipie
                     {...form.register("label")}
                   />
                 </Field>
-                <Field
-                  id="recipient-phone"
-                  label="WhatsApp number"
-                  hint="International format, e.g. +14155550123. Shown masked after saving."
-                  error={form.formState.errors.phoneE164?.message}
-                >
-                  <Input
+                {channel === "EMAIL" ? (
+                  <Field
+                    id="recipient-email"
+                    label="E-mail address"
+                    hint="Shown masked after saving."
+                    error={form.formState.errors.email?.message}
+                  >
+                    <Input
+                      id="recipient-email"
+                      type="email"
+                      autoComplete="off"
+                      aria-invalid={Boolean(form.formState.errors.email)}
+                      {...form.register("email")}
+                    />
+                  </Field>
+                ) : (
+                  <Field
                     id="recipient-phone"
-                    type="tel"
-                    autoComplete="off"
-                    aria-invalid={Boolean(form.formState.errors.phoneE164)}
-                    {...form.register("phoneE164")}
-                  />
-                </Field>
+                    label="WhatsApp number"
+                    hint="International format, e.g. +14155550123. Shown masked after saving."
+                    error={form.formState.errors.phoneE164?.message}
+                  >
+                    <Input
+                      id="recipient-phone"
+                      type="tel"
+                      autoComplete="off"
+                      aria-invalid={Boolean(form.formState.errors.phoneE164)}
+                      {...form.register("phoneE164")}
+                    />
+                  </Field>
+                )}
               </div>
               <Checkbox
-                label={OPT_IN_STATEMENT}
+                label={OPT_IN_STATEMENT[channel]}
                 hint="Leave unticked if you have not asked them yet."
                 {...form.register("optInConfirmed")}
               />
@@ -233,11 +280,11 @@ export function RecipientsManager({ recipients, canEdit }: { recipients: Recipie
       <Dialog open={optInFor !== null} onOpenChange={(open) => !busy && !open && setOptInFor(null)}>
         <DialogContent
           title={`Confirm opt-in for ${optInFor?.label ?? ""}?`}
-          description="WhatsApp requires that people agree before businesses message them. Your confirmation is recorded in the audit log."
+          description="People must agree before a business messages them. Your confirmation is recorded in the audit log."
         >
           <Checkbox
             className="mb-4"
-            label={OPT_IN_STATEMENT}
+            label={OPT_IN_STATEMENT[optInFor?.channel ?? "WHATSAPP"]}
             checked={agreed}
             onChange={(event) => setAgreed(event.target.checked)}
           />

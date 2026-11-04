@@ -5,5 +5,5 @@ import type { RecipientOption } from "./profile-editor";
 export function toRecipientOptions(recipients: RecipientView[]): RecipientOption[] {
   return recipients
     .filter((r) => r.optInConfirmedAt && !r.archivedAt)
-    .map((r) => ({ id: r.id, label: r.label, phoneMasked: r.phoneMasked }));
+    .map((r) => ({ id: r.id, label: r.label, channel: r.channel, address: r.phoneMasked ?? r.emailMasked ?? "" }));
 }

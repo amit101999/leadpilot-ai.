@@ -67,6 +67,7 @@ describe("integrations", () => {
       "job_source",
       "ai",
       "whatsapp",
+      "email",
       "n8n",
     ]);
     expect(
@@ -186,7 +187,7 @@ describe("dashboard, exports and audit", () => {
     expect(mine.json.data.daily).toHaveLength(30);
     expect(mine.json.data.daily.at(-1).runs).toBe(1);
     expect(mine.json.data.daily[0].day).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect(mine.json.data.integrations).toHaveLength(5);
+    expect(mine.json.data.integrations).toHaveLength(6);
 
     const stranger = await createUser("OPERATOR");
     const theirs = await call(dashboard, { user: stranger });

@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { ChangePasswordForm } from "@/components/settings/change-password-form";
+import { ImportTokensManager } from "@/components/settings/import-tokens-manager";
 import { RecipientsManager } from "@/components/settings/recipients-manager";
 import { ThemeChoice } from "@/components/settings/theme-choice";
 import { Panel } from "@/components/ui/panel";
 import { hasRole } from "@/lib/auth/authorization";
 import { requireUser } from "@/lib/auth/current-user";
 import { getDb } from "@/lib/database/client";
+import { listImportTokens } from "@/modules/imports/tokens";
 import { listRecipients } from "@/modules/notifications/recipients";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -19,6 +21,7 @@ const ROLE_TEXT: Record<string, string> = {
 export default async function SettingsPage() {
   const { user, actor } = await requireUser();
   const recipients = await listRecipients(getDb(), actor, true);
+  const tokens = hasRole(actor, "OPERATOR") ? await listImportTokens(getDb(), actor) : [];
 
   return (
     <div className="flex flex-col gap-6">
@@ -47,11 +50,21 @@ export default async function SettingsPage() {
 
       <Panel
         id="recipients"
-        title="WhatsApp recipients"
-        description="Who receives lead alerts. Choose a recipient for each profile on the Search Profiles page."
+        title="Alert recipients"
+        description="WhatsApp numbers and e-mail addresses that receive lead alerts. Choose them for each profile on the Search Profiles page."
       >
         <RecipientsManager recipients={recipients} canEdit={hasRole(actor, "OPERATOR")} />
       </Panel>
+
+      {hasRole(actor, "OPERATOR") && (
+        <Panel
+          id="import-tokens"
+          title="Import tokens"
+          description="The Upwork sync agent uses a token to send jobs to LeadPilot as you. See docs/upwork-sync.md."
+        >
+          <ImportTokensManager tokens={tokens} canEdit />
+        </Panel>
+      )}
 
       <Panel id="appearance" title="Appearance">
         <ThemeChoice />
