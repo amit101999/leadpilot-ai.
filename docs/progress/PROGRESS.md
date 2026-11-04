@@ -4,7 +4,7 @@ Curated record of what has been built, decided and verified. Maintained by the
 `project-tracker` subagent (`.claude/agents/project-tracker.md`). The raw,
 automatic history is in `activity-log.md` (local, gitignored).
 
-Last updated: 2026-10-15
+Last updated: 2026-11-04
 
 ## Phase status
 
@@ -23,7 +23,8 @@ Plan: `C:\Users\ACER\.claude\plans\clever-noodling-finch.md`.
 | D. n8n                   | Run workflow calling the app's internal step API, lease-safe `/fail`      | ✅ Merged to `main` (same fast-forward); `9cf72ad`                                               |
 | E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                                | ✅ Merged to `main` (same fast-forward); `62d69cc` + `7e34456`                                   |
 | F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                       | ✅ Merged to `main` (same fast-forward); `b806b52` + docs `727c19b`                              |
-| G. Docs and final review | README, `docs/*.md`, full verification                                    | ✅ Committed `9b7b102` on `worktree-phase-g-docs`; merge to `main` pending at time of writing    |
+| G. Docs and final review | README, `docs/*.md`, full verification                                    | ✅ On `main` (`9b7b102` + PROGRESS `f492a9b`)                                                    |
+| H. Upwork sync           | Upwork sync via Claude + Upwork MCP, import API, e-mail alerts            | ⚠️ Committed `05b064a` on `worktree-phase-h-upwork-import`; not merged; e2e not run              |
 
 ## Baseline (pre-existing work, committed 2026-10-11 as `703761f`)
 
@@ -790,20 +791,150 @@ UI or API; no data-retention policy; live OpenAI, WhatsApp and Upwork integratio
 
 ### Open items
 
-- Fast-forward `main` to `9b7b102` plus this PROGRESS commit (pending at time of writing).
+- ~~Fast-forward `main` to `9b7b102` plus this PROGRESS commit~~: `main` is at `f492a9b` (Phase H's base).
 - Developer to confirm the numbering and wording of the ten inferred acceptance scenarios (Phase F).
 - Live OpenAI and WhatsApp: blocked on credentials. Live Upwork discovery: BLOCKED until an approved API key with
-  job-search scope, a confirmed data contract and a live adapter exist (`docs/upwork-access.md`).
+  job-search scope, a confirmed data contract and a live adapter exist (`docs/upwork-access.md`). Phase H adds an
+  interim bridge (Claude + Upwork MCP); the direct API adapter is still blocked.
 - Production on a real Linux host with a Let's Encrypt certificate: not verified.
+
+## Phase H: Upwork sync via Claude + Upwork MCP, import API, e-mail alerts (2026-11-04, `worktree-phase-h-upwork-import`)
+
+Commits on the branch, based on `main` `f492a9b`: `f3b60d0`, `d4bd81a`, `85067a2`, `f2ebe99` (WIP) and `05b064a`
+(final). **Not merged to `main`.** Full write-up, including the live verification, in `docs/upwork-sync.md`.
+
+### Context
+
+- Upwork's official API needs an approved key, which the new account cannot get (financial condition).
+- Upwork's MCP server only accepts approved OAuth clients (its `mcp.upwork.com/.well-known` metadata gives the sign-up
+  page as `registration_endpoint`), so LeadPilot cannot connect directly. Claude's own Upwork connector is used as the
+  bridge: Claude fetches, LeadPilot decides what is relevant.
+
+### Decisions (grilled 2026-11-04 in plan mode, all confirmed by the developer)
+
+1. E-mail alerts via SMTP (nodemailer).
+2. Windows Task Scheduler runs headless `claude -p "/upwork-sync"`.
+3. A per-user import token.
+4. An import starts a run immediately.
+5. Search keywords are set in the profile UI.
+6. One search per keyword plus Upwork's most-recent feed.
+7. Two phases: screen first, then fetch details only for jobs that pass.
+8. A keyword-coverage % rule.
+9. One shared keyword list.
+10. Jobs arriving during an active run are queued and a follow-up run starts.
+11. E-mail recipients are managed in Settings, with opt-in.
+12. Only profiles with "Upwork sync" turned on are synced.
+13. Sync schedule per profile in the UI.
+14. Re-imports update stored data but alert only once.
+15. Unknown client data defaults to `NEEDS_REVIEW`.
+
+Technical choices: imported jobs use source id `upwork` (the deduplication key matches a future API adapter); extra
+client fields go in `jobs.source_metadata`; the run source id `upwork-import` is recorded in the run snapshot.
+
+### Implemented
+
+- Database: migration `database/migrations/0002_upwork_import.sql` adds `import_tokens` (unique `token_hash`),
+  `import_batches`, `staged_jobs` (partial unique index: one `PENDING` row per profile, source and job id),
+  `sync_state`, and `notification_recipients.email`. `phone_e164` becomes nullable and the phone check is replaced by
+  a per-channel address check (`recipients_address_chk`), plus a unique index on owner, channel and lower-case e-mail.
+  Schema in `src/lib/database/schema.ts`.
+- Import tokens: `src/lib/auth/import-token.ts`, `src/modules/imports/tokens.ts`, routes `src/app/api/import-tokens/`
+  (create; `[id]/revoke`). Shown once, stored as an HMAC, revocable, rate limited (60 calls/min,
+  `src/lib/security/rate-limit.ts`); route wrapper in `src/lib/http/api.ts`.
+- Import API (`src/app/api/import/`): `context` (due profiles, keywords, filters), `jobs/screen` (returns
+  `detailsWanted`, stores nothing), `jobs` (stages jobs, answers with run `STARTED`/`QUEUED`), `sync-status`. Logic in
+  `src/modules/imports/service.ts`; schedule in `schedule.ts`; follow-up runs in `follow-up.ts`.
+- Upwork MCP payload mapping: `src/modules/job-sources/upwork-import/normalize.ts`. It strips the
+  `<untrusted_participant_content>` wrapper and tracking parameters, keeps only `https://www.upwork.com` links, sets
+  payment verification to true only on `VERIFIED`, treats a 0 rating with no reviews as unknown, and defaults budgets
+  without a currency to USD.
+- Import job source: `src/modules/job-sources/import-provider.ts` (staged jobs → run discovery). Changes in
+  `src/modules/runs/{service,executor}.ts` and `engine/{context,finalization}.ts` handle the per-run source and the
+  follow-up run.
+- Profiles: "Search & sync" settings in `src/modules/profiles/config-schema.ts` (keywords, keyword-coverage %, sync
+  on/off, interval, active hours, time zone); coverage hard filter in `src/modules/qualification/hard-filters.ts` and
+  `src/modules/runs/engine/filtering.ts`; tab in `src/components/profiles/profile-editor.tsx`; diffs in
+  `src/modules/profiles/diff.ts`.
+- E-mail channel: `src/modules/notifications/{channels,email-provider,mock-email,smtp-email,message,recipients,service}.ts`,
+  `src/modules/providers.ts`, environment variables in `src/lib/configuration/env.ts` (`EMAIL_PROVIDER` defaults to
+  mock, plus SMTP settings). Selection and delivery work per channel and keep one alert per job, channel and recipient
+  (`src/modules/runs/engine/{selection,delivery}.ts`).
+- UI: e-mail recipients and import tokens in Settings (`src/components/settings/{recipients-manager,import-tokens-manager}.tsx`,
+  `src/app/(app)/settings/page.tsx`); Upwork details on `src/app/(app)/jobs/[id]/page.tsx`; e-mail on the Integrations
+  page (`src/app/(app)/integrations/page.tsx`, `src/components/integrations/integration-actions.tsx`,
+  `src/app/api/integrations/[provider]/test/route.ts`).
+- Agent side: skill `.claude/skills/upwork-sync/SKILL.md`, bridge `scripts/leadpilot-import.mjs`
+  (`context`/`screen`/`commit`/`status`), wrapper `scripts/upwork-sync.ps1` for Task Scheduler. `--allowedTools`
+  limits the agent to Upwork `list_accounts`/`find_jobs`, that script, and edits under `.upwork-sync/`. Scheduled syncs
+  get no due profiles until `UPWORK_SYNC_SCHEDULED_ALLOWED=true`. `.upwork-sync/` and `logs/` are gitignored.
+- Dependencies: `nodemailer` (`^10.3.1`) and `@types/nodemailer` (`^8.0.2`) were added with caret ranges, while the
+  other dependencies are pinned exactly. `next` 16.4.0 → 16.4.5, `zod` 4.6.5 → 4.6.7.
+- Docs: `docs/upwork-sync.md` (new); `docs/{api,database,security,architecture,testing,upwork-access}.md`, `README.md`
+  and `.env.example` updated (variable names only).
+- Tests: `tests/unit/email.test.ts` (new, 9), `tests/unit/upwork-import.test.ts` (new, 12), additions to
+  `tests/unit/hard-filters.test.ts`, `tests/integration/imports.test.ts` (new, 8); `tests/integration/platform.test.ts`
+  updated for the e-mail integration.
+
+### Security findings and fixes
+
+- `npm audit` found new production advisories: Next.js 16.4.0 (critical RCE/DoS) and zod 4.6.5 (high, memory
+  exhaustion). Both were patched (`next` 16.4.5, `zod` 4.6.7).
+- The profile recipient ownership check was extended to the e-mail recipient. Without it, a profile could have pointed
+  at another user's recipient. Duplicating another user's profile now clears both channels.
+
+### Verification (actual results, after the last change)
+
+| Check                                  | Result                                                                                 |
+| -------------------------------------- | -------------------------------------------------------------------------------------- |
+| Prettier, ESLint, `tsc`                | ✅ clean / exit 0 / clean                                                              |
+| Unit tests                             | ✅ 156/156                                                                             |
+| Integration tests                      | ✅ 70/70 (8 new in `tests/integration/imports.test.ts`)                                |
+| `npm audit --omit=dev`                 | ✅ 0 vulnerabilities (after the next/zod patches)                                      |
+| H0 spike                               | ✅ headless `claude -p` reached the claude.ai Upwork connector (Freelancer account)    |
+| Live sync, agent part (details below)  | ⚠️ search, screen and details OK; process stopped (low memory) before `commit`         |
+| Live sync, commit/status run by hand   | ✅ 30 accepted, 0 invalid; run completed all 7 stages; re-commit created no duplicates |
+| Playwright e2e                         | ⏳ Not run (PC low on memory)                                                          |
+| `next build`                           | Not recorded as run in this phase; needs developer confirmation                        |
+| Task Scheduler, real OpenAI, real SMTP | ⏳ Not run                                                                             |
+
+Live run details (dev database):
+
+- The dev database was backed up to `E:\upwork-agent-backups\leadpilot-dev-before-phase-h.dump` before migration 0002
+  was applied with `npm run db:migrate`.
+- The first run of `scripts/upwork-sync.ps1` failed for two reasons, both fixed: its own permission rule (`Write(path)`
+  is not valid in `--allowedTools`, now `Edit(path)`), and PowerShell turning stderr into an error.
+- Second run: searched Upwork, saved 30 real jobs, screened them and fetched 8 job details. Claude Code then stopped
+  the process (and the dev server) because the PC was critically low on memory, before the `commit` step.
+- The `commit` and `status` steps were then run by hand with the saved files against the still-running server:
+  30 accepted, 0 invalid. The import run completed all 7 stages: 30 discovered, 26 passed the hard filters, 26 scored
+  by the **mock** AI, 1 qualified. No alert was sent because the test profile had no recipient. A re-commit stored no
+  duplicates (still 30) and kept the client hires for the 8 detailed jobs.
+- Left in the dev database: test profile "Upwork sync test" and import token "Upwork sync (local test)".
+
+### Environment incidents
+
+- C: had 6.9–8.5 GB free. Docker Desktop failed to start once (WSL bootstrap `0xc00000fd`); it recovered after its
+  processes were killed and `wsl --shutdown` was run. The PC ran out of memory during the live sync (see above).
+
+### Open items
+
+- Merge to `main` (developer).
+- Run the Playwright e2e suite, an uninterrupted agent run from search to import, and an unattended Task Scheduler run.
+- Live OpenAI scoring and a real SMTP e-mail: not verified.
+- Decide on `UPWORK_SYNC_SCHEDULED_ALLOWED` after reading section 4.1 of Upwork's API & MCP Terms of Use (so far only
+  quoted by a third party).
+- The developer's Upwork account has 0 Connects, so applying to jobs is not possible yet.
+- Optional clean-up: the test profile and import token in the dev database; the pre-migration dump.
 
 ## Environment notes
 
-- Windows 11, Node 22.17.0, Next.js 16.4.0, PostgreSQL 16 via Docker (`127.0.0.1:55432`).
+- Windows 11, Node 22.17.0, Next.js 16.4.0 (16.4.5 on the Phase H branch), PostgreSQL 16 via Docker (`127.0.0.1:55432`).
 - Docker Desktop: Engine 29.7.2, Compose v5.4.0 (Phase E verification). Image builds need several GB free on C:.
 - No git remote configured; nothing has been pushed.
 - Phase G: the Turbopack build passed in the worktree because it had its own `npm ci` `node_modules` (earlier worktrees
   used a junction outside the project root, which Turbopack rejects).
-- No OpenAI, WhatsApp or Upwork credentials; those integrations run in mock mode.
+- No OpenAI, WhatsApp, SMTP or Upwork API credentials; those integrations run in mock mode. Phase H reaches Upwork only
+  through Claude's Upwork connector (developer's Freelancer account).
 - Port 3000 on the developer's machine was in use by the developer's own `next` server (started from the main
   checkout on 2026-10-11 22:11) and was left running. C2 previews used port 3200 with `APP_BASE_URL` overridden to
   match, because the Origin check requires it.
