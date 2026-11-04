@@ -1,6 +1,10 @@
 # Upwork access
 
-**Status: live Upwork discovery is BLOCKED.** LeadPilot runs on a mock job source. The Upwork provider exists only as
+> Real Upwork jobs can be imported today without an API key through the **Upwork sync** (Claude Code with Upwork's
+> official MCP connector feeding LeadPilot's import API): see [upwork-sync.md](upwork-sync.md). This page is about
+> LeadPilot calling Upwork's API directly.
+
+**Status: direct Upwork API discovery is BLOCKED.** LeadPilot runs on a mock job source. The Upwork provider exists only as
 a configuration check and refuses to discover jobs. It never scrapes pages, reuses browser sessions or calls guessed
 endpoints.
 

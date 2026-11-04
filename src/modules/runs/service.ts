@@ -31,7 +31,9 @@ export async function createRun(
   requireRole(actor, "OPERATOR");
   // Import runs process staged jobs; the snapshot records that source so the run never switches.
   const providers =
-    input.jobSource === "import" ? { ...baseProviders, jobSource: new ImportJobSourceProvider() } : baseProviders;
+    input.jobSource === "import"
+      ? { ...baseProviders, jobSource: new ImportJobSourceProvider() }
+      : baseProviders;
   const existing = await findByIdempotencyKey(db, actor.id, input.idempotencyKey);
   if (existing) return reuse(existing, input.profileId);
 

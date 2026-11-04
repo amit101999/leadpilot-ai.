@@ -13,6 +13,8 @@ const config = [
       "playwright-report/**",
       "test-results/**",
       "next-env.d.ts",
+      // Upwork sync working files (job data, local one-off scripts); gitignored.
+      ".upwork-sync/**",
     ],
   },
   {

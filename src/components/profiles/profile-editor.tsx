@@ -661,7 +661,10 @@ export function ProfileEditor({
             <Field
               id={id("everyHours")}
               label="Sync every (hours)"
-              error={(cfgErrors.search?.upworkSync as Record<string, { message?: string }> | undefined)?.everyHours?.message}
+              error={
+                (cfgErrors.search?.upworkSync as Record<string, { message?: string }> | undefined)?.everyHours
+                  ?.message
+              }
             >
               <Input
                 id={id("everyHours")}
@@ -676,10 +679,18 @@ export function ProfileEditor({
               <Input id={id("timezone")} {...register("configuration.search.upworkSync.timezone")} />
             </Field>
             <Field id={id("activeFrom")} label="Active from">
-              <Input id={id("activeFrom")} type="time" {...register("configuration.search.upworkSync.activeFrom")} />
+              <Input
+                id={id("activeFrom")}
+                type="time"
+                {...register("configuration.search.upworkSync.activeFrom")}
+              />
             </Field>
             <Field id={id("activeTo")} label="Active until">
-              <Input id={id("activeTo")} type="time" {...register("configuration.search.upworkSync.activeTo")} />
+              <Input
+                id={id("activeTo")}
+                type="time"
+                {...register("configuration.search.upworkSync.activeTo")}
+              />
             </Field>
           </div>
         </>,

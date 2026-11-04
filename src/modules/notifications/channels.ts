@@ -12,6 +12,7 @@ export function enabledChannels(config: Pick<ProfileConfig, "notifications">): C
   const n = config.notifications;
   const targets: ChannelTarget[] = [];
   if (n.whatsappEnabled && n.recipientId) targets.push({ channel: "WHATSAPP", recipientId: n.recipientId });
-  if (n.emailEnabled && n.emailRecipientId) targets.push({ channel: "EMAIL", recipientId: n.emailRecipientId });
+  if (n.emailEnabled && n.emailRecipientId)
+    targets.push({ channel: "EMAIL", recipientId: n.emailRecipientId });
   return targets;
 }

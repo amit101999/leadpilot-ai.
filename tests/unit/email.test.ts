@@ -29,11 +29,13 @@ describe("lead e-mail", () => {
     expect(text).toContain("Job URL: https://www.upwork.com/jobs/~01");
 
     const unsafe = buildLeadEmail({ ...lead, jobUrl: "javascript:alert(1)", dashboardUrl: null }, "STANDARD");
-    expect(unsafe.html).not.toContain("href=\"javascript");
+    expect(unsafe.html).not.toContain('href="javascript');
   });
 
   it("keeps the subject on one line", () => {
-    expect(buildLeadEmail({ ...lead, title: "a\r\nBcc: x@evil.example" }, "STANDARD").subject).not.toMatch(/[\r\n]/);
+    expect(buildLeadEmail({ ...lead, title: "a\r\nBcc: x@evil.example" }, "STANDARD").subject).not.toMatch(
+      /[\r\n]/,
+    );
   });
 
   it("masks addresses for display", () => {
@@ -79,10 +81,19 @@ describe("SmtpEmailProvider", () => {
   }
 
   it("sends with the idempotency key as Message-ID and reports acceptance", async () => {
-    const sendMail = vi.fn(async () => ({ accepted: ["me@example.com"], messageId: "<key1@leadpilot.local>" }));
+    const sendMail = vi.fn(async () => ({
+      accepted: ["me@example.com"],
+      messageId: "<key1@leadpilot.local>",
+    }));
     const { provider: p } = provider(sendMail);
-    expect(await p.send(message)).toEqual({ kind: "accepted", providerMessageId: "<key1@leadpilot.local>", httpStatus: null });
-    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ messageId: "<key1@leadpilot.local>", from: config.from }));
+    expect(await p.send(message)).toEqual({
+      kind: "accepted",
+      providerMessageId: "<key1@leadpilot.local>",
+      httpStatus: null,
+    });
+    expect(sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({ messageId: "<key1@leadpilot.local>", from: config.from }),
+    );
   });
 
   it("refuses to send without configuration and never opens a connection", async () => {

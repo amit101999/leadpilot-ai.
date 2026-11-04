@@ -57,7 +57,10 @@ const detailsSchema = z
   .partial();
 
 export const upworkMcpJobSchema = z.object({
-  id: z.string().trim().regex(/^[A-Za-z0-9~]{1,64}$/, "Unexpected Upwork job id"),
+  id: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9~]{1,64}$/, "Unexpected Upwork job id"),
   title: shortText(500).min(1),
   description: shortText(60_000).nullish(),
   description_snippet: shortText(2_000).nullish(),
@@ -151,7 +154,10 @@ export function normalizeUpworkMcpJob(job: UpworkMcpJob): NormalizedJob {
     sourceJobId: job.id,
     title: cleanText(job.title).slice(0, 500),
     // Full text from job details when fetched; search results may carry only a snippet.
-    description: cleanText(posting?.content?.description ?? job.description ?? job.description_snippet).slice(0, 20_000),
+    description: cleanText(posting?.content?.description ?? job.description ?? job.description_snippet).slice(
+      0,
+      20_000,
+    ),
     jobUrl: canonicalUpworkUrl(job.url),
     budgetType,
     budgetAmount: budgetType === "FIXED" ? toDecimal(fixedAmount?.rawValue ?? job.budget) : null,

@@ -5,8 +5,8 @@ WhatsApp number without an explicit opt-in.
 
 | Suite       | Command                    | Runner                        | Needs                                | Count (2026-10-15)          |
 | ----------- | -------------------------- | ----------------------------- | ------------------------------------ | --------------------------- |
-| Unit        | `npm run test:unit`        | Vitest, project `unit`        | nothing                              | 130 tests                   |
-| Integration | `npm run test:integration` | Vitest, project `integration` | Postgres and `TEST_DATABASE_URL`     | 62 tests                    |
+| Unit        | `npm run test:unit`        | Vitest, project `unit`        | nothing                              | 156 tests                   |
+| Integration | `npm run test:integration` | Vitest, project `integration` | Postgres and `TEST_DATABASE_URL`     | 70 tests                    |
 | End to end  | `npm run test:e2e`         | Playwright (Chromium)         | Postgres and `TEST_DATABASE_URL`     | 19 tests                    |
 | Live        | `npm run test:live`        | Vitest, project `live`        | `LIVE_TESTS=1` plus real credentials | 3 tests, skipped by default |
 
@@ -103,6 +103,18 @@ behaviour.
 | ?   | The same job delivered twice is stored once                                                                   | integration `pipeline.test.ts` › deduplicates jobs within a run and across runs…                                         |
 | ?   | A job source without access ends the run as `BLOCKED_SOURCE`                                                  | integration `pipeline.test.ts` › blocks the run when the job source is not authorized…                                   |
 | ?   | Alert reservation: 15 eligible with limit 10 sends 10; 3 eligible sends 3; concurrent runs never double-alert | integration `notifications.test.ts` › reserves exactly the limit… / sends every lead… / never alerts the same job twice… |
+
+## Upwork sync and e-mail (Phase H)
+
+- Unit: `upwork-import.test.ts` (MCP → job mapping on a recorded real Upwork response, untrusted-text and tracking-link
+  removal, money parsing, staged-payload round trip, schedule time zones and windows), `email.test.ts` (HTML escaping,
+  header-safe subject, SMTP outcome classification, SMTP provider with an injected transport), keyword coverage in
+  `hard-filters.test.ts`.
+- Integration: `imports.test.ts` (token creation/listing/revocation and auth, cross-user 404, screening stores nothing,
+  commit → import run with correct mapping, dedup and update on re-import keeping earlier details, queueing with a
+  follow-up run, e-mail alert sent once, sync status with secret scrubbing, scheduled-sync gate).
+- Not run in Phase H: the Playwright e2e suite (the development PC was low on memory) and a complete live sync
+  (stopped by the OS before the import step; see [upwork-sync.md](upwork-sync.md#verification-2026-11-04)).
 
 ## Not covered
 

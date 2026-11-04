@@ -87,10 +87,18 @@ export default async function IntegrationsPage() {
         <>
           Set{" "}
           <Vars
-            names={["EMAIL_PROVIDER", "SMTP_HOST", "SMTP_PORT", "SMTP_SECURE", "SMTP_USER", "SMTP_PASSWORD", "EMAIL_FROM"]}
+            names={[
+              "EMAIL_PROVIDER",
+              "SMTP_HOST",
+              "SMTP_PORT",
+              "SMTP_SECURE",
+              "SMTP_USER",
+              "SMTP_PASSWORD",
+              "EMAIL_FROM",
+            ]}
           />
-          . Any SMTP mailbox works, e.g. a Gmail address with an app password. The test checks the login without
-          sending anything.
+          . Any SMTP mailbox works, e.g. a Gmail address with an app password. The test checks the login
+          without sending anything.
         </>
       ),
     },

@@ -24,7 +24,10 @@ export async function startFollowUpRunIfQueued(
     .limit(1);
   if (!pending) return null;
   if (pending.status !== "ACTIVE" || pending.role === "VIEWER") {
-    logger.warn({ profile_id: finished.profileId }, "Queued imported jobs left pending: importing user cannot run");
+    logger.warn(
+      { profile_id: finished.profileId },
+      "Queued imported jobs left pending: importing user cannot run",
+    );
     return null;
   }
   // Loaded lazily: the run service depends on the engine, which calls this module.

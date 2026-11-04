@@ -3,7 +3,11 @@ import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { env } from "@/lib/configuration/env";
 import { jobs, notifications, qualifications, runJobs } from "@/lib/database/schema";
 import type { RiskFlag } from "@/modules/ai/output-schema";
-import { enabledChannels, type ChannelTarget, type NotificationChannel } from "@/modules/notifications/channels";
+import {
+  enabledChannels,
+  type ChannelTarget,
+  type NotificationChannel,
+} from "@/modules/notifications/channels";
 import { buildLeadEmail, buildLeadMessage } from "@/modules/notifications/message";
 import { getRecipientForSend } from "@/modules/notifications/recipients";
 import { RECLAIMABLE_NOTIFICATION_STATUSES } from "@/modules/notifications/transitions";

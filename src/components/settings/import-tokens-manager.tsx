@@ -32,7 +32,10 @@ export function ImportTokensManager({ tokens, canEdit }: { tokens: ImportTokenRo
   async function create() {
     setBusy(true);
     try {
-      const result = await apiFetch<{ token: string }>("/api/import-tokens", { method: "POST", body: { name } });
+      const result = await apiFetch<{ token: string }>("/api/import-tokens", {
+        method: "POST",
+        body: { name },
+      });
       setCreated(result.token);
       router.refresh();
     } catch (error) {
@@ -61,7 +64,8 @@ export function ImportTokensManager({ tokens, canEdit }: { tokens: ImportTokenRo
         <div role="status" className="m-4 rounded-md border border-line bg-sunken p-3 text-sm">
           <p className="font-medium">Copy this token now. It will not be shown again.</p>
           <p className="mt-1 text-muted">
-            Put it in <code>.env</code> as <code>LEADPILOT_IMPORT_TOKEN</code> on the computer that runs the sync.
+            Put it in <code>.env</code> as <code>LEADPILOT_IMPORT_TOKEN</code> on the computer that runs the
+            sync.
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <code className="rounded bg-surface px-2 py-1 break-all" data-testid="new-import-token">
@@ -100,7 +104,15 @@ export function ImportTokensManager({ tokens, canEdit }: { tokens: ImportTokenRo
                   <span>
                     Created <Time value={t.createdAt} />
                   </span>
-                  <span>{t.lastUsedAt ? <>Last used <Time value={t.lastUsedAt} /></> : "Never used"}</span>
+                  <span>
+                    {t.lastUsedAt ? (
+                      <>
+                        Last used <Time value={t.lastUsedAt} />
+                      </>
+                    ) : (
+                      "Never used"
+                    )}
+                  </span>
                 </p>
               </div>
               {canEdit && !t.revokedAt && (
@@ -122,7 +134,12 @@ export function ImportTokensManager({ tokens, canEdit }: { tokens: ImportTokenRo
           }}
         >
           <Field id="import-token-name" label="Token name">
-            <Input id="import-token-name" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
+            <Input
+              id="import-token-name"
+              value={name}
+              maxLength={80}
+              onChange={(e) => setName(e.target.value)}
+            />
           </Field>
           <Button type="submit" size="sm" variant="secondary" disabled={busy || name.trim() === ""}>
             <KeyRound />

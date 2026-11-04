@@ -70,7 +70,12 @@ export class SmtpEmailProvider implements EmailProvider {
   async send(message: OutboundEmail): Promise<SendOutcome> {
     const missing = this.missingConfig();
     if (missing.length > 0) {
-      return { kind: "rejected", retryable: false, httpStatus: null, error: `Not configured: ${missing.join(", ")}` };
+      return {
+        kind: "rejected",
+        retryable: false,
+        httpStatus: null,
+        error: `Not configured: ${missing.join(", ")}`,
+      };
     }
     try {
       const info = await this.getTransporter().sendMail({
@@ -84,7 +89,12 @@ export class SmtpEmailProvider implements EmailProvider {
       const accepted = (info.accepted ?? []).length > 0;
       return accepted
         ? { kind: "accepted", providerMessageId: String(info.messageId), httpStatus: null }
-        : { kind: "rejected", retryable: false, httpStatus: null, error: "SMTP server refused the recipient" };
+        : {
+            kind: "rejected",
+            retryable: false,
+            httpStatus: null,
+            error: "SMTP server refused the recipient",
+          };
     } catch (error) {
       return classifySmtpError(error as SmtpError);
     }
@@ -98,16 +108,34 @@ export class SmtpEmailProvider implements EmailProvider {
 export function classifySmtpError(error: SmtpError): SendOutcome {
   const detail = sanitizeErrorMessage(error.message ?? "SMTP error");
   if (error.responseCode && error.responseCode >= 500) {
-    return { kind: "rejected", retryable: false, httpStatus: null, error: `SMTP ${error.responseCode}: ${detail}` };
+    return {
+      kind: "rejected",
+      retryable: false,
+      httpStatus: null,
+      error: `SMTP ${error.responseCode}: ${detail}`,
+    };
   }
   if (error.responseCode && error.responseCode >= 400) {
-    return { kind: "rejected", retryable: true, httpStatus: null, error: `SMTP ${error.responseCode}: ${detail}` };
+    return {
+      kind: "rejected",
+      retryable: true,
+      httpStatus: null,
+      error: `SMTP ${error.responseCode}: ${detail}`,
+    };
   }
   if (error.code === "EAUTH" || error.code === "EENVELOPE" || error.code === "EMESSAGE") {
     return { kind: "rejected", retryable: false, httpStatus: null, error: `SMTP ${error.code}: ${detail}` };
   }
   if (error.code === "ECONNECTION" || error.code === "EDNS") {
-    return { kind: "rejected", retryable: true, httpStatus: null, error: `SMTP connection failed (${error.code})` };
+    return {
+      kind: "rejected",
+      retryable: true,
+      httpStatus: null,
+      error: `SMTP connection failed (${error.code})`,
+    };
   }
-  return { kind: "uncertain", error: `SMTP connection interrupted (${error.code ?? "unknown"}); the e-mail may have been sent` };
+  return {
+    kind: "uncertain",
+    error: `SMTP connection interrupted (${error.code ?? "unknown"}); the e-mail may have been sent`,
+  };
 }

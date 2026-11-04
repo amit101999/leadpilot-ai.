@@ -112,7 +112,12 @@ export async function deliverNotification(
 
   const recipient = await getRecipientForSend(db, claimed.recipientId);
   let outcome: SendOutcome;
-  if (!recipient || recipient.archivedAt || !recipient.optInConfirmedAt || recipient.channel !== claimed.channel) {
+  if (
+    !recipient ||
+    recipient.archivedAt ||
+    !recipient.optInConfirmedAt ||
+    recipient.channel !== claimed.channel
+  ) {
     outcome = {
       kind: "rejected",
       retryable: false,
@@ -159,12 +164,26 @@ async function sendOnChannel(
   if (claimed.channel === "EMAIL") {
     const payload = claimed.payload as { email?: { subject: string; text: string; html: string } };
     if (!recipient.email || !payload.email) {
-      return { kind: "rejected", retryable: false, httpStatus: null, error: "E-mail recipient or message missing" };
+      return {
+        kind: "rejected",
+        retryable: false,
+        httpStatus: null,
+        error: "E-mail recipient or message missing",
+      };
     }
-    return providers.email.send({ to: recipient.email, ...payload.email, idempotencyKey: claimed.idempotencyKey });
+    return providers.email.send({
+      to: recipient.email,
+      ...payload.email,
+      idempotencyKey: claimed.idempotencyKey,
+    });
   }
   if (!recipient.phoneE164) {
-    return { kind: "rejected", retryable: false, httpStatus: null, error: "WhatsApp recipient has no phone number" };
+    return {
+      kind: "rejected",
+      retryable: false,
+      httpStatus: null,
+      error: "WhatsApp recipient has no phone number",
+    };
   }
   const payload = claimed.payload as { templateParams?: string[] };
   return providers.whatsapp.send({

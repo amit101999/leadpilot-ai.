@@ -188,7 +188,10 @@ export async function sendTestMessage(
   requireRole(actor, "OPERATOR");
   const recipient = await getRecipient(db, actor, recipientId);
   if (expectedChannel && recipient.channel !== expectedChannel) {
-    throw new AppError("VALIDATION_ERROR", `Choose a ${expectedChannel === "EMAIL" ? "e-mail" : "WhatsApp"} recipient`);
+    throw new AppError(
+      "VALIDATION_ERROR",
+      `Choose a ${expectedChannel === "EMAIL" ? "e-mail" : "WhatsApp"} recipient`,
+    );
   }
   if (recipient.archivedAt) throw new AppError("INVALID_STATE", "This recipient is archived");
   if (!recipient.optInConfirmedAt) {

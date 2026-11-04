@@ -50,7 +50,8 @@ const TEST_TEXT = {
   },
   email: {
     name: "E-mail",
-    accepted: "The mail server accepted the test e-mail. Check the inbox (and spam folder) to confirm it arrived.",
+    accepted:
+      "The mail server accepted the test e-mail. Check the inbox (and spam folder) to confirm it arrived.",
     live: "A short test e-mail will be sent to the recipient below. Limited to 3 per 10 minutes.",
   },
 } as const;
@@ -79,7 +80,9 @@ export function TestMessageButton({
         { method: "POST", body: { recipientId } },
       );
       if (result.status === "ACCEPTED") {
-        toast.success(result.isMock ? "Mock provider: the test message was recorded, not sent." : text.accepted);
+        toast.success(
+          result.isMock ? "Mock provider: the test message was recorded, not sent." : text.accepted,
+        );
         setOpen(false);
       } else {
         toast.error(`${text.name} did not accept the test message: ${result.error ?? result.status}`);
@@ -104,7 +107,9 @@ export function TestMessageButton({
         <DialogContent
           title={`Send a${channel === "email" ? "n e-mail" : " WhatsApp"} test message?`}
           description={
-            isMock ? `${text.name} is in mock mode, so nothing is actually sent; the attempt is recorded.` : text.live
+            isMock
+              ? `${text.name} is in mock mode, so nothing is actually sent; the attempt is recorded.`
+              : text.live
           }
         >
           <div className="mb-4 flex flex-col gap-1.5">

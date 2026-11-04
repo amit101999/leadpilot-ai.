@@ -51,11 +51,20 @@ function upworkJob(overrides: Record<string, unknown> = {}) {
 }
 
 const details = (hires: number) => ({
-  client_record: { contracts_total: hires, hire_rate_percent: 70, jobs_posted: 197, open_jobs: 5, spend_total: "$23,575.22" },
+  client_record: {
+    contracts_total: hires,
+    hire_rate_percent: 70,
+    jobs_posted: 197,
+    open_jobs: 5,
+    spend_total: "$23,575.22",
+  },
   data: {
     marketplaceJobPosting: {
       classification: { category: { preferredLabel: "Web, Mobile & Software Dev" } },
-      contractTerms: { contractType: "FIXED", fixedPriceContractTerms: { amount: { currency: "USD", rawValue: "900.0" } } },
+      contractTerms: {
+        contractType: "FIXED",
+        fixedPriceContractTerms: { amount: { currency: "USD", rawValue: "900.0" } },
+      },
       activityStat: { jobActivity: { totalHired: 0, invitesSent: 1 } },
     },
   },
@@ -65,7 +74,10 @@ const details = (hires: number) => ({
 async function newToken(user: TestUser) {
   const res = await call(createToken, { method: "POST", user, body: { name: "Upwork sync" } });
   expect(res.status).toBe(201);
-  return { id: res.json.data.id as string, bearer: { authorization: `Bearer ${res.json.data.token as string}` } };
+  return {
+    id: res.json.data.id as string,
+    bearer: { authorization: `Bearer ${res.json.data.token as string}` },
+  };
 }
 
 async function newProfile(user: TestUser, mutate?: (c: ProfileConfig) => void) {
@@ -157,7 +169,12 @@ describe("import flow", () => {
       .where(and(eq(jobs.source, "upwork"), eq(jobs.sourceJobId, job.id)));
     expect(stored!.jobUrl).toBe(`https://www.upwork.com/jobs/~02${job.id}`);
     expect(stored!.description).not.toContain("untrusted_participant_content");
-    expect(stored).toMatchObject({ paymentVerified: true, clientHires: 151, clientTotalSpent: "23575.22", budgetAmount: "900.00" });
+    expect(stored).toMatchObject({
+      paymentVerified: true,
+      clientHires: 151,
+      clientTotalSpent: "23575.22",
+      budgetAmount: "900.00",
+    });
     expect(JSON.stringify(stored!.sourceMetadata)).not.toContain("should never be stored");
 
     const [finished] = await getDb().select().from(agentRuns).where(eq(agentRuns.id, runId));
@@ -254,9 +271,17 @@ describe("sync schedule", () => {
     const profileId = await newProfile(user);
     const token = await newToken(user);
 
-    const manual = await call(importContext, { headers: token.bearer, path: "/api/import/context?scheduled=false" });
-    expect(manual.json.data.profiles.find((p: { id: string }) => p.id === profileId)).toMatchObject({ due: true });
-    const scheduled = await call(importContext, { headers: token.bearer, path: "/api/import/context?scheduled=true" });
+    const manual = await call(importContext, {
+      headers: token.bearer,
+      path: "/api/import/context?scheduled=false",
+    });
+    expect(manual.json.data.profiles.find((p: { id: string }) => p.id === profileId)).toMatchObject({
+      due: true,
+    });
+    const scheduled = await call(importContext, {
+      headers: token.bearer,
+      path: "/api/import/context?scheduled=true",
+    });
     expect(scheduled.json.data.scheduledAllowed).toBe(false);
     expect(scheduled.json.data.profiles.every((p: { due: boolean }) => !p.due)).toBe(true);
 

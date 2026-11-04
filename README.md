@@ -5,23 +5,25 @@ an AI model score the ones that pass, and sends the best leads to WhatsApp. One 
 define what a good job looks like once, start a run (from the UI or through n8n), and get a short list of qualified
 leads with the reasons behind each decision.
 
-> **Live Upwork discovery is blocked.** The app runs on a mock job source until an approved Upwork API key with
-> job-search access is available and a live adapter is built and verified. See
-> [docs/upwork-access.md](docs/upwork-access.md).
+> **Upwork access.** LeadPilot has no direct Upwork API access yet (that needs an approved key, see
+> [docs/upwork-access.md](docs/upwork-access.md)). Real Upwork jobs come in through the **Upwork sync**: a Claude Code
+> agent using Upwork's official connector imports them, and LeadPilot filters, scores and alerts
+> ([docs/upwork-sync.md](docs/upwork-sync.md)). Without it, runs use a mock job source.
 
 ## What works today
 
-| Area            | Status                                                                                                    |
-| --------------- | --------------------------------------------------------------------------------------------------------- |
-| Search profiles | ✅ Create, edit (versioned, optimistic locking), duplicate, archive, restore an old version               |
-| Runs            | ✅ Seven idempotent stages with leases; in-process or n8n executor; cancel; live progress (2 s polling)   |
-| Hard filters    | ✅ Budget, fixed-price/hourly, payment verification, currency, skills/keywords, client conditions, URLs   |
-| AI scoring      | ✅ Mock evaluator; OpenAI adapter (strict JSON schema), unit-tested with mocked HTTP, not run live        |
-| WhatsApp alerts | ✅ Mock provider; Cloud API adapter and status webhook, unit/integration-tested, not run live             |
-| Job source      | ⚠️ Mock feed only. Upwork adapter reports `NOT_AUTHORIZED` by design                                      |
-| UI              | ✅ Dashboard, Run Agent, History, Leads, All Jobs, Profiles, Notifications, Integrations, Settings, Audit |
-| Auth            | ✅ Email + password (argon2), server-side sessions, roles VIEWER < OPERATOR < ADMIN                       |
-| Deployment      | ✅ Docker Compose stack, Caddy HTTPS, Postgres backup/restore scripts (verified on Docker Desktop)        |
+| Area            | Status                                                                                                                                                                                                                  |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Search profiles | ✅ Create, edit (versioned, optimistic locking), duplicate, archive, restore an old version                                                                                                                             |
+| Runs            | ✅ Seven idempotent stages with leases; in-process or n8n executor; cancel; live progress (2 s polling)                                                                                                                 |
+| Hard filters    | ✅ Budget, fixed-price/hourly, payment verification, currency, skills/keywords, keyword coverage %, client conditions, URLs                                                                                             |
+| AI scoring      | ✅ Mock evaluator; OpenAI adapter (strict JSON schema), unit-tested with mocked HTTP, not run live                                                                                                                      |
+| WhatsApp alerts | ✅ Mock provider; Cloud API adapter and status webhook, unit/integration-tested, not run live                                                                                                                           |
+| E-mail alerts   | ✅ Mock provider; SMTP adapter (nodemailer), unit/integration-tested, not run against a real mailbox                                                                                                                    |
+| Job source      | ✅ Upwork sync (Claude + Upwork MCP → import API), import side integration-tested, live search verified, full live import not yet. ⚠️ Direct Upwork API adapter reports `NOT_AUTHORIZED` by design; mock feed for demos |
+| UI              | ✅ Dashboard, Run Agent, History, Leads, All Jobs, Profiles, Notifications, Integrations, Settings, Audit                                                                                                               |
+| Auth            | ✅ Email + password (argon2), server-side sessions, roles VIEWER < OPERATOR < ADMIN                                                                                                                                     |
+| Deployment      | ✅ Docker Compose stack, Caddy HTTPS, Postgres backup/restore scripts (verified on Docker Desktop)                                                                                                                      |
 
 ## Quick start (development)
 
@@ -71,6 +73,7 @@ Vitest and Playwright · Docker Compose and Caddy.
 | [n8n/documentation/README.md](n8n/documentation/README.md) | The n8n run workflow                                       |
 | [docs/whatsapp.md](docs/whatsapp.md)                       | WhatsApp Cloud API setup, templates, delivery guarantees   |
 | [docs/upwork-access.md](docs/upwork-access.md)             | Why live Upwork discovery is blocked and what unblocks it  |
+| [docs/upwork-sync.md](docs/upwork-sync.md)                 | Importing real Upwork jobs through Claude + Upwork MCP     |
 | [docs/deployment.md](docs/deployment.md)                   | Docker, production, backups                                |
 | [docs/testing.md](docs/testing.md)                         | Test suites and acceptance-scenario mapping                |
 | [docs/troubleshooting.md](docs/troubleshooting.md)         | Common problems and fixes                                  |

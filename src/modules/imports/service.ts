@@ -22,7 +22,12 @@ import { createRun } from "@/modules/runs/service";
 import { syncDue } from "./schedule";
 
 /** Limits handed to the agent so one sync stays small and inside Upwork's browse throttle. */
-export const SYNC_LIMITS = { pagesPerSearch: 2, resultsPerPage: 10, maxDetailCalls: 15, maxJobsPerCommit: 100 };
+export const SYNC_LIMITS = {
+  pagesPerSearch: 2,
+  resultsPerPage: 10,
+  maxDetailCalls: 15,
+  maxJobsPerCommit: 100,
+};
 
 export const importJobsSchema = z.object({
   profileId: uuidParam,
@@ -89,7 +94,10 @@ async function storedJobs(db: Database, sourceJobIds: string[]) {
  * A re-import from search results must not erase details fetched earlier (hires, category, client
  * record). Search data wins for everything it carries; detail-only fields are kept from the stored job.
  */
-function keepStoredDetails(incoming: NormalizedJob, stored: typeof jobs.$inferSelect | undefined): NormalizedJob {
+function keepStoredDetails(
+  incoming: NormalizedJob,
+  stored: typeof jobs.$inferSelect | undefined,
+): NormalizedJob {
   const storedMeta = (stored?.sourceMetadata ?? {}) as Record<string, unknown>;
   if (incoming.sourceMetadata.detailsFetched || !storedMeta.detailsFetched || !stored) return incoming;
   return {
@@ -124,12 +132,19 @@ export async function getImportContext(db: Database, actor: Actor, options: { sc
   const scheduledAllowed = env().UPWORK_SYNC_SCHEDULED_ALLOWED;
   const now = new Date();
   const profiles = rows
-    .map(({ profile, lastSyncedAt }) => ({ profile, lastSyncedAt, config: parseStoredConfig(profile.configuration) }))
+    .map(({ profile, lastSyncedAt }) => ({
+      profile,
+      lastSyncedAt,
+      config: parseStoredConfig(profile.configuration),
+    }))
     .filter(({ config }) => config.search.upworkSync.enabled)
     .map(({ profile, lastSyncedAt, config }) => {
       let decision = syncDue(config.search, lastSyncedAt, now);
       if (options.scheduled && !scheduledAllowed) {
-        decision = { due: false, reason: "Scheduled syncs are disabled (UPWORK_SYNC_SCHEDULED_ALLOWED=false)" };
+        decision = {
+          due: false,
+          reason: "Scheduled syncs are disabled (UPWORK_SYNC_SCHEDULED_ALLOWED=false)",
+        };
       } else if (!options.scheduled && !decision.due && config.search.keywords.length > 0) {
         // A manual sync always runs; only the schedule respects the interval and active hours.
         decision = { due: true };
@@ -183,7 +198,9 @@ export async function screenJobs(db: Database, actor: Actor, input: z.infer<type
       rejected += 1;
       continue;
     }
-    const detailsKnown = Boolean((row?.sourceMetadata as { detailsFetched?: boolean } | undefined)?.detailsFetched);
+    const detailsKnown = Boolean(
+      (row?.sourceMetadata as { detailsFetched?: boolean } | undefined)?.detailsFetched,
+    );
     if (!detailsKnown) detailsWanted.push(job.sourceJobId);
   }
   return {
@@ -248,7 +265,12 @@ export async function commitJobs(
       action: "import.commit",
       entityType: "search_profile",
       entityId: profile.id,
-      after: { batchId: created!.id, origin: input.origin, accepted: toStage.length, invalid: invalid.length },
+      after: {
+        batchId: created!.id,
+        origin: input.origin,
+        accepted: toStage.length,
+        invalid: invalid.length,
+      },
       requestId,
     });
     return created!;
@@ -288,7 +310,8 @@ export async function recordSyncStatus(db: Database, actor: Actor, input: z.infe
   const values = {
     lastSyncedAt: new Date(),
     lastStatus: input.status,
-    lastError: input.status === "OK" ? null : sanitizeErrorMessage(input.message ?? "Sync reported a problem"),
+    lastError:
+      input.status === "OK" ? null : sanitizeErrorMessage(input.message ?? "Sync reported a problem"),
     updatedAt: new Date(),
   };
   await db

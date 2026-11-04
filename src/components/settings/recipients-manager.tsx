@@ -44,7 +44,11 @@ const addSchema = z
   })
   .superRefine((v, ctx) => {
     if (v.channel === "WHATSAPP" && !/^\+[1-9]\d{6,14}$/.test(v.phoneE164)) {
-      ctx.addIssue({ code: "custom", path: ["phoneE164"], message: "Use international format with +, e.g. +14155550123" });
+      ctx.addIssue({
+        code: "custom",
+        path: ["phoneE164"],
+        message: "Use international format with +, e.g. +14155550123",
+      });
     }
     if (v.channel === "EMAIL" && !z.email().safeParse(v.email).success) {
       ctx.addIssue({ code: "custom", path: ["email"], message: "Enter a valid e-mail address" });
@@ -86,8 +90,18 @@ export function RecipientsManager({ recipients, canEdit }: { recipients: Recipie
   async function add(values: AddValues) {
     const body =
       values.channel === "EMAIL"
-        ? { channel: "EMAIL", label: values.label, email: values.email, optInConfirmed: values.optInConfirmed }
-        : { channel: "WHATSAPP", label: values.label, phoneE164: values.phoneE164, optInConfirmed: values.optInConfirmed };
+        ? {
+            channel: "EMAIL",
+            label: values.label,
+            email: values.email,
+            optInConfirmed: values.optInConfirmed,
+          }
+        : {
+            channel: "WHATSAPP",
+            label: values.label,
+            phoneE164: values.phoneE164,
+            optInConfirmed: values.optInConfirmed,
+          };
     try {
       await apiFetch("/api/recipients", { method: "POST", body });
       toast.success(`${values.label} added.`);
@@ -96,7 +110,8 @@ export function RecipientsManager({ recipients, canEdit }: { recipients: Recipie
       router.refresh();
     } catch (error) {
       if (error instanceof ApiError && error.code === "CONFLICT") {
-        if (values.channel === "EMAIL") form.setError("email", { message: "This address is already a recipient" });
+        if (values.channel === "EMAIL")
+          form.setError("email", { message: "This address is already a recipient" });
         else form.setError("phoneE164", { message: "This number is already a recipient" });
       } else if (error instanceof ApiError && error.code === "VALIDATION_ERROR") {
         for (const [path, message] of Object.entries(error.fieldErrors())) {
@@ -112,8 +127,8 @@ export function RecipientsManager({ recipients, canEdit }: { recipients: Recipie
     <div>
       {recipients.length === 0 ? (
         <EmptyState title="No recipients yet">
-          Add the WhatsApp number or e-mail address that should receive lead alerts. Alerts are sent only after
-          you confirm the person agreed to receive them.
+          Add the WhatsApp number or e-mail address that should receive lead alerts. Alerts are sent only
+          after you confirm the person agreed to receive them.
         </EmptyState>
       ) : (
         <ul className="divide-y divide-line">

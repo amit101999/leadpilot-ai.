@@ -2,7 +2,13 @@ import { and, asc, eq } from "drizzle-orm";
 import type { DbExecutor } from "@/lib/database/client";
 import { stagedJobs } from "@/lib/database/schema";
 import type { ProfileConfig } from "@/modules/profiles/config-schema";
-import type { DiscoverPage, JobSourceProvider, NormalizedJob, SourceCapabilities, SourceConnectionResult } from "./types";
+import type {
+  DiscoverPage,
+  JobSourceProvider,
+  NormalizedJob,
+  SourceCapabilities,
+  SourceConnectionResult,
+} from "./types";
 import { parseStagedJob } from "./upwork-import/normalize";
 
 export const IMPORT_SOURCE_ID = "upwork-import";

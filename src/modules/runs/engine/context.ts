@@ -136,7 +136,10 @@ export async function enterRun(
     // Import runs read their own staged jobs instead of the globally configured source.
     providers:
       snapshot.providers.jobSource === IMPORT_SOURCE_ID
-        ? { ...providers, jobSource: new ImportJobSourceProvider({ db, profileId: run.profileId, runId: run.id }) }
+        ? {
+            ...providers,
+            jobSource: new ImportJobSourceProvider({ db, profileId: run.profileId, runId: run.id }),
+          }
         : providers,
     log: childLogger({ run_id: run.id, profile_id: run.profileId }),
   };

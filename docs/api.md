@@ -93,22 +93,41 @@ parses and validates input with zod, calls a module in `src/modules`, and return
 
 ### Notifications and recipients
 
-| Method | Path                           | Access   | Purpose                                                                                                          |
-| ------ | ------------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------- |
-| GET    | `/api/notifications`           | VIEWER   | Own alerts, filterable by status                                                                                 |
-| POST   | `/api/notifications/:id/retry` | OPERATOR | Retry a failed alert; an `UNCERTAIN` one only after 15 minutes and with `confirmNotReceived: true`. Rate limited |
-| GET    | `/api/recipients`              | VIEWER   | Own recipients (phone numbers masked)                                                                            |
-| POST   | `/api/recipients`              | OPERATOR | `{ label, phoneE164, optInConfirmed }`; E.164 validated                                                          |
-| PATCH  | `/api/recipients/:id`          | OPERATOR | `{ label?, optInConfirmed?, archived? }`: rename, confirm opt-in, archive                                        |
+| Method | Path                           | Access   | Purpose                                                                                                                                    |
+| ------ | ------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| GET    | `/api/notifications`           | VIEWER   | Own alerts, filterable by status                                                                                                           |
+| POST   | `/api/notifications/:id/retry` | OPERATOR | Retry a failed alert; an `UNCERTAIN` one only after 15 minutes and with `confirmNotReceived: true`. Rate limited                           |
+| GET    | `/api/recipients`              | VIEWER   | Own recipients (phone numbers and e-mail addresses masked)                                                                                 |
+| POST   | `/api/recipients`              | OPERATOR | WhatsApp: `{ label, phoneE164, optInConfirmed }` (E.164, `channel` optional); e-mail: `{ channel: "EMAIL", label, email, optInConfirmed }` |
+| PATCH  | `/api/recipients/:id`          | OPERATOR | `{ label?, optInConfirmed?, archived? }`: rename, confirm opt-in, archive                                                                  |
 
 ### Integrations and administration
 
-| Method | Path                                | Access   | Purpose                                                                     |
-| ------ | ----------------------------------- | -------- | --------------------------------------------------------------------------- |
-| GET    | `/api/integrations/status`          | VIEWER   | Stored state of database, job source, AI, WhatsApp, n8n (no external calls) |
-| POST   | `/api/integrations/:provider/check` | OPERATOR | Live connection check for one integration; result stored. Rate limited      |
-| POST   | `/api/integrations/whatsapp/test`   | OPERATOR | Send the test template to an opted-in recipient (audited). Rate limited     |
-| GET    | `/api/audit-logs`                   | ADMIN    | Audit log, filterable by action, actor and date                             |
+| Method | Path                                      | Access   | Purpose                                                                             |
+| ------ | ----------------------------------------- | -------- | ----------------------------------------------------------------------------------- |
+| GET    | `/api/integrations/status`                | VIEWER   | Stored state of database, job source, AI, WhatsApp, e-mail, n8n (no external calls) |
+| POST   | `/api/integrations/:provider/check`       | OPERATOR | Live connection check for one integration; result stored. Rate limited              |
+| POST   | `/api/integrations/{whatsapp,email}/test` | OPERATOR | Send a test to an opted-in recipient of that channel (audited). Rate limited        |
+| GET    | `/api/import-tokens`                      | OPERATOR | Own import tokens (never the token itself)                                          |
+| POST   | `/api/import-tokens`                      | OPERATOR | `{ name }` → 201 with `data.token`, shown once (audited). Rate limited              |
+| POST   | `/api/import-tokens/:id/revoke`           | OPERATOR | Revoke an own token immediately (audited)                                           |
+| GET    | `/api/audit-logs`                         | ADMIN    | Audit log, filterable by action, actor and date                                     |
+
+### Job import (Upwork sync agent)
+
+Authenticated with `Authorization: Bearer lpi_…` (an import token); no cookie, so no CSRF check. The request acts as
+the token's user (OPERATOR or higher), with the same ownership rules. See [upwork-sync.md](upwork-sync.md).
+
+| Method | Path                      | Purpose                                                                                                                         |
+| ------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/import/context`     | `?scheduled=true` from the scheduler. Profiles with Upwork sync on: keywords, filters, last sync, `due`, limits                 |
+| POST   | `/api/import/jobs/screen` | `{ profileId, origin: "upwork-mcp", jobs[≤100] }` → `{ received, valid, rejected, invalid[], detailsWanted[] }`; stores nothing |
+| POST   | `/api/import/jobs`        | Same body → stages the jobs and starts an import run: 202 `{ status: STARTED \| QUEUED, runId, accepted, invalid[] }`           |
+| POST   | `/api/import/sync-status` | `{ profileId, status: OK \| PARTIAL \| ERROR, message? }` → records the sync time for the schedule                              |
+
+Each job is an Upwork MCP `find_jobs` search item, optionally with the raw `find_jobs get` response as `details`
+(contract: `upworkMcpJobSchema` in `src/modules/job-sources/upwork-import/normalize.ts`). Invalid items are reported
+by index and skipped; the rest are imported.
 
 ### Machine-to-machine
 
@@ -125,15 +144,17 @@ Caddy answers `/api/internal/*` with 404 in production, so these routes are reac
 
 Fixed windows stored in Postgres (`src/lib/security/rate-limit.ts`), so they hold across app instances.
 
-| Rule               | Limit             | Counted per                    |
-| ------------------ | ----------------- | ------------------------------ |
-| Login              | 10 per 15 minutes | client IP, and e-mail (hashed) |
-| Password change    | 5 per 15 minutes  | user                           |
-| Start run          | 10 per minute     | user                           |
-| Notification retry | 20 per minute     | user                           |
-| WhatsApp test      | 3 per 10 minutes  | user                           |
-| Integration check  | 20 per minute     | user                           |
-| CSV export         | 10 per minute     | user                           |
+| Rule                | Limit             | Counted per                    |
+| ------------------- | ----------------- | ------------------------------ |
+| Login               | 10 per 15 minutes | client IP, and e-mail (hashed) |
+| Password change     | 5 per 15 minutes  | user                           |
+| Start run           | 10 per minute     | user                           |
+| Notification retry  | 20 per minute     | user                           |
+| WhatsApp test       | 3 per 10 minutes  | user                           |
+| Integration check   | 20 per minute     | user                           |
+| CSV export          | 10 per minute     | user                           |
+| Import API          | 60 per minute     | import token                   |
+| Create import token | 10 per hour       | user                           |
 
 ## Not implemented
 

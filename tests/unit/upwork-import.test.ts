@@ -14,7 +14,8 @@ import { DEFAULT_SEARCH_CONFIG, type SearchConfig } from "@/modules/profiles/con
 const searchItem = {
   id: "2117399309499514919",
   title: "ZOHO and ZOHO Forms Specialist Needed",
-  description: "<untrusted_participant_content>\nWe need a ZOHO specialist.\n</untrusted_participant_content>",
+  description:
+    "<untrusted_participant_content>\nWe need a ZOHO specialist.\n</untrusted_participant_content>",
   url: "https://www.upwork.com/jobs/~022117399309499514919?utm_campaign=LLM_claude_MCP_jobpost&utm_source=claude",
   job_type: "fixed",
   budget: "35.00",
@@ -68,9 +69,15 @@ describe("Upwork MCP job mapping", () => {
         client_record: { contracts_total: 151, jobs_with_hires: 138, hire_rate_percent: 70, open_jobs: 5 },
         data: {
           marketplaceJobPosting: {
-            content: { description: "<untrusted_participant_content>\nFull description from details.\n</untrusted_participant_content>" },
+            content: {
+              description:
+                "<untrusted_participant_content>\nFull description from details.\n</untrusted_participant_content>",
+            },
             classification: { category: { preferredLabel: "Web, Mobile & Software Dev" } },
-            contractTerms: { contractType: "FIXED", fixedPriceContractTerms: { amount: { currency: "usd", rawValue: "35.0" } } },
+            contractTerms: {
+              contractType: "FIXED",
+              fixedPriceContractTerms: { amount: { currency: "usd", rawValue: "35.0" } },
+            },
             activityStat: { jobActivity: { totalHired: 1, invitesSent: 0 } },
           },
         },
@@ -92,14 +99,21 @@ describe("Upwork MCP job mapping", () => {
   });
 
   it("never assumes payment verification or a rating that is not there", () => {
-    expect(normalize({ ...searchItem, client: { verification_status: "UNVERIFIED" } }).paymentVerified).toBe(false);
+    expect(normalize({ ...searchItem, client: { verification_status: "UNVERIFIED" } }).paymentVerified).toBe(
+      false,
+    );
     expect(normalize({ ...searchItem, client: {} }).paymentVerified).toBeNull();
     expect(normalize({ ...searchItem, client: { rating: 0, total_reviews: 0 } }).clientRating).toBeNull();
   });
 
   it("reads hourly ranges and leaves fixed fields empty", () => {
     const job = normalize({ ...searchItem, job_type: "hourly", budget: "$15.00 - $30.00/hr" });
-    expect(job).toMatchObject({ budgetType: "HOURLY", budgetAmount: null, hourlyMin: "15.00", hourlyMax: "30.00" });
+    expect(job).toMatchObject({
+      budgetType: "HOURLY",
+      budgetAmount: null,
+      hourlyMin: "15.00",
+      hourlyMax: "30.00",
+    });
   });
 
   it("rejects unexpected ids and oversized fields instead of storing them", () => {
@@ -161,6 +175,9 @@ describe("sync schedule", () => {
     const now = at("2026-11-04T23:30:00Z");
     expect(syncDue(search({ enabled: false }), null, now).due).toBe(false);
     expect(syncDue({ ...search(), keywords: [] }, null, now).due).toBe(false);
-    expect(syncDue(search(), null, now)).toMatchObject({ due: false, reason: expect.stringContaining("active hours") });
+    expect(syncDue(search(), null, now)).toMatchObject({
+      due: false,
+      reason: expect.stringContaining("active hours"),
+    });
   });
 });

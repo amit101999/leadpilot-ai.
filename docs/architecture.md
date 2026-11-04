@@ -10,7 +10,8 @@ an optional orchestrator that drives runs through the app's own API; it holds no
                                │  API (src/app/api/**)
                                │  Modules (src/modules/**)
                                │
-                               ├─► Job source provider ──► mock feed | Upwork (blocked)
+                               ├─► Job source provider ──► mock feed | Upwork API (blocked) | imported jobs
+                               │     ▲ Claude + Upwork MCP ──Bearer token──► /api/import/* (docs/upwork-sync.md)
                                ├─► AI evaluator ─────────► mock | OpenAI Responses API
                                ├─► WhatsApp provider ────► mock | WhatsApp Cloud API ──► status webhook back
                                │
@@ -85,9 +86,12 @@ Transitions are declared in `src/modules/runs/transitions.ts`; any other transit
 
 ## Notifications and delivery guarantees
 
-Selection reserves at most `maxPerRun` notification rows. A unique index on `(job_id, channel, recipient_id)` makes
-"never alert the same job to the same recipient twice" a database guarantee, even for concurrent runs. Sending is
-claim → send → record. The provider classifies every result:
+Alerts go out on each channel the profile enables: WhatsApp (Cloud API) and/or e-mail (SMTP), each with its own
+opted-in recipient (`src/modules/notifications/channels.ts`). Selection reserves at most `maxPerRun` notification rows
+per channel, under a per-channel, per-recipient advisory lock. A unique index on `(job_id, channel, recipient_id)`
+makes "never alert the same job to the same recipient on the same channel twice" a database guarantee, even for
+concurrent runs. Sending is claim → send → record. The provider classifies every result (SMTP replies are mapped the
+same way: 5xx and login errors are permanent, 4xx and failed connections retryable, a dropped connection uncertain):
 
 - **accepted** (message id returned): `SENT`, later `DELIVERED` / `READ` from the status webhook.
 - **rejected**: `FAILED_RETRYABLE` (429, 5xx, connection refused before sending), retried automatically within the

@@ -5,14 +5,17 @@ What protects LeadPilot today, where it lives in the code, and the risks that re
 
 ## Trust boundaries
 
-| Boundary                        | Who is on the other side            | Control                                                                                          |
-| ------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Browser → app                   | Signed-in users (and anyone online) | Session cookie, roles, per-user ownership checks, same-origin check, rate limits                 |
-| n8n → `/api/internal/*`         | The n8n container                   | HMAC-SHA256 signature with timestamp (`INTERNAL_API_SECRET`); Caddy blocks the path from outside |
-| App → n8n webhook               | n8n                                 | Shared header secret (`N8N_WEBHOOK_SECRET`) checked by an n8n credential                         |
-| Meta → `/api/webhooks/whatsapp` | WhatsApp Cloud API                  | `X-Hub-Signature-256` HMAC with `WHATSAPP_APP_SECRET`; verify-token handshake                    |
-| App → OpenAI / Graph API        | External APIs                       | Fixed hosts from configuration, never from user input; timeouts; sanitized errors                |
-| Job source data → app           | Untrusted job text                  | Normalized and validated; shown via React (escaped); sent to the AI as data only                 |
+| Boundary                            | Who is on the other side            | Control                                                                                                                                                                               |
+| ----------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Browser → app                       | Signed-in users (and anyone online) | Session cookie, roles, per-user ownership checks, same-origin check, rate limits                                                                                                      |
+| n8n → `/api/internal/*`             | The n8n container                   | HMAC-SHA256 signature with timestamp (`INTERNAL_API_SECRET`); Caddy blocks the path from outside                                                                                      |
+| App → n8n webhook                   | n8n                                 | Shared header secret (`N8N_WEBHOOK_SECRET`) checked by an n8n credential                                                                                                              |
+| Meta → `/api/webhooks/whatsapp`     | WhatsApp Cloud API                  | `X-Hub-Signature-256` HMAC with `WHATSAPP_APP_SECRET`; verify-token handshake                                                                                                         |
+| App → OpenAI / Graph API            | External APIs                       | Fixed hosts from configuration, never from user input; timeouts; sanitized errors                                                                                                     |
+| Job source data → app               | Untrusted job text                  | Normalized and validated; shown via React (escaped); sent to the AI as data only                                                                                                      |
+| Upwork sync agent → `/api/import/*` | Claude Code on the operator's PC    | Per-user import token (HMAC-stored, revocable, rate limited); acts with that user's role and ownership; every job re-validated with zod; links restricted to `https://www.upwork.com` |
+| Upwork job text → agent             | Strangers writing job posts         | Agent instructions forbid following instructions in job text; `--allowedTools` limits it to read-only Upwork calls, the import script and `.upwork-sync/`                             |
+| App → SMTP server                   | Your mail provider                  | Server, sender and login from configuration only; timeouts; errors sanitized; job text HTML-escaped in alerts                                                                         |
 
 ## Controls
 
@@ -58,7 +61,11 @@ What protects LeadPilot today, where it lives in the code, and the risks that re
   the variable, never its value.
 - pino redacts passwords, tokens, access tokens, authorization headers and cookies by path. Provider errors are passed
   through `sanitizeErrorMessage` before storage, which removes tokens, e-mails and phone numbers.
-- Recipient phone numbers are never returned in full by the API (masked) and never logged.
+- Recipient phone numbers and e-mail addresses are never returned in full by the API (masked) and never logged.
+- Lead e-mails escape every job-supplied value in the HTML body and keep the subject on one line, so job text cannot
+  inject markup or mail headers; only `http(s)` links become clickable.
+- Import tokens (`lpi_` + 32 random bytes) are shown once, stored as an HMAC (separate from session hashing), and
+  checked on every request together with the user's status.
 - OpenAI requests use `store: false`. The model receives only the job and a minimal profile slice: skill names,
   category and risk sensitivity.
 
@@ -85,7 +92,14 @@ What protects LeadPilot today, where it lives in the code, and the risks that re
 | No account lockout or MFA                                                                                                                            | Online guessing limited only by rate limits                          | Rate limits per IP and e-mail; strong password minimum                                              |
 | No user-management UI or API                                                                                                                         | Users are created with the seed or SQL                               | Documented; out of scope so far                                                                     |
 | Data kept indefinitely                                                                                                                               | Job text, audit logs and phone numbers accumulate                    | Define a retention policy before real production data                                               |
-| Live OpenAI / WhatsApp / Upwork never exercised                                                                                                      | Adapter behaviour verified only with mocked HTTP                     | `npm run test:live` once credentials exist                                                          |
+| Live OpenAI / WhatsApp / SMTP never exercised                                                                                                        | Adapter behaviour verified only with mocked HTTP / transports        | `npm run test:live` once credentials exist                                                          |
+| Upwork sync depends on Upwork's terms                                                                                                                | Scheduled searching may count as "continuous monitoring"             | Scheduled syncs disabled until `UPWORK_SYNC_SCHEDULED_ALLOWED=true`; the operator decides           |
+| A stolen import token can inject jobs for its user's profiles                                                                                        | Fake jobs could trigger alerts (no data is read or deleted)          | Revoke in Settings; tokens never leave `.env` on the sync PC; rate limited; actions audited         |
 
 The final review on 2026-10-15 was a manual pass over the code against the CLAUDE.md §4 checklist, plus `npm audit`
 and the full test suites. It is not a penetration test or a third-party audit.
+
+On 2026-11-04 `npm audit --omit=dev` reported new advisories in production dependencies: Next.js 16.4.0 (critical:
+remote code execution in image optimization with SVG and in `use cache`, plus a Server Actions DoS) and zod 4.6.5
+(high: memory exhaustion validating oversized collections). Both were patched in place (`next` 16.4.5, `zod` 4.6.7);
+`npm audit --omit=dev` then reported 0 vulnerabilities.

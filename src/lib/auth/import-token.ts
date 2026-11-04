@@ -25,7 +25,10 @@ export interface ImportTokenUser {
 }
 
 /** Resolves an active (not revoked) token of an active user, or null. */
-export async function resolveImportToken(db: DbExecutor, token: string | null): Promise<ImportTokenUser | null> {
+export async function resolveImportToken(
+  db: DbExecutor,
+  token: string | null,
+): Promise<ImportTokenUser | null> {
   if (!token || !TOKEN_RE.test(token)) return null;
   const [row] = await db
     .select({ tokenId: importTokens.id, userId: users.id, role: users.role })

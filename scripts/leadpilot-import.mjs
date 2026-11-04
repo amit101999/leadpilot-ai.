@@ -31,6 +31,11 @@ function fail(message) {
   process.exit(1);
 }
 
+/** Results go to stdout as JSON for the agent to read. */
+function print(value) {
+  process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
+}
+
 function readJson(path) {
   if (!existsSync(path)) fail(`missing file ${path}`);
   if (statSync(path).size > MAX_FILE_BYTES) fail(`${path} is larger than 5 MB`);
@@ -91,7 +96,7 @@ const [command, ...args] = process.argv.slice(2);
 if (command === "context") {
   const scheduled = args.includes("--scheduled");
   const data = await api("GET", `/api/import/context?scheduled=${scheduled}`);
-  console.log(JSON.stringify(data, null, 2));
+  print(data);
 } else if (command === "screen") {
   const jobs = loadJobs(args[0]);
   const totals = { received: 0, valid: 0, rejected: 0, invalid: 0, detailsWanted: [] };
@@ -107,7 +112,7 @@ if (command === "context") {
     totals.invalid += data.invalid.length;
     totals.detailsWanted.push(...data.detailsWanted);
   }
-  console.log(JSON.stringify(totals, null, 2));
+  print(totals);
 } else if (command === "commit") {
   const jobs = loadJobs(args[0]);
   for (let i = 0; i < jobs.length; i += CHUNK) {
@@ -116,17 +121,15 @@ if (command === "context") {
       origin: "upwork-mcp",
       jobs: jobs.slice(i, i + CHUNK),
     });
-    console.log(
-      JSON.stringify({
-        status: data.status,
-        runId: data.runId,
-        accepted: data.accepted,
-        invalid: data.invalid.length,
-        withDetails: jobs.slice(i, i + CHUNK).filter((j) => j.details).length,
-      }),
-    );
+    print({
+      status: data.status,
+      runId: data.runId,
+      accepted: data.accepted,
+      invalid: data.invalid.length,
+      withDetails: jobs.slice(i, i + CHUNK).filter((j) => j.details).length,
+    });
   }
-  if (jobs.length === 0) console.log(JSON.stringify({ status: "NOTHING_TO_IMPORT" }));
+  if (jobs.length === 0) print({ status: "NOTHING_TO_IMPORT" });
 } else if (command === "status") {
   const [profileId, status, ...message] = args;
   if (!["OK", "PARTIAL", "ERROR"].includes(status)) fail("status must be OK, PARTIAL or ERROR");
@@ -136,7 +139,9 @@ if (command === "context") {
     status,
     ...(message.length ? { message: message.join(" ").slice(0, 1000) } : {}),
   });
-  console.log(JSON.stringify({ profileId, status }));
+  print({ profileId, status });
 } else {
-  fail("usage: context [--scheduled] | screen <profileId> | commit <profileId> | status <profileId> <OK|PARTIAL|ERROR> [message]");
+  fail(
+    "usage: context [--scheduled] | screen <profileId> | commit <profileId> | status <profileId> <OK|PARTIAL|ERROR> [message]",
+  );
 }

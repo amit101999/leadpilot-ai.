@@ -29,7 +29,10 @@ export function syncDue(search: SearchConfig, lastSyncedAt: Date | null, now: Da
   if (search.keywords.length === 0) return { due: false, reason: "No search keywords" };
   const clock = localClock(now, sync.timezone);
   if (!withinActiveHours(clock, sync.activeFrom, sync.activeTo)) {
-    return { due: false, reason: `Outside active hours (${sync.activeFrom}–${sync.activeTo} ${sync.timezone})` };
+    return {
+      due: false,
+      reason: `Outside active hours (${sync.activeFrom}–${sync.activeTo} ${sync.timezone})`,
+    };
   }
   if (lastSyncedAt && now.getTime() - lastSyncedAt.getTime() < sync.everyHours * 3_600_000 - TOLERANCE_MS) {
     return { due: false, reason: `Synced less than ${sync.everyHours} h ago` };
