@@ -30,6 +30,7 @@ const detailsSchema = z
       .object({
         marketplaceJobPosting: z
           .object({
+            content: z.object({ title: shortText(500), description: shortText(60_000) }).partial(),
             classification: z
               .object({ category: z.object({ preferredLabel: shortText(120) }).partial() })
               .partial(),
@@ -149,7 +150,8 @@ export function normalizeUpworkMcpJob(job: UpworkMcpJob): NormalizedJob {
     source: UPWORK_SOURCE,
     sourceJobId: job.id,
     title: cleanText(job.title).slice(0, 500),
-    description: cleanText(job.description ?? job.description_snippet).slice(0, 20_000),
+    // Full text from job details when fetched; search results may carry only a snippet.
+    description: cleanText(posting?.content?.description ?? job.description ?? job.description_snippet).slice(0, 20_000),
     jobUrl: canonicalUpworkUrl(job.url),
     budgetType,
     budgetAmount: budgetType === "FIXED" ? toDecimal(fixedAmount?.rawValue ?? job.budget) : null,

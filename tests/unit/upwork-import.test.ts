@@ -68,6 +68,7 @@ describe("Upwork MCP job mapping", () => {
         client_record: { contracts_total: 151, jobs_with_hires: 138, hire_rate_percent: 70, open_jobs: 5 },
         data: {
           marketplaceJobPosting: {
+            content: { description: "<untrusted_participant_content>\nFull description from details.\n</untrusted_participant_content>" },
             classification: { category: { preferredLabel: "Web, Mobile & Software Dev" } },
             contractTerms: { contractType: "FIXED", fixedPriceContractTerms: { amount: { currency: "usd", rawValue: "35.0" } } },
             activityStat: { jobActivity: { totalHired: 1, invitesSent: 0 } },
@@ -76,7 +77,12 @@ describe("Upwork MCP job mapping", () => {
         client_feedback: { reviews: [{ comment: "free text that must be dropped" }] },
       },
     });
-    expect(job).toMatchObject({ clientHires: 151, category: "Web, Mobile & Software Dev", currency: "USD" });
+    expect(job).toMatchObject({
+      clientHires: 151,
+      category: "Web, Mobile & Software Dev",
+      currency: "USD",
+      description: "Full description from details.",
+    });
     expect(job.sourceMetadata).toMatchObject({
       detailsFetched: true,
       client: { hireRatePercent: 70, openJobs: 5 },
