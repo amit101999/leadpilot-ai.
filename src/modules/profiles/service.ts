@@ -53,23 +53,29 @@ async function assertRecipientUsable(
   ownerUserId: string,
   config: ProfileConfig,
 ): Promise<void> {
-  const recipientId = config.notifications.recipientId;
-  if (!recipientId) return;
-  const [recipient] = await tx
-    .select({ id: notificationRecipients.id })
-    .from(notificationRecipients)
-    .where(
-      and(
-        eq(notificationRecipients.id, recipientId),
-        eq(notificationRecipients.ownerUserId, ownerUserId),
-        isNull(notificationRecipients.archivedAt),
-      ),
-    )
-    .limit(1);
-  if (!recipient) {
-    throw new AppError("VALIDATION_ERROR", "Selected recipient was not found", [
-      { path: "configuration.notifications.recipientId", message: "Recipient not found" },
-    ]);
+  const selected = [
+    { id: config.notifications.recipientId, channel: "WHATSAPP" as const, field: "recipientId" },
+    { id: config.notifications.emailRecipientId, channel: "EMAIL" as const, field: "emailRecipientId" },
+  ];
+  for (const { id, channel, field } of selected) {
+    if (!id) continue;
+    const [recipient] = await tx
+      .select({ id: notificationRecipients.id })
+      .from(notificationRecipients)
+      .where(
+        and(
+          eq(notificationRecipients.id, id),
+          eq(notificationRecipients.ownerUserId, ownerUserId),
+          eq(notificationRecipients.channel, channel),
+          isNull(notificationRecipients.archivedAt),
+        ),
+      )
+      .limit(1);
+    if (!recipient) {
+      throw new AppError("VALIDATION_ERROR", "Selected recipient was not found", [
+        { path: `configuration.notifications.${field}`, message: "Recipient not found" },
+      ]);
+    }
   }
 }
 
@@ -190,9 +196,11 @@ export async function duplicateProfile(
   const source = await getProfile(db, actor, id);
   const config = parseStoredConfig(source.configuration);
   // The copy belongs to the acting user; drop a recipient that belongs to someone else.
-  if (source.ownerUserId !== actor.id && config.notifications.recipientId) {
+  if (source.ownerUserId !== actor.id) {
     config.notifications.recipientId = null;
     config.notifications.whatsappEnabled = false;
+    config.notifications.emailRecipientId = null;
+    config.notifications.emailEnabled = false;
   }
   return createProfile(
     db,

@@ -4,6 +4,7 @@ import type { Database } from "@/lib/database/client";
 import { agentRuns, notificationAttempts, notifications, runStages } from "@/lib/database/schema";
 import { sanitizeErrorMessage } from "@/lib/security/sanitize";
 import { recordAudit } from "@/modules/audit/service";
+import { startFollowUpRunIfQueued } from "@/modules/imports/follow-up";
 import { buildRunSummaryMessage } from "@/modules/notifications/message";
 import { getRecipientForSend } from "@/modules/notifications/recipients";
 import type { Providers } from "@/modules/providers";
@@ -68,6 +69,7 @@ export async function finalizeStep(ctx: RunContext): Promise<StageResponse> {
     after: { status: finalRun.status, ...counters },
   });
   await maybeSendRunSummary(db, ctx.providers, finalRun);
+  await startFollowUpRunIfQueued(db, ctx.providers, { id: run.id, profileId: run.profileId });
   return { runId: run.id, step: "finalize", runStatus: finalRun.status, terminal: true, next: null };
 }
 

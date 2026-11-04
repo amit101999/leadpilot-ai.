@@ -6,6 +6,7 @@ import { AppError, notFound } from "@/lib/http/errors";
 import { childLogger } from "@/lib/logging/logger";
 import { sanitizeErrorMessage } from "@/lib/security/sanitize";
 import { allowedFrom, isTerminal } from "@/lib/state-machine";
+import { IMPORT_SOURCE_ID, ImportJobSourceProvider } from "@/modules/job-sources/import-provider";
 import type { Providers } from "@/modules/providers";
 import type { RunStage, RunStatus } from "@/types/domain";
 import { parseSnapshot, type RunSnapshot } from "../snapshot";
@@ -132,7 +133,11 @@ export async function enterRun(
     run,
     snapshot,
     executorId,
-    providers,
+    // Import runs read their own staged jobs instead of the globally configured source.
+    providers:
+      snapshot.providers.jobSource === IMPORT_SOURCE_ID
+        ? { ...providers, jobSource: new ImportJobSourceProvider({ db, profileId: run.profileId, runId: run.id }) }
+        : providers,
     log: childLogger({ run_id: run.id, profile_id: run.profileId }),
   };
 }

@@ -18,6 +18,9 @@ export const RATE_LIMITS = {
   whatsappTest: { name: "whatsapp-test", limit: 3, windowSeconds: 10 * 60 },
   integrationCheck: { name: "integration-check", limit: 20, windowSeconds: 60 },
   export: { name: "export", limit: 10, windowSeconds: 60 },
+  /** All import-token calls together; one sync makes a handful per profile. */
+  importApi: { name: "import-api", limit: 60, windowSeconds: 60 },
+  importTokenCreate: { name: "import-token-create", limit: 10, windowSeconds: 60 * 60 },
 } satisfies Record<string, RateLimitRule>;
 
 /**

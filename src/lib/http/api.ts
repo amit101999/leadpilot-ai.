@@ -2,12 +2,14 @@ import { randomUUID } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { ZodError, type z } from "zod";
 import { requireRole, type Actor } from "@/lib/auth/authorization";
+import { resolveImportToken } from "@/lib/auth/import-token";
 import { resolveSession, SESSION_COOKIE, type SessionUser } from "@/lib/auth/session";
 import { env } from "@/lib/configuration/env";
 import { getDb, type Database } from "@/lib/database/client";
 import { childLogger } from "@/lib/logging/logger";
 import { SIGNATURE_HEADER, verifySignature } from "@/lib/security/hmac";
 import { isAllowedRequestOrigin } from "@/lib/security/origin";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/security/rate-limit";
 import { InvalidTransitionError } from "@/lib/state-machine";
 import type { UserRole } from "@/types/domain";
 import { AppError, isUniqueViolation } from "./errors";
@@ -54,6 +56,25 @@ export function assertSameOrigin(req: NextRequest): void {
   if (!isAllowedRequestOrigin(req.method, req.headers.get("origin"), env().APP_BASE_URL)) {
     throw new AppError("CSRF_REJECTED", "Request origin not allowed");
   }
+}
+
+/**
+ * Route for external agents (the Upwork sync) authenticated with a per-user import token
+ * (`Authorization: Bearer lpi_...`). No cookie, so no CSRF exposure; rate limited per token.
+ * The handler acts as the token's user, so ownership and role checks apply unchanged.
+ */
+export function tokenRoute(minRole: UserRole, handler: Handler<UserContext & { tokenId: string }>) {
+  return wrap(async (req, params, requestId, db) => {
+    const header = req.headers.get("authorization");
+    const token = header?.startsWith("Bearer ") ? header.slice(7).trim() : null;
+    const resolved = await resolveImportToken(db, token);
+    if (!resolved) throw new AppError("UNAUTHENTICATED", "Missing, invalid or revoked import token");
+    await enforceRateLimit(db, RATE_LIMITS.importApi, `token:${resolved.tokenId}`);
+    const actor: Actor = { id: resolved.userId, role: resolved.role };
+    requireRole(actor, minRole);
+    const user = { id: resolved.userId, email: "", name: null, role: resolved.role, sessionId: "" };
+    return handler({ req, params, requestId, db, actor, user, tokenId: resolved.tokenId });
+  });
 }
 
 /** Server-to-server route signed with INTERNAL_API_SECRET (used by n8n). */

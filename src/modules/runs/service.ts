@@ -6,6 +6,7 @@ import { agentRuns, runStages, searchProfiles } from "@/lib/database/schema";
 import { AppError, isUniqueViolation, notFound } from "@/lib/http/errors";
 import { isTerminal } from "@/lib/state-machine";
 import { recordAudit, userActor } from "@/modules/audit/service";
+import { ImportJobSourceProvider } from "@/modules/job-sources/import-provider";
 import { getCurrentVersion, getProfile } from "@/modules/profiles/service";
 import type { Providers } from "@/modules/providers";
 import { RUN_STAGES, type RunStatus } from "@/types/domain";
@@ -21,13 +22,16 @@ import { RUN_TRANSITIONS } from "./transitions";
  */
 export async function createRun(
   db: Database,
-  providers: Providers,
+  baseProviders: Providers,
   actor: Actor,
-  input: { profileId: string; idempotencyKey: string },
+  input: { profileId: string; idempotencyKey: string; jobSource?: "configured" | "import" },
   requestId?: string,
   dispatch: typeof dispatchRun = dispatchRun,
 ): Promise<{ run: RunRow; created: boolean }> {
   requireRole(actor, "OPERATOR");
+  // Import runs process staged jobs; the snapshot records that source so the run never switches.
+  const providers =
+    input.jobSource === "import" ? { ...baseProviders, jobSource: new ImportJobSourceProvider() } : baseProviders;
   const existing = await findByIdempotencyKey(db, actor.id, input.idempotencyKey);
   if (existing) return reuse(existing, input.profileId);
 

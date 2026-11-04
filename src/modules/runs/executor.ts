@@ -17,13 +17,19 @@ export type DispatchResult = { ok: true } | { ok: false; error: string };
  */
 export async function dispatchRun(runId: string, executor: ExecutorKind): Promise<DispatchResult> {
   if (executor === "inprocess") {
-    after(async () => {
+    const work = async () => {
       try {
         await runInProcess(getDb(), getProviders(), runId);
       } catch (error) {
         logger.error({ run_id: runId, err: error }, "In-process run crashed");
       }
-    });
+    };
+    try {
+      after(work);
+    } catch {
+      // No request scope (e.g. a follow-up run started by a finishing run): run in the background.
+      void work();
+    }
     return { ok: true };
   }
   return dispatchToN8n(runId);
