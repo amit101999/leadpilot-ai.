@@ -6,8 +6,11 @@ import { MockJobSourceProvider } from "@/modules/job-sources/mock-provider";
 import type { JobSourceProvider } from "@/modules/job-sources/types";
 import { UpworkJobSourceProvider } from "@/modules/job-sources/upwork-provider";
 import { CloudWhatsAppProvider } from "@/modules/notifications/cloud-whatsapp";
+import type { EmailProvider } from "@/modules/notifications/email-provider";
+import { MockEmailProvider } from "@/modules/notifications/mock-email";
 import { MockWhatsAppProvider } from "@/modules/notifications/mock-whatsapp";
 import type { WhatsAppProvider } from "@/modules/notifications/provider";
+import { SmtpEmailProvider } from "@/modules/notifications/smtp-email";
 
 /**
  * External integrations behind interfaces, selected by environment. Business
@@ -19,6 +22,7 @@ export interface Providers {
   jobSource: JobSourceProvider;
   ai: AiEvaluator;
   whatsapp: WhatsAppProvider;
+  email: EmailProvider;
 }
 
 let cached: Providers | undefined;
@@ -55,6 +59,18 @@ export function getProviders(): Providers {
             timeoutMs: config.WHATSAPP_TIMEOUT_MS,
           })
         : new MockWhatsAppProvider(),
+    email:
+      config.EMAIL_PROVIDER === "smtp"
+        ? new SmtpEmailProvider({
+            host: config.SMTP_HOST,
+            port: config.SMTP_PORT,
+            secure: config.SMTP_SECURE,
+            user: config.SMTP_USER,
+            password: config.SMTP_PASSWORD,
+            from: config.EMAIL_FROM,
+            timeoutMs: config.SMTP_TIMEOUT_MS,
+          })
+        : new MockEmailProvider(),
   };
   return cached;
 }

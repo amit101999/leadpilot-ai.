@@ -174,15 +174,57 @@ describe("hard filters — skills and keywords", () => {
   });
 });
 
+describe("hard filters — keyword coverage", () => {
+  const coverage = (percent: number | null, keywords = ["React", "Node.js", "Zoho", "Shopify"]) =>
+    config((c) => {
+      c.search.keywords = keywords;
+      c.search.keywordCoveragePercent = percent;
+    });
+
+  it("is not applied when no percentage is set", () => {
+    expect(rule(evaluateHardChecks(makeJob(), coverage(null), context), "KEYWORD_COVERAGE").outcome).toBe(
+      "NOT_APPLICABLE",
+    );
+  });
+
+  it("passes at the boundary and reports which keywords matched", () => {
+    // makeJob mentions React, Node.js and Zoho but not Shopify: 3 of 4 = 75%.
+    const result = rule(evaluateHardChecks(makeJob(), coverage(75), context), "KEYWORD_COVERAGE");
+    expect(result.outcome).toBe("PASS");
+    expect(result.observed).toEqual({ percent: 75, found: ["React", "Node.js", "Zoho"] });
+  });
+
+  it("rejects below the minimum", () => {
+    const summary = evaluateHardChecks(makeJob(), coverage(76), context);
+    expect(rule(summary, "KEYWORD_COVERAGE").outcome).toBe("FAIL");
+    expect(summary.status).toBe("FILTERED_OUT");
+    expect(summary.rejectionReasons).toContain("Keyword coverage 75% is below 76%");
+  });
+
+  it("matches whole words only", () => {
+    const job = makeJob({ title: "Reactive dashboard", description: "Build a reactive UI.", skills: [] });
+    const result = rule(evaluateHardChecks(job, coverage(1, ["React"]), context), "KEYWORD_COVERAGE");
+    expect(result.outcome).toBe("FAIL");
+  });
+});
+
 describe("hard filters — optional client conditions", () => {
   it("is NOT_APPLICABLE when not configured and UNKNOWN when data is missing", () => {
     expect(rule(evaluateHardChecks(makeJob(), config(), context), "CLIENT_RATING").outcome).toBe(
       "NOT_APPLICABLE",
     );
-    const withMin = config((c) => (c.client.minRating = 4.5));
+    const withMin = config((c) => {
+      c.client.minRating = 4.5;
+      c.client.unknownClientDataPolicy = "FAIL";
+    });
     const summary = evaluateHardChecks(makeJob({ clientRating: null }), withMin, context);
     expect(rule(summary, "CLIENT_RATING").outcome).toBe("UNKNOWN");
     expect(summary.status).toBe("FILTERED_OUT");
+  });
+
+  it("sends unknown client data to review under the default policy", () => {
+    const withMin = config((c) => (c.client.minHires = 5));
+    expect(evaluateHardChecks(makeJob({ clientHires: null }), withMin, context).status).toBe("NEEDS_REVIEW");
   });
 
   it("honours the IGNORE policy for unavailable client data", () => {

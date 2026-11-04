@@ -64,7 +64,9 @@ export const qualificationDecision = pgEnum("qualification_decision", [
   "AI_ERROR",
 ]);
 
-export const notificationChannel = pgEnum("notification_channel", ["WHATSAPP"]);
+export const notificationChannel = pgEnum("notification_channel", ["WHATSAPP", "EMAIL"]);
+
+export const stagedJobStatus = pgEnum("staged_job_status", ["PENDING", "CONSUMED"]);
 
 export const notificationStatus = pgEnum("notification_status", [
   "RESERVED",
@@ -141,8 +143,10 @@ export const notificationRecipients = pgTable(
       .references(() => users.id, { onDelete: "restrict" }),
     label: text("label").notNull(),
     channel: notificationChannel("channel").notNull().default("WHATSAPP"),
-    /** E.164 phone number. Never copied into notifications or logs. */
-    phoneE164: text("phone_e164").notNull(),
+    /** E.164 phone number (WhatsApp recipients). Never copied into notifications or logs. */
+    phoneE164: text("phone_e164"),
+    /** E-mail address (EMAIL recipients). Never copied into notifications or logs. */
+    email: text("email"),
     optInConfirmedAt: timestamp("opt_in_confirmed_at", { withTimezone: true }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: createdAt(),
@@ -150,7 +154,13 @@ export const notificationRecipients = pgTable(
   },
   (t) => [
     uniqueIndex("recipients_owner_phone_uq").on(t.ownerUserId, t.channel, t.phoneE164),
-    check("recipients_phone_e164_chk", sql`${t.phoneE164} ~ '^\\+[1-9][0-9]{6,14}$'`),
+    uniqueIndex("recipients_owner_email_uq").on(t.ownerUserId, t.channel, sql`lower(${t.email})`),
+    // channel::text: a newly added enum value cannot be referenced in the migration that adds it.
+    check(
+      "recipients_address_chk",
+      sql`(${t.channel}::text = 'WHATSAPP' and ${t.phoneE164} ~ '^\\+[1-9][0-9]{6,14}$' and ${t.email} is null)
+        or (${t.channel}::text = 'EMAIL' and ${t.email} is not null and ${t.phoneE164} is null)`,
+    ),
   ],
 );
 
@@ -505,3 +515,86 @@ export const rateLimits = pgTable(
   },
   (t) => [primaryKey({ columns: [t.key, t.windowStart] })],
 );
+
+// ---------------------------------------------------------------------------
+// Job import (external agents such as the Claude + Upwork MCP bridge)
+// ---------------------------------------------------------------------------
+
+/** Long-lived per-user tokens for machine imports. Only an HMAC of the token is stored. */
+export const importTokens = pgTable(
+  "import_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("import_tokens_hash_uq").on(t.tokenHash), index("import_tokens_user_idx").on(t.userId)],
+);
+
+/** One accepted import request (a "commit" from the agent). */
+export const importBatches = pgTable(
+  "import_batches",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => searchProfiles.id, { onDelete: "restrict" }),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    origin: text("origin").notNull(),
+    received: integer("received").notNull(),
+    accepted: integer("accepted").notNull(),
+    invalid: integer("invalid").notNull(),
+    /** Run started for this batch; null when the jobs were queued behind an active run. */
+    runId: uuid("run_id").references(() => agentRuns.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("import_batches_profile_created_idx").on(t.profileId, t.createdAt)],
+);
+
+/** Imported jobs waiting for (PENDING) or taken by (CONSUMED) a run's discovery stage. */
+export const stagedJobs = pgTable(
+  "staged_jobs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    batchId: uuid("batch_id")
+      .notNull()
+      .references(() => importBatches.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => searchProfiles.id, { onDelete: "restrict" }),
+    source: text("source").notNull(),
+    sourceJobId: text("source_job_id").notNull(),
+    /** A NormalizedJob, already validated by the import endpoint. */
+    payload: jsonb("payload").notNull(),
+    status: stagedJobStatus("status").notNull().default("PENDING"),
+    consumedRunId: uuid("consumed_run_id").references(() => agentRuns.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    // A job waits at most once per profile; a re-import while pending refreshes its payload.
+    uniqueIndex("staged_jobs_pending_uq")
+      .on(t.profileId, t.source, t.sourceJobId)
+      .where(sql`${t.status} = 'PENDING'`),
+    index("staged_jobs_profile_status_idx").on(t.profileId, t.status),
+  ],
+);
+
+/** When each profile was last synced by the import agent, for the "due" schedule. */
+export const syncState = pgTable("sync_state", {
+  profileId: uuid("profile_id")
+    .primaryKey()
+    .references(() => searchProfiles.id, { onDelete: "cascade" }),
+  lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+  lastStatus: text("last_status"),
+  lastError: text("last_error"),
+  updatedAt: updatedAt(),
+});

@@ -3,8 +3,9 @@ import { env } from "@/lib/configuration/env";
 import type { Database } from "@/lib/database/client";
 import { notificationAttempts, notifications } from "@/lib/database/schema";
 import { sanitizeErrorMessage } from "@/lib/security/sanitize";
-import { getRecipientForSend } from "@/modules/notifications/recipients";
-import type { SendOutcome, WhatsAppProvider } from "@/modules/notifications/provider";
+import { getRecipientForSend, type RecipientRow } from "@/modules/notifications/recipients";
+import type { SendOutcome } from "@/modules/notifications/provider";
+import type { Providers } from "@/modules/providers";
 import type { NotificationStatus } from "@/types/domain";
 import {
   beginStage,
@@ -47,7 +48,7 @@ export async function notifyStep(ctx: RunContext): Promise<StageResponse> {
     .limit(env().NOTIFY_BATCH_SIZE);
 
   for (const notification of due) {
-    await deliverNotification(db, ctx.providers.whatsapp, notification, { manual: false });
+    await deliverNotification(db, ctx.providers, notification, { manual: false });
   }
 
   const [pending] = await db
@@ -81,7 +82,7 @@ export async function notifyStep(ctx: RunContext): Promise<StageResponse> {
  */
 export async function deliverNotification(
   db: Database,
-  provider: WhatsAppProvider,
+  providers: Pick<Providers, "whatsapp" | "email">,
   notification: NotificationRow,
   options: { manual: boolean; allowedFrom?: NotificationStatus[] },
 ): Promise<NotificationStatus | null> {
@@ -111,7 +112,7 @@ export async function deliverNotification(
 
   const recipient = await getRecipientForSend(db, claimed.recipientId);
   let outcome: SendOutcome;
-  if (!recipient || recipient.archivedAt || !recipient.optInConfirmedAt) {
+  if (!recipient || recipient.archivedAt || !recipient.optInConfirmedAt || recipient.channel !== claimed.channel) {
     outcome = {
       kind: "rejected",
       retryable: false,
@@ -119,16 +120,8 @@ export async function deliverNotification(
       error: "Recipient unavailable or not opted in",
     };
   } else {
-    const payload = claimed.payload as { templateParams?: string[] };
     try {
-      outcome = await provider.send({
-        to: recipient.phoneE164,
-        kind: "lead",
-        templateParams: payload.templateParams ?? [],
-        previewText: claimed.messagePreview,
-        idempotencyKey: claimed.idempotencyKey,
-        callbackData: claimed.idempotencyKey,
-      });
+      outcome = await sendOnChannel(providers, claimed, recipient);
     } catch (error) {
       // An unexpected exception inside the provider call may have happened after the request was sent.
       outcome = { kind: "uncertain", error: sanitizeErrorMessage(error) };
@@ -155,6 +148,33 @@ export async function deliverNotification(
     }
   });
   return status;
+}
+
+/** Hands the reserved message to the provider for its channel; the payload was built at selection time. */
+async function sendOnChannel(
+  providers: Pick<Providers, "whatsapp" | "email">,
+  claimed: NotificationRow,
+  recipient: RecipientRow,
+): Promise<SendOutcome> {
+  if (claimed.channel === "EMAIL") {
+    const payload = claimed.payload as { email?: { subject: string; text: string; html: string } };
+    if (!recipient.email || !payload.email) {
+      return { kind: "rejected", retryable: false, httpStatus: null, error: "E-mail recipient or message missing" };
+    }
+    return providers.email.send({ to: recipient.email, ...payload.email, idempotencyKey: claimed.idempotencyKey });
+  }
+  if (!recipient.phoneE164) {
+    return { kind: "rejected", retryable: false, httpStatus: null, error: "WhatsApp recipient has no phone number" };
+  }
+  const payload = claimed.payload as { templateParams?: string[] };
+  return providers.whatsapp.send({
+    to: recipient.phoneE164,
+    kind: "lead",
+    templateParams: payload.templateParams ?? [],
+    previewText: claimed.messagePreview,
+    idempotencyKey: claimed.idempotencyKey,
+    callbackData: claimed.idempotencyKey,
+  });
 }
 
 function applyOutcome(

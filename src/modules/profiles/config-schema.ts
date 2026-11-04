@@ -44,6 +44,43 @@ export type ScoringWeights = z.infer<typeof scoringWeightsSchema>;
 export const unknownPolicy = z.enum(["FAIL", "NEEDS_REVIEW", "IGNORE"]);
 export type UnknownPolicy = z.infer<typeof unknownPolicy>;
 
+const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM (24-hour)");
+const timeZone = z
+  .string()
+  .trim()
+  .min(1)
+  .max(64)
+  .refine((tz) => {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: tz });
+      return true;
+    } catch {
+      return false;
+    }
+  }, "Unknown time zone");
+
+/** Search keywords and the import agent's schedule. Defaults keep older stored configurations valid. */
+export const searchConfigSchema = z.object({
+  /** Used by the import agent to search the source, and by the keyword-coverage rule. */
+  keywords: termList(20),
+  /** Minimum share of keywords that must appear in the job (title, description, skills). null = rule off. */
+  keywordCoveragePercent: z.number().int().min(1).max(100).nullable(),
+  upworkSync: z.object({
+    enabled: z.boolean(),
+    everyHours: z.number().int().min(1).max(24),
+    activeFrom: clockTime,
+    activeTo: clockTime,
+    timezone: timeZone,
+  }),
+});
+export type SearchConfig = z.infer<typeof searchConfigSchema>;
+
+export const DEFAULT_SEARCH_CONFIG: SearchConfig = {
+  keywords: [],
+  keywordCoveragePercent: null,
+  upworkSync: { enabled: false, everyHours: 3, activeFrom: "08:00", activeTo: "22:00", timezone: "UTC" },
+};
+
 export const profileConfigSchema = z
   .object({
     schemaVersion: z.literal(CONFIG_SCHEMA_VERSION).default(CONFIG_SCHEMA_VERSION),
@@ -103,11 +140,15 @@ export const profileConfigSchema = z
     notifications: z.object({
       whatsappEnabled: z.boolean(),
       recipientId: z.uuid().nullable(),
+      emailEnabled: z.boolean().default(false),
+      emailRecipientId: z.uuid().nullable().default(null),
+      /** Shared by all channels: at most this many leads are alerted per run, on each enabled channel. */
       maxPerRun: z.number().int().min(1).max(50),
       messageFormat: z.enum(["STANDARD", "COMPACT"]),
       sendRunSummary: z.boolean(),
       alertOnFailure: z.boolean(),
     }),
+    search: searchConfigSchema.default(DEFAULT_SEARCH_CONFIG),
   })
   .superRefine((config, ctx) => {
     const { budget, skills } = config;
@@ -153,6 +194,30 @@ export const profileConfigSchema = z
         path: ["notifications", "recipientId"],
         message: "Select a recipient or disable WhatsApp notifications",
       });
+    }
+    if (config.notifications.emailEnabled && !config.notifications.emailRecipientId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["notifications", "emailRecipientId"],
+        message: "Select an e-mail recipient or disable e-mail notifications",
+      });
+    }
+    const { search } = config;
+    if (search.keywords.length === 0) {
+      if (search.keywordCoveragePercent !== null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["search", "keywordCoveragePercent"],
+          message: "Add keywords or turn the coverage rule off",
+        });
+      }
+      if (search.upworkSync.enabled) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["search", "keywords"],
+          message: "Add at least one keyword for the Upwork sync to search",
+        });
+      }
     }
   });
 
@@ -200,7 +265,8 @@ export function defaultProfileConfig(recipientId: string | null = null): Profile
       minTotalSpent: null,
       allowedCountries: [],
       blockedCountries: [],
-      unknownClientDataPolicy: "FAIL",
+      // Imported jobs often lack some client data; review rather than silently drop them.
+      unknownClientDataPolicy: "NEEDS_REVIEW",
     },
     ai: {
       minScore: 75,
@@ -218,10 +284,16 @@ export function defaultProfileConfig(recipientId: string | null = null): Profile
     notifications: {
       whatsappEnabled: recipientId !== null,
       recipientId,
+      emailEnabled: false,
+      emailRecipientId: null,
       maxPerRun: 10,
       messageFormat: "STANDARD",
       sendRunSummary: false,
       alertOnFailure: true,
+    },
+    search: {
+      ...DEFAULT_SEARCH_CONFIG,
+      keywords: ["React", "Node.js", "Zoho", "API integration"],
     },
   };
 }

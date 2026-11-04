@@ -57,10 +57,12 @@ async function ensureAdmin(db: Database, email: string, password: string): Promi
 /** Opt-in is never assumed: the operator confirms it in Settings before WhatsApp can be enabled. */
 async function ensureRecipient(db: Database, admin: Actor, phone: string): Promise<void> {
   const input = createRecipientSchema.parse({
+    channel: "WHATSAPP",
     label: "Default recipient",
     phoneE164: phone,
     optInConfirmed: false,
   });
+  if (input.channel !== "WHATSAPP") throw new Error("Expected a WhatsApp recipient");
   const [existing] = await db
     .select({ id: notificationRecipients.id })
     .from(notificationRecipients)

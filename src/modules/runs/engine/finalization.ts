@@ -174,7 +174,7 @@ async function maybeSendRunSummary(db: Database, providers: Providers, run: RunR
 
   const recipient = await getRecipientForSend(db, n.recipientId);
   let result: Record<string, unknown>;
-  if (!recipient || !recipient.optInConfirmedAt || recipient.archivedAt) {
+  if (!recipient || !recipient.optInConfirmedAt || recipient.archivedAt || !recipient.phoneE164) {
     result = { status: "SKIPPED", reason: "Recipient unavailable or not opted in" };
   } else {
     const message = buildRunSummaryMessage({

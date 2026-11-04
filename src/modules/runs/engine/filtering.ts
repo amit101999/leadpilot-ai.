@@ -2,6 +2,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import type { DbExecutor } from "@/lib/database/client";
 import { jobs, notifications, runJobs, runStages } from "@/lib/database/schema";
 import { rowToNormalized } from "@/modules/jobs/repository";
+import { enabledChannels } from "@/modules/notifications/channels";
 import { CLAIMED_NOTIFICATION_STATUSES } from "@/modules/notifications/transitions";
 import type { ProfileConfig } from "@/modules/profiles/config-schema";
 import { evaluateHardChecks } from "@/modules/qualification/hard-filters";
@@ -100,24 +101,32 @@ export async function filterStep(ctx: RunContext): Promise<StageResponse> {
   return respond(ctx, "filter", "evaluate");
 }
 
-/** Jobs that already hold an active or delivered claim for the profile's recipient. */
+/**
+ * Jobs that already hold an active or delivered claim on EVERY enabled channel's recipient. A job still
+ * missing on one channel (e.g. e-mail enabled later) stays eligible so that channel can be alerted.
+ */
 export async function alreadyNotifiedJobIds(
   db: DbExecutor,
   config: ProfileConfig,
   jobIds: string[],
 ): Promise<Set<string>> {
-  const recipientId = config.notifications.recipientId;
-  if (!config.notifications.whatsappEnabled || !recipientId || jobIds.length === 0) return new Set();
-  const rows = await db
-    .select({ jobId: notifications.jobId })
-    .from(notifications)
-    .where(
-      and(
-        inArray(notifications.jobId, jobIds),
-        eq(notifications.channel, "WHATSAPP"),
-        eq(notifications.recipientId, recipientId),
-        inArray(notifications.status, [...CLAIMED_NOTIFICATION_STATUSES]),
-      ),
-    );
-  return new Set(rows.map((r) => r.jobId));
+  const targets = enabledChannels(config);
+  if (targets.length === 0 || jobIds.length === 0) return new Set();
+  let notified: Set<string> | null = null as Set<string> | null;
+  for (const target of targets) {
+    const rows = await db
+      .select({ jobId: notifications.jobId })
+      .from(notifications)
+      .where(
+        and(
+          inArray(notifications.jobId, jobIds),
+          eq(notifications.channel, target.channel),
+          eq(notifications.recipientId, target.recipientId),
+          inArray(notifications.status, [...CLAIMED_NOTIFICATION_STATUSES]),
+        ),
+      );
+    const ids = new Set(rows.map((r) => r.jobId));
+    notified = notified === null ? ids : new Set([...notified].filter((id) => ids.has(id)));
+  }
+  return notified ?? new Set();
 }

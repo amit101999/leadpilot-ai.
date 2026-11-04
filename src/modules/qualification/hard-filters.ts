@@ -1,6 +1,7 @@
 import { centsToString, convertCents, toCents, type Cents } from "@/lib/money/decimal";
 import { validateJobUrl } from "@/lib/security/url";
 import type { NormalizedJob } from "@/modules/job-sources/types";
+import { enabledChannels } from "@/modules/notifications/channels";
 import type { ProfileConfig, UnknownPolicy } from "@/modules/profiles/config-schema";
 import {
   containsTerm,
@@ -32,6 +33,7 @@ export type HardRule =
   | "INCLUDE_KEYWORDS"
   | "EXCLUDE_KEYWORDS"
   | "REQUIRED_COMBINATIONS"
+  | "KEYWORD_COVERAGE"
   | "NOT_PREVIOUSLY_NOTIFIED";
 
 export interface HardCheckResult {
@@ -46,7 +48,7 @@ export interface HardCheckResult {
 
 export interface HardCheckContext {
   sourceAuthorized: boolean;
-  /** True when this job already has an active/sent notification claim for the profile's recipient. */
+  /** True when this job already has an active/sent claim for every enabled channel's recipient. */
   alreadyNotified: boolean;
 }
 
@@ -83,6 +85,7 @@ export function evaluateHardChecks(
     checkIncludeKeywords(searchable, config),
     checkExcludeKeywords(searchable, config),
     checkRequiredCombinations(searchable, config),
+    checkKeywordCoverage(searchable, config),
     checkNotPreviouslyNotified(config, context),
   ];
 
@@ -489,8 +492,35 @@ function checkRequiredCombinations(job: SearchableJob, config: ProfileConfig): H
       );
 }
 
+/** Share of the profile's search keywords present in the job, compared with the configured minimum. */
+export function keywordCoverage(job: SearchableJob, keywords: string[]) {
+  const found = keywords.filter((k) => containsTerm(job, k));
+  const percent = keywords.length === 0 ? 0 : Math.floor((found.length * 100) / keywords.length);
+  return { found, percent };
+}
+
+function checkKeywordCoverage(job: SearchableJob, config: ProfileConfig): HardCheckResult {
+  const { keywords, keywordCoveragePercent: minimum } = config.search;
+  if (minimum === null || keywords.length === 0) {
+    return notApplicable("KEYWORD_COVERAGE", "No keyword coverage rule");
+  }
+  const { found, percent } = keywordCoverage(job, keywords);
+  const observed = { percent, found };
+  const expected = `at least ${minimum}% of ${keywords.length} keyword(s)`;
+  return percent >= minimum
+    ? pass("KEYWORD_COVERAGE", `Keyword coverage ${percent}% (${found.join(", ")})`, { observed, expected })
+    : result(
+        "KEYWORD_COVERAGE",
+        "FAIL",
+        "REJECT",
+        "LOW_KEYWORD_COVERAGE",
+        `Keyword coverage ${percent}% is below ${minimum}%`,
+        { observed, expected },
+      );
+}
+
 function checkNotPreviouslyNotified(config: ProfileConfig, context: HardCheckContext): HardCheckResult {
-  if (!config.notifications.whatsappEnabled || !config.notifications.recipientId) {
+  if (enabledChannels(config).length === 0) {
     return notApplicable("NOT_PREVIOUSLY_NOTIFIED", "Notifications disabled for this profile");
   }
   return context.alreadyNotified

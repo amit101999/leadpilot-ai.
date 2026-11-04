@@ -47,6 +47,26 @@ const envSchema = z.object({
     .default("v21.0"),
   WHATSAPP_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(15000),
 
+  EMAIL_PROVIDER: z.enum(["mock", "smtp"]).default("mock"),
+  SMTP_HOST: optionalString,
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+  /** "true" = TLS from the first byte (usually port 465); "false" = STARTTLS when the server offers it. */
+  SMTP_SECURE: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+  SMTP_USER: optionalString,
+  SMTP_PASSWORD: optionalString,
+  /** Sender, e.g. "LeadPilot <alerts@example.com>". */
+  EMAIL_FROM: optionalString,
+  SMTP_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(15000),
+
+  /** Scheduled (unattended) Upwork syncs get no due profiles until this is "true"; manual syncs always work. */
+  UPWORK_SYNC_SCHEDULED_ALLOWED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+
   JOB_SOURCE_PROVIDER: z.enum(["mock", "upwork"]).default("mock"),
   JOB_SOURCE_API_BASE_URL: optionalString,
   JOB_SOURCE_API_KEY: optionalString,

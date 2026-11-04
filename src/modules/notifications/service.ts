@@ -166,7 +166,7 @@ export async function retryNotification(
 
   const [row] = await db.select().from(notifications).where(eq(notifications.id, id)).limit(1);
   const result = row
-    ? await deliverNotification(db, providers.whatsapp, row, { manual: true, allowedFrom: [claimFrom] })
+    ? await deliverNotification(db, providers, row, { manual: true, allowedFrom: [claimFrom] })
     : null;
   if (result === null) throw new AppError("CONFLICT", "The notification is already being processed");
   await refreshRunCounters(db, current.runId);
@@ -183,22 +183,36 @@ export async function sendTestMessage(
   actor: Actor,
   recipientId: string,
   requestId?: string,
+  expectedChannel?: "WHATSAPP" | "EMAIL",
 ) {
   requireRole(actor, "OPERATOR");
   const recipient = await getRecipient(db, actor, recipientId);
+  if (expectedChannel && recipient.channel !== expectedChannel) {
+    throw new AppError("VALIDATION_ERROR", `Choose a ${expectedChannel === "EMAIL" ? "e-mail" : "WhatsApp"} recipient`);
+  }
   if (recipient.archivedAt) throw new AppError("INVALID_STATE", "This recipient is archived");
   if (!recipient.optInConfirmedAt) {
-    throw new AppError("INVALID_STATE", "Confirm the recipient's WhatsApp opt-in before sending a test");
+    throw new AppError("INVALID_STATE", "Confirm the recipient's opt-in before sending a test");
   }
+  const provider = recipient.channel === "EMAIL" ? providers.email : providers.whatsapp;
   let outcome;
   try {
-    outcome = await providers.whatsapp.send({
-      to: recipient.phoneE164,
-      kind: "test",
-      templateParams: [],
-      previewText: "LeadPilot AI connection test",
-      idempotencyKey: `test-${randomUUID()}`,
-    });
+    outcome =
+      recipient.channel === "EMAIL"
+        ? await providers.email.send({
+            to: recipient.email!,
+            subject: "LeadPilot AI connection test",
+            text: "This is a test message from LeadPilot AI. Lead alerts will arrive at this address.",
+            html: "<p>This is a test message from LeadPilot AI. Lead alerts will arrive at this address.</p>",
+            idempotencyKey: `test-${randomUUID()}`,
+          })
+        : await providers.whatsapp.send({
+            to: recipient.phoneE164!,
+            kind: "test",
+            templateParams: [],
+            previewText: "LeadPilot AI connection test",
+            idempotencyKey: `test-${randomUUID()}`,
+          });
   } catch (error) {
     outcome = { kind: "uncertain" as const, error: sanitizeErrorMessage(error) };
   }
@@ -212,12 +226,12 @@ export async function sendTestMessage(
         };
   await recordAudit(db, {
     actor: userActor(actor.id),
-    action: "whatsapp.test_message",
+    action: recipient.channel === "EMAIL" ? "email.test_message" : "whatsapp.test_message",
     entityType: "notification_recipient",
     entityId: recipientId,
-    after: { status: result.status, provider: providers.whatsapp.id },
+    after: { status: result.status, provider: provider.id },
     requestId,
   });
-  // "ACCEPTED" means the provider took the request, not that the phone received it.
-  return { ...result, provider: providers.whatsapp.id, isMock: providers.whatsapp.isMock };
+  // "ACCEPTED" means the provider took the request, not that the recipient received it.
+  return { ...result, channel: recipient.channel, provider: provider.id, isMock: provider.isMock };
 }

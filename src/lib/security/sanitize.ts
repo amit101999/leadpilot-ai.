@@ -31,3 +31,10 @@ export function maskPhone(phone: string): string {
   if (phone.length <= 5) return "•••";
   return `${phone.slice(0, 2)}${"•".repeat(Math.max(3, phone.length - 5))}${phone.slice(-3)}`;
 }
+
+/** "jane.doe@example.com" -> "j•••@example.com". The domain stays visible so recipients can be told apart. */
+export function maskEmail(email: string): string {
+  const at = email.lastIndexOf("@");
+  if (at <= 0) return "•••";
+  return `${email[0]}•••${email.slice(at)}`;
+}

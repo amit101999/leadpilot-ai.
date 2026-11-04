@@ -71,6 +71,49 @@ export function buildLeadMessage(input: LeadMessageInput, format: "STANDARD" | "
   return { templateParams: params, previewText: lines.join("\n") };
 }
 
+const HTML_ESCAPES: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]!);
+}
+/** Only http(s) links become clickable; anything else is shown as text. */
+function safeHref(url: string): string | null {
+  return /^https?:\/\//i.test(url) ? escapeHtml(url) : null;
+}
+
+/**
+ * E-mail version of the lead alert: the same fields and limits as the WhatsApp template, as plain text
+ * plus a small HTML body. Every job-supplied value is escaped; job text is never treated as markup.
+ */
+export function buildLeadEmail(input: LeadMessageInput, format: "STANDARD" | "COMPACT") {
+  const { templateParams: p, previewText } = buildLeadMessage(input, format);
+  const subject = templateParam(`New lead (${p[5]}): ${input.title}`, 150);
+  const rows: Array<[string, string]> = [
+    ["Budget", p[1]!],
+    ["Job type", p[2]!],
+    ["Payment verified", p[3]!],
+    ["Matched skills", p[4]!],
+    ["AI match score", p[5]!],
+    ["Reason", p[6]!],
+    ...(input.riskFlags.length > 0 ? ([["Risks", p[7]!]] as Array<[string, string]>) : []),
+  ];
+  const jobLink = safeHref(p[8]!);
+  const detailsLink = input.dashboardUrl ? safeHref(input.dashboardUrl) : null;
+  const html = [
+    `<h2 style="font-family:sans-serif">${escapeHtml(p[0]!)}</h2>`,
+    `<table style="font-family:sans-serif;border-collapse:collapse">`,
+    ...rows.map(
+      ([label, value]) =>
+        `<tr><td style="padding:4px 12px 4px 0;color:#555">${escapeHtml(label)}</td><td style="padding:4px 0">${escapeHtml(value)}</td></tr>`,
+    ),
+    `</table>`,
+    `<p style="font-family:sans-serif">`,
+    jobLink ? `<a href="${jobLink}">Open the job on Upwork</a>` : escapeHtml(p[8]!),
+    detailsLink ? ` · <a href="${detailsLink}">Details in LeadPilot</a>` : "",
+    `</p>`,
+  ].join("\n");
+  return { subject, text: previewText, html };
+}
+
 export interface RunSummaryInput {
   status: string;
   discovered: number;
