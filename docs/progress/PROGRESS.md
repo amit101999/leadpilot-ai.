@@ -10,21 +10,21 @@ Last updated: 2026-11-04
 
 Plan: `C:\Users\ACER\.claude\plans\clever-noodling-finch.md`.
 
-| Phase                    | Scope                                                                     | Status                                                                                           |
-| ------------------------ | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Baseline                 | Pre-existing backend core committed                                       | ✅ Done (`703761f`)                                                                              |
-| A. Foundation            | Seed, `.env.example`, page auth proxy, CSRF check                         | ✅ Merged to `main` (`ab4b7e1`); seed verified during B1                                         |
-| B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                     | ✅ Merged to `main` (`0bed021`); Turbopack build verified on main                                |
-| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook      | ✅ Merged to `main` (`41e8d95`); Turbopack build verified on main                                |
-| C1. UI (part 1)          | Design system, app shell, login, Dashboard, Run Agent                     | ✅ Merged to `main` (`71a0b50`); Turbopack build verified on main                                |
-| C2. UI (part 2)          | Search History and run detail, Qualified Leads, All Jobs                  | ✅ Merged to `main` (`d742e0a`); Turbopack build verified on main                                |
-| C3a. UI (part 3a)        | Search Profiles list, editor, version history                             | ✅ Merged to `main` (fast-forward, `e650286` + docs `a82ddab`)                                   |
-| C3b. UI (part 3b)        | Notifications, Integrations, Settings (incl. change password), Audit Logs | ✅ Merged to `main` (fast-forward `a82ddab` → `727c19b`, 2026-10-15); `d18e5f8` + docs `3730daf` |
-| D. n8n                   | Run workflow calling the app's internal step API, lease-safe `/fail`      | ✅ Merged to `main` (same fast-forward); `9cf72ad`                                               |
-| E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                                | ✅ Merged to `main` (same fast-forward); `62d69cc` + `7e34456`                                   |
-| F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                       | ✅ Merged to `main` (same fast-forward); `b806b52` + docs `727c19b`                              |
-| G. Docs and final review | README, `docs/*.md`, full verification                                    | ✅ On `main` (`9b7b102` + PROGRESS `f492a9b`)                                                    |
-| H. Upwork sync           | Upwork sync via Claude + Upwork MCP, import API, e-mail alerts            | ⚠️ Committed `05b064a` on `worktree-phase-h-upwork-import`; not merged; e2e not run              |
+| Phase                    | Scope                                                                     | Status                                                                                             |
+| ------------------------ | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Baseline                 | Pre-existing backend core committed                                       | ✅ Done (`703761f`)                                                                                |
+| A. Foundation            | Seed, `.env.example`, page auth proxy, CSRF check                         | ✅ Merged to `main` (`ab4b7e1`); seed verified during B1                                           |
+| B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                     | ✅ Merged to `main` (`0bed021`); Turbopack build verified on main                                  |
+| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook      | ✅ Merged to `main` (`41e8d95`); Turbopack build verified on main                                  |
+| C1. UI (part 1)          | Design system, app shell, login, Dashboard, Run Agent                     | ✅ Merged to `main` (`71a0b50`); Turbopack build verified on main                                  |
+| C2. UI (part 2)          | Search History and run detail, Qualified Leads, All Jobs                  | ✅ Merged to `main` (`d742e0a`); Turbopack build verified on main                                  |
+| C3a. UI (part 3a)        | Search Profiles list, editor, version history                             | ✅ Merged to `main` (fast-forward, `e650286` + docs `a82ddab`)                                     |
+| C3b. UI (part 3b)        | Notifications, Integrations, Settings (incl. change password), Audit Logs | ✅ Merged to `main` (fast-forward `a82ddab` → `727c19b`, 2026-10-15); `d18e5f8` + docs `3730daf`   |
+| D. n8n                   | Run workflow calling the app's internal step API, lease-safe `/fail`      | ✅ Merged to `main` (same fast-forward); `9cf72ad`                                                 |
+| E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                                | ✅ Merged to `main` (same fast-forward); `62d69cc` + `7e34456`                                     |
+| F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                       | ✅ Merged to `main` (same fast-forward); `b806b52` + docs `727c19b`                                |
+| G. Docs and final review | README, `docs/*.md`, full verification                                    | ✅ On `main` (`9b7b102` + PROGRESS `f492a9b`)                                                      |
+| H. Upwork sync           | Upwork sync via Claude + Upwork MCP, import API, e-mail alerts            | ✅ Committed `05b064a` on `worktree-phase-h-upwork-import`; e2e 19/19 and build passed; not merged |
 
 ## Baseline (pre-existing work, committed 2026-10-11 as `703761f`)
 
@@ -884,18 +884,18 @@ client fields go in `jobs.source_metadata`; the run source id `upwork-import` is
 
 ### Verification (actual results, after the last change)
 
-| Check                                  | Result                                                                                 |
-| -------------------------------------- | -------------------------------------------------------------------------------------- |
-| Prettier, ESLint, `tsc`                | ✅ clean / exit 0 / clean                                                              |
-| Unit tests                             | ✅ 156/156                                                                             |
-| Integration tests                      | ✅ 70/70 (8 new in `tests/integration/imports.test.ts`)                                |
-| `npm audit --omit=dev`                 | ✅ 0 vulnerabilities (after the next/zod patches)                                      |
-| H0 spike                               | ✅ headless `claude -p` reached the claude.ai Upwork connector (Freelancer account)    |
-| Live sync, agent part (details below)  | ⚠️ search, screen and details OK; process stopped (low memory) before `commit`         |
-| Live sync, commit/status run by hand   | ✅ 30 accepted, 0 invalid; run completed all 7 stages; re-commit created no duplicates |
-| Playwright e2e                         | ⏳ Not run (PC low on memory)                                                          |
-| `next build`                           | Not recorded as run in this phase; needs developer confirmation                        |
-| Task Scheduler, real OpenAI, real SMTP | ⏳ Not run                                                                             |
+| Check                                  | Result                                                                                                      |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Prettier, ESLint, `tsc`                | ✅ clean / exit 0 / clean                                                                                   |
+| Unit tests                             | ✅ 156/156                                                                                                  |
+| Integration tests                      | ✅ 70/70 (8 new in `tests/integration/imports.test.ts`)                                                     |
+| `npm audit --omit=dev`                 | ✅ 0 vulnerabilities (after the next/zod patches)                                                           |
+| H0 spike                               | ✅ headless `claude -p` reached the claude.ai Upwork connector (Freelancer account)                         |
+| Live sync, agent part (details below)  | ⚠️ search, screen and details OK; process stopped (low memory) before `commit`                              |
+| Live sync, commit/status run by hand   | ✅ 30 accepted, 0 invalid; run completed all 7 stages; re-commit created no duplicates                      |
+| Playwright e2e                         | ✅ 19/19 (2026-11-07); first run caught a selector clash with the new "Token name" field, fixed in the test |
+| `next build` (Turbopack, Next 16.4.5)  | ✅ compiled, 37 pages (2026-11-07)                                                                          |
+| Task Scheduler, real OpenAI, real SMTP | ⏳ Not run                                                                                                  |
 
 Live run details (dev database):
 

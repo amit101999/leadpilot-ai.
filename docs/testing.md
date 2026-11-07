@@ -113,8 +113,10 @@ behaviour.
 - Integration: `imports.test.ts` (token creation/listing/revocation and auth, cross-user 404, screening stores nothing,
   commit → import run with correct mapping, dedup and update on re-import keeping earlier details, queueing with a
   follow-up run, e-mail alert sent once, sync status with secret scrubbing, scheduled-sync gate).
-- Not run in Phase H: the Playwright e2e suite (the development PC was low on memory) and a complete live sync
-  (stopped by the OS before the import step; see [upwork-sync.md](upwork-sync.md#verification-2026-11-04)).
+- E2E: the full Playwright suite passes (19/19, 2026-11-07); the recipient test now selects the "Name" field by exact
+  label because Settings also has a "Token name" field.
+- Not yet run: an uninterrupted live sync from search to import (the first was stopped by the OS before its import
+  step; see [upwork-sync.md](upwork-sync.md#verification-2026-11-04)).
 
 ## Not covered
 

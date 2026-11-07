@@ -30,7 +30,8 @@ test("recipient opt-in, WhatsApp on a profile, a run, and the alerts on the Noti
   await page.goto("/settings");
   await waitForHydratedForm(page);
   await page.getByRole("button", { name: "Add recipient" }).click();
-  await page.getByLabel("Name").fill(label);
+  // Exact: Settings also has a "Token name" field (import tokens).
+  await page.getByLabel("Name", { exact: true }).fill(label);
   await page.getByLabel("WhatsApp number").fill(uniquePhone());
   await page.getByRole("button", { name: "Save recipient" }).click();
   const row = page.locator("#recipients li").filter({ hasText: label });
