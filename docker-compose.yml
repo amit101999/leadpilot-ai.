@@ -3,6 +3,7 @@
 #   Local development:  docker compose up -d postgres        (then `npm run dev`)
 #   Full stack:         docker compose --profile stack up -d --build
 #   Production:         docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile stack up -d --build
+#   Cloudflare Tunnel:  docker compose -f docker-compose.yml -f docker-compose.cloudflare.yml --profile stack up -d --build
 #
 # Values come from .env (never committed); see .env.example and docs/deployment.md.
 # Interpolation runs for every service even when its profile is off, so stack-only
@@ -27,6 +28,15 @@ x-app-env: &app-env
   AI_BATCH_SIZE: ${AI_BATCH_SIZE:-5}
   AI_CONCURRENCY: ${AI_CONCURRENCY:-2}
   NOTIFY_BATCH_SIZE: ${NOTIFY_BATCH_SIZE:-5}
+  EMAIL_PROVIDER: ${EMAIL_PROVIDER:-mock}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_SECURE: ${SMTP_SECURE:-false}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  EMAIL_FROM: ${EMAIL_FROM:-}
+  SMTP_TIMEOUT_MS: ${SMTP_TIMEOUT_MS:-15000}
+  UPWORK_SYNC_SCHEDULED_ALLOWED: ${UPWORK_SYNC_SCHEDULED_ALLOWED:-false}
   AI_PROVIDER: ${AI_PROVIDER:-mock}
   OPENAI_API_KEY: ${OPENAI_API_KEY:-}
   OPENAI_MODEL: ${OPENAI_MODEL:-}

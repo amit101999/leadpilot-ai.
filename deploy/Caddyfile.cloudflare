@@ -1,0 +1,42 @@
+# LeadPilot reverse proxy behind a Cloudflare Tunnel (docker-compose.cloudflare.yml).
+#
+# Browser ─HTTPS─► Cloudflare ─tunnel─► cloudflared ─HTTP─► caddy:80 ─► web:3000
+#
+# Cloudflare terminates HTTPS, so Caddy listens on plain HTTP inside the Docker network only;
+# no port of this stack is published. The tunnel's public hostname must point at http://caddy:80.
+{
+	auto_https off
+	admin off
+
+	servers {
+		# Only cloudflared can reach Caddy (Docker network, no published ports), so requests from
+		# private addresses are trusted to carry the visitor's address in CF-Connecting-IP.
+		# Cloudflare always overwrites that header, so visitors cannot choose it.
+		trusted_proxies static private_ranges
+		client_ip_headers CF-Connecting-IP
+	}
+}
+
+:80 {
+	encode zstd gzip
+
+	# Visitors only ever reach LeadPilot over Cloudflare's HTTPS.
+	# No includeSubDomains: the other subdomains of APP_DOMAIN's zone are not ours to force onto HTTPS.
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	# Step and failure endpoints are for n8n on the Docker network only. They are also
+	# HMAC-signed, so this is a second layer, not the only protection.
+	@internal path /api/internal/*
+	respond @internal 404
+
+	# The app reads the first X-Forwarded-For entry for login rate limiting and session records
+	# (clientIp in src/lib/http/api.ts). Replace both headers with the visitor address resolved
+	# above: Cloudflare appends to a client-sent X-Forwarded-For, so its first entry is spoofable.
+	reverse_proxy web:3000 {
+		header_up X-Forwarded-For {client_ip}
+		header_up X-Real-IP {client_ip}
+	}
+}

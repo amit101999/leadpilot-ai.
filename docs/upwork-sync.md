@@ -28,8 +28,9 @@ wrapper `scripts/upwork-sync.ps1`; server side `src/modules/imports/`, `src/modu
 
 1. Apply the migration: `npm run db:migrate` (adds import tokens, batches, staged jobs, sync state, e-mail recipients).
 2. In LeadPilot **Settings → Import tokens**, create a token and copy it (shown once).
-3. In `.env` on the computer that runs the agent: `LEADPILOT_URL` (where LeadPilot runs, e.g. `http://localhost:3001`)
-   and `LEADPILOT_IMPORT_TOKEN`.
+3. In `.env` on the computer that runs the agent: `LEADPILOT_URL` (where LeadPilot runs, e.g. `http://localhost:3001`,
+   or `https://leads.example.com` when deployed, see [deployment.md](deployment.md#cloudflare-tunnel)) and
+   `LEADPILOT_IMPORT_TOKEN` (created on that same LeadPilot instance).
 4. In Claude Code, connect Upwork's official connector and sign in with your freelancer account. Check that headless
    Claude can use it: `claude -p "Call the Upwork tool list_accounts and reply with the account type only"`.
 5. On a search profile, open **Search & sync**: add keywords, optionally a keyword-coverage %, turn on the sync and

@@ -5,7 +5,7 @@ AI model, WhatsApp) sit behind provider interfaces chosen by environment variabl
 an optional orchestrator that drives runs through the app's own API; it holds no business logic.
 
 ```
- Browser ──HTTPS──► Caddy ──► Next.js app ─────────────────► PostgreSQL
+ Browser ──HTTPS──► Caddy ──► Next.js app ─────────────────► PostgreSQL   (or Cloudflare ► cloudflared ► Caddy, see deployment.md)
                                │  UI (App Router, React)      15 tables, Drizzle
                                │  API (src/app/api/**)
                                │  Modules (src/modules/**)

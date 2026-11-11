@@ -1,0 +1,45 @@
+# Cloudflare override: publishes LeadPilot through a Cloudflare Tunnel instead of open ports.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.cloudflare.yml --profile stack up -d --build
+#
+# No port of this stack is published, not even 80/443: cloudflared opens an outbound connection to
+# Cloudflare, and Cloudflare serves https://APP_DOMAIN. Works the same on a VPS or on a Windows/macOS
+# PC with Docker Desktop. Use this file instead of docker-compose.prod.yml, not together with it.
+# Setup: docs/deployment.md, "Cloudflare Tunnel".
+services:
+  postgres:
+    ports: !reset []
+
+  web:
+    ports: !reset []
+    environment:
+      # Must be the public origin: the CSRF check compares the browser's Origin with it.
+      APP_BASE_URL: https://${APP_DOMAIN:?Set APP_DOMAIN in .env}
+
+  n8n:
+    ports: !reset []
+
+  # Internal reverse proxy (plain HTTP, Docker network only): blocks /api/internal/*, sets
+  # headers and passes the visitor's real address to the app. See deploy/Caddyfile.cloudflare.
+  caddy:
+    profiles: [stack]
+    image: caddy:2.11.7-alpine
+    volumes:
+      - ./deploy/Caddyfile.cloudflare:/etc/caddy/Caddyfile:ro
+    depends_on:
+      web:
+        condition: service_started
+    restart: unless-stopped
+
+  # Runs the tunnel created in the Cloudflare dashboard. The token identifies that tunnel; the
+  # public hostname and its target (http://caddy:80) are configured in the dashboard.
+  cloudflared:
+    profiles: [stack]
+    image: cloudflare/cloudflared:2026.10.1
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?Set CLOUDFLARE_TUNNEL_TOKEN in .env}
+    depends_on:
+      caddy:
+        condition: service_started
+    restart: unless-stopped

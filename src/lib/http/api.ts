@@ -179,7 +179,8 @@ export function parseQuery<S extends z.ZodType>(req: NextRequest, schema: S): z.
 }
 
 export function clientIp(req: NextRequest): string {
-  // X-Forwarded-For is trusted only because production runs behind our own reverse proxy (Caddy).
+  // X-Forwarded-For is trusted only because production runs behind our own reverse proxy (Caddy), which
+  // replaces it with the peer address (deploy/Caddyfile) or Cloudflare's visitor address (deploy/Caddyfile.cloudflare).
   return (
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown"
   );

@@ -23,7 +23,7 @@ leads with the reasons behind each decision.
 | Job source      | ✅ Upwork sync (Claude + Upwork MCP → import API), import side integration-tested, live search verified, full live import not yet. ⚠️ Direct Upwork API adapter reports `NOT_AUTHORIZED` by design; mock feed for demos |
 | UI              | ✅ Dashboard, Run Agent, History, Leads, All Jobs, Profiles, Notifications, Integrations, Settings, Audit                                                                                                               |
 | Auth            | ✅ Email + password (argon2), server-side sessions, roles VIEWER < OPERATOR < ADMIN                                                                                                                                     |
-| Deployment      | ✅ Docker Compose stack, Caddy HTTPS, Postgres backup/restore scripts (verified on Docker Desktop)                                                                                                                      |
+| Deployment      | ✅ Docker Compose stack, Caddy HTTPS or Cloudflare Tunnel (config checked; no live tunnel yet), Postgres backup/restore scripts (verified on Docker Desktop)                                                            |
 
 ## Quick start (development)
 
