@@ -141,7 +141,12 @@ export function normalizeUpworkMcpJob(job: UpworkMcpJob): NormalizedJob {
   const posting = job.details?.data?.marketplaceJobPosting;
   const record = job.details?.client_record;
   const contractType = (posting?.contractTerms?.contractType ?? job.job_type ?? "").toUpperCase();
-  const budgetType = contractType === "FIXED" ? "FIXED" : contractType === "HOURLY" ? "HOURLY" : "UNKNOWN";
+  // Tolerant of spellings such as "FIXED_PRICE", "Fixed price" or "HOURLY_RATE".
+  const budgetType = contractType.includes("FIXED")
+    ? "FIXED"
+    : contractType.includes("HOURLY")
+      ? "HOURLY"
+      : "UNKNOWN";
   const fixedAmount = posting?.contractTerms?.fixedPriceContractTerms?.amount;
   const hourly = budgetType === "HOURLY" ? hourlyRange(job.budget) : { min: null, max: null };
   const client = job.client ?? {};

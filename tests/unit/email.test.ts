@@ -55,11 +55,21 @@ describe("SMTP outcome classification", () => {
 
   it("retries 4xx refusals and connections that never opened", () => {
     expect(classifySmtpError({ responseCode: 421 })).toMatchObject({ kind: "rejected", retryable: true });
-    expect(classifySmtpError({ code: "ECONNECTION" })).toMatchObject({ kind: "rejected", retryable: true });
+    // nodemailer: code ESOCKET with the system error kept as originalCode.
+    expect(classifySmtpError({ code: "ESOCKET", originalCode: "ECONNREFUSED" })).toMatchObject({
+      kind: "rejected",
+      retryable: true,
+    });
+    expect(classifySmtpError({ code: "EDNS" })).toMatchObject({ kind: "rejected", retryable: true });
   });
 
-  it("marks a connection lost mid-send as uncertain", () => {
+  it("marks a connection lost mid-session as uncertain, never safe to resend", () => {
+    // nodemailer raises ECONNECTION ("Connection closed unexpectedly") also after DATA was accepted.
+    expect(classifySmtpError({ code: "ECONNECTION", message: "Connection closed unexpectedly" }).kind).toBe(
+      "uncertain",
+    );
     expect(classifySmtpError({ code: "ETIMEDOUT" }).kind).toBe("uncertain");
+    expect(classifySmtpError({ code: "ESOCKET", originalCode: "ECONNRESET" }).kind).toBe("uncertain");
   });
 });
 

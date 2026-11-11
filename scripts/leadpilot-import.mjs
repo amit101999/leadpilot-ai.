@@ -16,10 +16,10 @@
 import "dotenv/config";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { chunkJobs, slimJob } from "./lib/import-payload.mjs";
 
 const WORK_DIR = resolve(".upwork-sync");
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
-const CHUNK = 100;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const JOB_ID = /^[A-Za-z0-9~]{1,64}$/;
 
@@ -71,7 +71,10 @@ function profileDir(profileId) {
   return join(WORK_DIR, profileId);
 }
 
-/** Search items (deduplicated by id) with any fetched details attached as `details`. */
+/**
+ * Search items (deduplicated by id) slimmed to the fields LeadPilot reads, with any fetched details
+ * attached as `details`.
+ */
 function loadJobs(profileId) {
   const dir = profileDir(profileId);
   const list = readJson(join(dir, "jobs.json"));
@@ -80,15 +83,15 @@ function loadJobs(profileId) {
   for (const job of list) {
     if (job && typeof job === "object" && typeof job.id === "string") byId.set(job.id, job);
   }
+  const details = new Map();
   const detailsDir = join(dir, "details");
   if (existsSync(detailsDir)) {
     for (const file of readdirSync(detailsDir)) {
       const id = file.replace(/\.json$/, "");
-      if (!JOB_ID.test(id) || !byId.has(id)) continue;
-      byId.set(id, { ...byId.get(id), details: readJson(join(detailsDir, file)) });
+      if (JOB_ID.test(id) && byId.has(id)) details.set(id, readJson(join(detailsDir, file)));
     }
   }
-  return [...byId.values()];
+  return [...byId.values()].map((job) => slimJob(job, details.get(job.id)));
 }
 
 const [command, ...args] = process.argv.slice(2);
@@ -100,11 +103,11 @@ if (command === "context") {
 } else if (command === "screen") {
   const jobs = loadJobs(args[0]);
   const totals = { received: 0, valid: 0, rejected: 0, invalid: 0, detailsWanted: [] };
-  for (let i = 0; i < jobs.length; i += CHUNK) {
+  for (const chunk of chunkJobs(jobs)) {
     const data = await api("POST", "/api/import/jobs/screen", {
       profileId: args[0],
       origin: "upwork-mcp",
-      jobs: jobs.slice(i, i + CHUNK),
+      jobs: chunk,
     });
     totals.received += data.received;
     totals.valid += data.valid;
@@ -115,18 +118,20 @@ if (command === "context") {
   print(totals);
 } else if (command === "commit") {
   const jobs = loadJobs(args[0]);
-  for (let i = 0; i < jobs.length; i += CHUNK) {
+  for (const chunk of chunkJobs(jobs)) {
     const data = await api("POST", "/api/import/jobs", {
       profileId: args[0],
       origin: "upwork-mcp",
-      jobs: jobs.slice(i, i + CHUNK),
+      jobs: chunk,
     });
+    // status FAILED: the run could not start; the jobs stay queued and `error` says why.
     print({
       status: data.status,
       runId: data.runId,
       accepted: data.accepted,
       invalid: data.invalid.length,
-      withDetails: jobs.slice(i, i + CHUNK).filter((j) => j.details).length,
+      withDetails: chunk.filter((j) => j.details).length,
+      ...(data.error ? { error: data.error } : {}),
     });
   }
   if (jobs.length === 0) print({ status: "NOTHING_TO_IMPORT" });

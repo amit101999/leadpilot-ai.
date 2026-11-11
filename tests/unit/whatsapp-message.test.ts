@@ -51,6 +51,16 @@ describe("buildLeadMessage", () => {
     ]);
   });
 
+  it("shows the hourly rate for hourly jobs", () => {
+    const hourly = (hourlyMin: string, hourlyMax: string | null) =>
+      buildLeadMessage(
+        lead({ budgetType: "HOURLY", budgetAmount: null, budgetMax: null, hourlyMin, hourlyMax }),
+        "STANDARD",
+      ).templateParams[1];
+    expect(hourly("15.00", "30.00")).toBe("USD 15 - USD 30 /hr");
+    expect(hourly("25.00", null)).toBe("USD 25+ /hr");
+  });
+
   it("shows budget ranges, unknown values and risk flags", () => {
     const { templateParams, previewText } = buildLeadMessage(
       lead({

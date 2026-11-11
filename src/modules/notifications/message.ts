@@ -5,6 +5,9 @@ export interface LeadMessageInput {
   title: string;
   budgetAmount: string | null;
   budgetMax: string | null;
+  /** Hourly jobs: the posted rate range. */
+  hourlyMin?: string | null;
+  hourlyMax?: string | null;
   currency: string | null;
   budgetType: string;
   paymentVerified: boolean | null;
@@ -14,6 +17,21 @@ export interface LeadMessageInput {
   riskFlags: RiskFlag[];
   jobUrl: string;
   dashboardUrl: string | null;
+}
+
+/** Fixed budget or range; for hourly jobs the posted rate ("USD 15 - USD 30 /hr", "USD 15+ /hr"). */
+function budgetText(input: LeadMessageInput): string {
+  const money = (value: string | null | undefined) => formatMoney(value ?? null, input.currency);
+  if (input.budgetType === "HOURLY" && input.hourlyMin) {
+    const range =
+      input.hourlyMax && input.hourlyMax !== input.hourlyMin
+        ? `${money(input.hourlyMin)} - ${money(input.hourlyMax)}`
+        : `${money(input.hourlyMin)}${input.hourlyMax ? "" : "+"}`;
+    return `${range} /hr`;
+  }
+  return input.budgetMax && input.budgetMax !== input.budgetAmount
+    ? `${money(input.budgetAmount)} - ${money(input.budgetMax)}`
+    : money(input.budgetAmount);
 }
 
 /** WhatsApp template parameters cannot contain newlines/tabs or more than 4 consecutive spaces. */
@@ -30,10 +48,7 @@ export function templateParam(text: string, max = 200): string {
  * docs/whatsapp.md) and a plain-text preview shown in the dashboard.
  */
 export function buildLeadMessage(input: LeadMessageInput, format: "STANDARD" | "COMPACT") {
-  const budget =
-    input.budgetMax && input.budgetMax !== input.budgetAmount
-      ? `${formatMoney(input.budgetAmount, input.currency)} - ${formatMoney(input.budgetMax, input.currency)}`
-      : formatMoney(input.budgetAmount, input.currency);
+  const budget = budgetText(input);
   const jobType =
     input.budgetType === "FIXED" ? "Fixed price" : input.budgetType === "HOURLY" ? "Hourly" : "Unknown";
   const verified =

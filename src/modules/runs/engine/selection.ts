@@ -177,6 +177,8 @@ async function reserveForChannel(
         title: candidate.job.title,
         budgetAmount: candidate.job.budgetAmount,
         budgetMax: candidate.job.budgetMax,
+        hourlyMin: candidate.job.hourlyMin,
+        hourlyMax: candidate.job.hourlyMax,
         currency: candidate.job.currency,
         budgetType: candidate.job.budgetType,
         paymentVerified: candidate.job.paymentVerified,

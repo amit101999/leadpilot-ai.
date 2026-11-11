@@ -6,6 +6,7 @@ import { agentRuns, runStages, searchProfiles } from "@/lib/database/schema";
 import { AppError, isUniqueViolation, notFound } from "@/lib/http/errors";
 import { isTerminal } from "@/lib/state-machine";
 import { recordAudit, userActor } from "@/modules/audit/service";
+import { afterRunEnded } from "@/modules/imports/follow-up";
 import { ImportJobSourceProvider } from "@/modules/job-sources/import-provider";
 import { getCurrentVersion, getProfile } from "@/modules/profiles/service";
 import type { Providers } from "@/modules/providers";
@@ -230,11 +231,13 @@ export async function cancelRun(db: Database, actor: Actor, id: string, requestI
     .where(eq(agentRuns.id, id));
   if (run.status === "QUEUED" && !run.startedAt) {
     // Not picked up yet (or the executor never received it): cancel directly.
-    await transitionRun(db, id, "CANCELLED", {
+    const cancelled = await transitionRun(db, id, "CANCELLED", {
       finishedAt: new Date(),
       leaseOwner: null,
       leaseExpiresAt: null,
     });
+    // Imported jobs it had claimed go back to the queue for the next sync or run.
+    if (cancelled) await afterRunEnded(db, null, cancelled);
   }
   await recordAudit(db, {
     actor: userActor(actor.id),

@@ -118,12 +118,12 @@ parses and validates input with zod, calls a module in `src/modules`, and return
 Authenticated with `Authorization: Bearer lpi_…` (an import token); no cookie, so no CSRF check. The request acts as
 the token's user (OPERATOR or higher), with the same ownership rules. See [upwork-sync.md](upwork-sync.md).
 
-| Method | Path                      | Purpose                                                                                                                         |
-| ------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/api/import/context`     | `?scheduled=true` from the scheduler. Profiles with Upwork sync on: keywords, filters, last sync, `due`, limits                 |
-| POST   | `/api/import/jobs/screen` | `{ profileId, origin: "upwork-mcp", jobs[≤100] }` → `{ received, valid, rejected, invalid[], detailsWanted[] }`; stores nothing |
-| POST   | `/api/import/jobs`        | Same body → stages the jobs and starts an import run: 202 `{ status: STARTED \| QUEUED, runId, accepted, invalid[] }`           |
-| POST   | `/api/import/sync-status` | `{ profileId, status: OK \| PARTIAL \| ERROR, message? }` → records the sync time for the schedule                              |
+| Method | Path                      | Purpose                                                                                                                                                                                                 |
+| ------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/import/context`     | `?scheduled=true` from the scheduler. Profiles with Upwork sync on: keywords, filters, last sync, `due`, limits                                                                                         |
+| POST   | `/api/import/jobs/screen` | `{ profileId, origin: "upwork-mcp", jobs[≤100] }` → `{ received, valid, rejected, invalid[], detailsWanted[] }`; stores nothing                                                                         |
+| POST   | `/api/import/jobs`        | Same body → stages the jobs and starts an import run: 202 `{ status: STARTED \| QUEUED \| FAILED, runId, error, accepted, invalid[] }`; `FAILED` means the run could not start and the jobs stay queued |
+| POST   | `/api/import/sync-status` | `{ profileId, status: OK \| PARTIAL \| ERROR, message? }` → records the sync time for the schedule                                                                                                      |
 
 Each job is an Upwork MCP `find_jobs` search item, optionally with the raw `find_jobs get` response as `details`
 (contract: `upworkMcpJobSchema` in `src/modules/job-sources/upwork-import/normalize.ts`). Invalid items are reported

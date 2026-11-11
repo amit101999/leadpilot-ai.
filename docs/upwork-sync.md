@@ -15,7 +15,7 @@ Task Scheduler (hourly) or you ─► scripts/upwork-sync.ps1 ─► claude -p "
      + find_jobs smart_search most_recent since the last sync      → .upwork-sync/<profile>/jobs.json
   3. node scripts/leadpilot-import.mjs screen        POST /api/import/jobs/screen → detailsWanted (stores nothing)
   4. Upwork MCP find_jobs get for detailsWanted (≤ 15)            → .upwork-sync/<profile>/details/<id>.json
-  5. node scripts/leadpilot-import.mjs commit        POST /api/import/jobs        → staged jobs + run STARTED/QUEUED
+  5. node scripts/leadpilot-import.mjs commit        POST /api/import/jobs        → staged jobs + run STARTED/QUEUED/FAILED
   6. node scripts/leadpilot-import.mjs status        POST /api/import/sync-status → last sync time for the schedule
 LeadPilot run (source "upwork-import"): discovery reads the staged jobs → existing pipeline → e-mail/WhatsApp alerts
 ```
@@ -66,11 +66,32 @@ marketplace budgets); `<untrusted_participant_content>` wrappers are removed and
 ## Duplicates, re-imports and queueing
 
 - Jobs are keyed by `(upwork, Upwork job id)`, the same key a future official API adapter will use. A re-import updates
-  the stored job (e.g. a raised budget) but keeps job details fetched earlier, and a job is still alerted at most once
-  per recipient and channel.
+  the stored job (e.g. a raised budget) but keeps job details fetched earlier (full description, hires, category,
+  client record), whether they are stored or still queued, and a job is still alerted at most once per recipient and
+  channel.
 - A job waits at most once per profile in `staged_jobs` (PENDING); a re-import while it waits refreshes it.
-- If a run for the profile is active when jobs arrive, they stay PENDING and the commit answers `QUEUED`; when that
-  run finishes, LeadPilot starts one follow-up import run for them, as the user who imported them.
+- If a run for the profile is active when jobs arrive, they stay PENDING and the commit answers `QUEUED`. When any run
+  of the profile ends, LeadPilot starts one follow-up import run for them, as the most recent importing user who can
+  still run (active OPERATOR or ADMIN).
+- A run that fails or is cancelled gives back the staged jobs it had claimed (PENDING again). After a failure one
+  follow-up retries them; a cancelled run, or a follow-up that itself fails, starts nothing more (no retry loops), so
+  the jobs wait for the next sync or run.
+- If the run cannot even start (e.g. n8n unreachable) the commit answers `FAILED` with an `error`; the jobs stay queued
+  and the agent reports the profile's sync as `ERROR`.
+
+## Screening
+
+`/api/import/jobs/screen` only rejects a job on a definite failure of a rule that search results can decide: job type,
+budget, currency, payment verification, client rating, client spend, client location and excluded keywords. Unknown
+values never reject at this point, and rules that need the full description or the client's hiring record (required
+skills, include keywords, keyword coverage, required combinations, client hires, category) are left to the run, after
+the detail call. Every rule is applied in full during the run.
+
+## Request size
+
+`scripts/leadpilot-import.mjs` sends only the fields LeadPilot reads (`scripts/lib/import-payload.mjs`): job details are
+trimmed to the client record, contract terms, activity, category and description; descriptions are capped at 20,000
+characters; requests are split at 200 KB and 100 jobs, below the API's 256 KB body limit.
 
 ## Security
 

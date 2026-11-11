@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 import type { DbExecutor } from "@/lib/database/client";
 import { jobs, notifications, runJobs, runStages } from "@/lib/database/schema";
 import { rowToNormalized } from "@/modules/jobs/repository";
@@ -112,21 +112,22 @@ export async function alreadyNotifiedJobIds(
 ): Promise<Set<string>> {
   const targets = enabledChannels(config);
   if (targets.length === 0 || jobIds.length === 0) return new Set();
-  let notified: Set<string> | null = null as Set<string> | null;
-  for (const target of targets) {
-    const rows = await db
-      .select({ jobId: notifications.jobId })
-      .from(notifications)
-      .where(
-        and(
-          inArray(notifications.jobId, jobIds),
-          eq(notifications.channel, target.channel),
-          eq(notifications.recipientId, target.recipientId),
-          inArray(notifications.status, [...CLAIMED_NOTIFICATION_STATUSES]),
+  // At most one claim exists per (job, channel, recipient) (unique index), so a job is notified on
+  // every channel exactly when its claim count equals the number of enabled channels.
+  const rows = await db
+    .select({ jobId: notifications.jobId, claims: sql<number>`count(*)::int` })
+    .from(notifications)
+    .where(
+      and(
+        inArray(notifications.jobId, jobIds),
+        inArray(notifications.status, [...CLAIMED_NOTIFICATION_STATUSES]),
+        or(
+          ...targets.map((t) =>
+            and(eq(notifications.channel, t.channel), eq(notifications.recipientId, t.recipientId)),
+          ),
         ),
-      );
-    const ids = new Set(rows.map((r) => r.jobId));
-    notified = notified === null ? ids : new Set([...notified].filter((id) => ids.has(id)));
-  }
-  return notified ?? new Set();
+      ),
+    )
+    .groupBy(notifications.jobId);
+  return new Set(rows.filter((r) => r.claims === targets.length).map((r) => r.jobId));
 }

@@ -16,9 +16,14 @@ export interface SmtpConfig {
 
 interface SmtpError {
   code?: string;
+  /** nodemailer keeps the underlying system error (e.g. ECONNREFUSED) here when it sets its own code. */
+  originalCode?: string;
   responseCode?: number;
   message?: string;
 }
+
+/** System errors that mean the connection was never opened, so nothing can have been delivered. */
+const NEVER_CONNECTED = new Set(["ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN"]);
 
 /** SMTP delivery through any mail server (Gmail app password, Zoho Mail, a domain mailbox...). */
 export class SmtpEmailProvider implements EmailProvider {
@@ -126,12 +131,16 @@ export function classifySmtpError(error: SmtpError): SendOutcome {
   if (error.code === "EAUTH" || error.code === "EENVELOPE" || error.code === "EMESSAGE") {
     return { kind: "rejected", retryable: false, httpStatus: null, error: `SMTP ${error.code}: ${detail}` };
   }
-  if (error.code === "ECONNECTION" || error.code === "EDNS") {
+  // Only a connection that provably never opened is safe to retry. nodemailer reports a socket closed
+  // mid-session (possibly after the message was accepted) as ECONNECTION too, so that code alone is not
+  // enough: everything else is uncertain and never retried automatically.
+  const systemCode = error.originalCode ?? error.code;
+  if (error.code === "EDNS" || (systemCode && NEVER_CONNECTED.has(systemCode))) {
     return {
       kind: "rejected",
       retryable: true,
       httpStatus: null,
-      error: `SMTP connection failed (${error.code})`,
+      error: `SMTP server could not be reached (${systemCode})`,
     };
   }
   return {

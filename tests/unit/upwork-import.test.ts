@@ -106,6 +106,17 @@ describe("Upwork MCP job mapping", () => {
     expect(normalize({ ...searchItem, client: { rating: 0, total_reviews: 0 } }).clientRating).toBeNull();
   });
 
+  it("recognises other spellings of the job type", () => {
+    expect(normalize({ ...searchItem, job_type: "Fixed price" }).budgetType).toBe("FIXED");
+    expect(normalize({ ...searchItem, job_type: "HOURLY_RATE", budget: "20" }).budgetType).toBe("HOURLY");
+    const withDetails = normalize({
+      ...searchItem,
+      details: { data: { marketplaceJobPosting: { contractTerms: { contractType: "FIXED_PRICE" } } } },
+    });
+    expect(withDetails.budgetType).toBe("FIXED");
+    expect(normalize({ ...searchItem, job_type: "contract" }).budgetType).toBe("UNKNOWN");
+  });
+
   it("reads hourly ranges and leaves fixed fields empty", () => {
     const job = normalize({ ...searchItem, job_type: "hourly", budget: "$15.00 - $30.00/hr" });
     expect(job).toMatchObject({

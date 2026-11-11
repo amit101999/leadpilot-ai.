@@ -58,10 +58,12 @@ jobs yourself, and never change a job object you received from Upwork.
    imported, just with less client data.
 
    f. **Import.** Run `node scripts/leadpilot-import.mjs commit <profileId>`. It prints the run that was
-   started (`STARTED`) or queued (`QUEUED`).
+   started (`STARTED`) or queued (`QUEUED`), or `FAILED` with an `error` when the run could not start
+   (the jobs stay queued in LeadPilot).
 
    g. **Report.** Run `node scripts/leadpilot-import.mjs status <profileId> OK`, or `PARTIAL <reason>`
-   when details were cut short, or `ERROR <reason>` when the profile could not be synced.
+   when details were cut short, or `ERROR <reason>` when the profile could not be synced or the import
+   printed `FAILED` (use its `error` as the reason).
 
 4. Reply with one line per profile: name, jobs found, jobs sent, details fetched, run status. Do not
    list job titles or client details.

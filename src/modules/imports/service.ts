@@ -11,12 +11,14 @@ import { recordAudit, userActor } from "@/modules/audit/service";
 import type { NormalizedJob } from "@/modules/job-sources/types";
 import {
   normalizeUpworkMcpJob,
+  parseStagedJob,
   UPWORK_SOURCE,
   upworkMcpJobSchema,
 } from "@/modules/job-sources/upwork-import/normalize";
+import type { ProfileConfig } from "@/modules/profiles/config-schema";
 import { getProfile, parseStoredConfig } from "@/modules/profiles/service";
 import type { Providers } from "@/modules/providers";
-import { evaluateHardChecks } from "@/modules/qualification/hard-filters";
+import { evaluateHardChecks, type HardRule } from "@/modules/qualification/hard-filters";
 import { alreadyNotifiedJobIds } from "@/modules/runs/engine/filtering";
 import { createRun } from "@/modules/runs/service";
 import { syncDue } from "./schedule";
@@ -90,28 +92,84 @@ async function storedJobs(db: Database, sourceJobIds: string[]) {
   return new Map(rows.map((r) => [r.sourceJobId, r]));
 }
 
+/** What an earlier import already knew about a job (a stored job or a job still waiting in the queue). */
+interface PriorCopy {
+  description: string;
+  clientHires: number | null;
+  category: string | null;
+  sourceMetadata: Record<string, unknown>;
+}
+
 /**
- * A re-import from search results must not erase details fetched earlier (hires, category, client
- * record). Search data wins for everything it carries; detail-only fields are kept from the stored job.
+ * A re-import from search results must not erase details fetched earlier (full description, hires,
+ * category, client record). Search data wins for everything it carries; detail-only fields are kept.
  */
-function keepStoredDetails(
-  incoming: NormalizedJob,
-  stored: typeof jobs.$inferSelect | undefined,
-): NormalizedJob {
-  const storedMeta = (stored?.sourceMetadata ?? {}) as Record<string, unknown>;
-  if (incoming.sourceMetadata.detailsFetched || !storedMeta.detailsFetched || !stored) return incoming;
+function keepPriorDetails(incoming: NormalizedJob, prior: PriorCopy | undefined): NormalizedJob {
+  if (incoming.sourceMetadata.detailsFetched || !prior?.sourceMetadata.detailsFetched) return incoming;
+  const meta = prior.sourceMetadata;
   return {
     ...incoming,
-    clientHires: incoming.clientHires ?? stored.clientHires,
-    category: incoming.category ?? stored.category,
+    // Search results carry only a snippet; the earlier detail call had the full text.
+    description: prior.description || incoming.description,
+    clientHires: incoming.clientHires ?? prior.clientHires,
+    category: incoming.category ?? prior.category,
     sourceMetadata: {
       ...incoming.sourceMetadata,
       detailsFetched: true,
-      client: storedMeta.client ?? incoming.sourceMetadata.client,
-      job: storedMeta.job ?? incoming.sourceMetadata.job,
-      preferredQualifications: storedMeta.preferredQualifications ?? null,
+      client: meta.client ?? incoming.sourceMetadata.client,
+      job: meta.job ?? incoming.sourceMetadata.job,
+      preferredQualifications: meta.preferredQualifications ?? null,
     },
   };
+}
+
+/** The best earlier copy of each job: a queued copy (newest) if it has details, otherwise the stored job. */
+async function priorCopies(db: Database, profileId: string, sourceJobIds: string[]) {
+  const priors = new Map<string, PriorCopy>();
+  for (const [id, row] of await storedJobs(db, sourceJobIds)) {
+    priors.set(id, { ...row, sourceMetadata: (row.sourceMetadata ?? {}) as Record<string, unknown> });
+  }
+  if (sourceJobIds.length === 0) return priors;
+  const queued = await db
+    .select({ payload: stagedJobs.payload })
+    .from(stagedJobs)
+    .where(
+      and(
+        eq(stagedJobs.profileId, profileId),
+        eq(stagedJobs.status, "PENDING"),
+        eq(stagedJobs.source, UPWORK_SOURCE),
+        inArray(stagedJobs.sourceJobId, sourceJobIds),
+      ),
+    );
+  for (const { payload } of queued) {
+    const job = parseStagedJob(payload);
+    if (job?.sourceMetadata.detailsFetched) priors.set(job.sourceJobId, job);
+  }
+  return priors;
+}
+
+/**
+ * Rules that search results alone can decide. The others (required skills, include keywords, keyword
+ * coverage, required combinations, client hires, category) need the full description or the client's
+ * hiring record, which the detail call supplies, so they never reject a job at screening.
+ */
+const SCREENABLE_RULES = new Set<HardRule>([
+  "STABLE_IDENTIFIER",
+  "VALID_URL",
+  "JOB_TYPE",
+  "CURRENCY",
+  "BUDGET",
+  "PAYMENT_VERIFIED",
+  "CLIENT_RATING",
+  "CLIENT_SPEND",
+  "CLIENT_LOCATION",
+  "EXCLUDE_KEYWORDS",
+]);
+
+/** Only a definite failure of a screenable rule rejects; unknown values may be filled in by the details. */
+function rejectedAtScreening(job: NormalizedJob, config: ProfileConfig): boolean {
+  const { results } = evaluateHardChecks(job, config, { sourceAuthorized: true, alreadyNotified: false });
+  return results.some((r) => r.effect === "REJECT" && r.outcome === "FAIL" && SCREENABLE_RULES.has(r.rule));
 }
 
 /** Profiles the agent should consider, with their search settings and whether each is due now. */
@@ -193,8 +251,7 @@ export async function screenJobs(db: Database, actor: Actor, input: z.infer<type
       rejected += 1;
       continue;
     }
-    const summary = evaluateHardChecks(job, config, { sourceAuthorized: true, alreadyNotified: false });
-    if (summary.status === "FILTERED_OUT") {
+    if (rejectedAtScreening(job, config)) {
       rejected += 1;
       continue;
     }
@@ -226,11 +283,12 @@ export async function commitJobs(
 ) {
   const { profile } = await importableProfile(db, actor, input.profileId);
   const { valid, invalid } = parseItems(input.jobs);
-  const stored = await storedJobs(
+  const priors = await priorCopies(
     db,
+    profile.id,
     valid.map((j) => j.sourceJobId),
   );
-  const toStage = valid.map((job) => keepStoredDetails(job, stored.get(job.sourceJobId)));
+  const toStage = valid.map((job) => keepPriorDetails(job, priors.get(job.sourceJobId)));
 
   const batch = await db.transaction(async (tx) => {
     const [created] = await tx
@@ -277,7 +335,8 @@ export async function commitJobs(
   });
 
   let runId: string | null = null;
-  let status: "STARTED" | "QUEUED" | "NOTHING_TO_IMPORT" = "NOTHING_TO_IMPORT";
+  let status: "STARTED" | "QUEUED" | "FAILED" | "NOTHING_TO_IMPORT" = "NOTHING_TO_IMPORT";
+  let error: string | null = null;
   if (toStage.length > 0) {
     try {
       const { run } = await createRun(
@@ -288,10 +347,17 @@ export async function commitJobs(
         requestId,
       );
       runId = run.id;
-      status = "STARTED";
       await db.update(importBatches).set({ runId }).where(eq(importBatches.id, batch.id));
-    } catch (error) {
-      if (!(error instanceof AppError && error.code === "RUN_ALREADY_ACTIVE")) throw error;
+      if (run.status === "FAILED") {
+        // The run could not start (e.g. n8n unreachable); the jobs stay queued for the next sync or run.
+        status = "FAILED";
+        error =
+          (run.errorSummary as { message?: string } | null)?.message ?? "The import run could not start";
+      } else {
+        status = "STARTED";
+      }
+    } catch (caught) {
+      if (!(caught instanceof AppError && caught.code === "RUN_ALREADY_ACTIVE")) throw caught;
       status = "QUEUED";
     }
   }
@@ -299,6 +365,7 @@ export async function commitJobs(
     batchId: batch.id,
     status,
     runId,
+    error,
     received: input.jobs.length,
     accepted: toStage.length,
     invalid,

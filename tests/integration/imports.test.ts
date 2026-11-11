@@ -12,13 +12,15 @@ import { POST as revokeToken } from "@/app/api/import-tokens/[id]/revoke/route";
 import { GET as listTokens, POST as createToken } from "@/app/api/import-tokens/route";
 import { POST as createProfile } from "@/app/api/profiles/route";
 import { POST as createRecipient } from "@/app/api/recipients/route";
+import { POST as cancelRun } from "@/app/api/runs/[id]/cancel/route";
 import { POST as createRun } from "@/app/api/runs/route";
 import { getDb } from "@/lib/database/client";
-import { agentRuns, jobs, notifications, stagedJobs, syncState } from "@/lib/database/schema";
+import { agentRuns, jobs, notifications, stagedJobs, syncState, users } from "@/lib/database/schema";
 import type { MockEmailProvider } from "@/modules/notifications/mock-email";
 import { defaultProfileConfig, type ProfileConfig } from "@/modules/profiles/config-schema";
 import { getProviders } from "@/modules/providers";
-import { runInProcess } from "@/modules/runs/engine";
+import { failRun, runInProcess, runStep } from "@/modules/runs/engine";
+import { dispatchRun } from "@/modules/runs/executor";
 import { call, createUser, type TestUser } from "./helpers";
 
 const email = () => getProviders().email as MockEmailProvider;
@@ -262,6 +264,132 @@ describe("import flow", () => {
       .where(eq(notifications.recipientId, recipient.json.data.id));
     expect(claims).toHaveLength(1);
     expect(claims[0]!.channel).toBe("EMAIL");
+  });
+});
+
+describe("import robustness (code review fixes)", () => {
+  const staged = (profileId: string) =>
+    getDb().select().from(stagedJobs).where(eq(stagedJobs.profileId, profileId));
+  const runsOf = (profileId: string) =>
+    getDb().select().from(agentRuns).where(eq(agentRuns.profileId, profileId));
+
+  /** Claims the staged jobs (start + discovery), then fails the run as the executor would. */
+  async function claimThenFail(runId: string) {
+    await runStep(getDb(), getProviders(), runId, "start", "test-executor");
+    await runStep(getDb(), getProviders(), runId, "discover", "test-executor");
+    await failRun(getDb(), getProviders(), runId, { stage: "AI_EVALUATION", error: new Error("boom") });
+  }
+
+  it("gives back jobs a failed run had claimed, retries them once, and never loops", async () => {
+    const user = await createUser("OPERATOR");
+    const profileId = await newProfile(user);
+    const token = await newToken(user);
+    const first = await commit(token.bearer, profileId, [upworkJob()]);
+    const runId = first.json.data.runId as string;
+
+    await claimThenFail(runId);
+    expect((await staged(profileId)).map((s) => s.status)).toEqual(["PENDING"]);
+    let runs = await runsOf(profileId);
+    const followUp = runs.find((r) => r.idempotencyKey === `follow-up:${runId}`);
+    expect(followUp).toMatchObject({ status: "QUEUED", sourceProvider: "upwork-import" });
+
+    // The follow-up fails too: its jobs are given back, but no further run is started.
+    await claimThenFail(followUp!.id);
+    runs = await runsOf(profileId);
+    expect(runs).toHaveLength(2);
+    expect((await staged(profileId)).map((s) => s.status)).toEqual(["PENDING"]);
+  });
+
+  it("cancelling a queued import run keeps its jobs queued and starts nothing", async () => {
+    const user = await createUser("OPERATOR");
+    const profileId = await newProfile(user);
+    const token = await newToken(user);
+    const first = await commit(token.bearer, profileId, [upworkJob()]);
+    const runId = first.json.data.runId as string;
+    expect((await call(cancelRun, { method: "POST", user, params: { id: runId } })).status).toBe(200);
+
+    const runs = await runsOf(profileId);
+    expect(runs.map((r) => r.status)).toEqual(["CANCELLED"]);
+    expect((await staged(profileId)).map((s) => s.status)).toEqual(["PENDING"]);
+  });
+
+  it("reports FAILED, not STARTED, when the import run cannot start", async () => {
+    const user = await createUser("OPERATOR");
+    const profileId = await newProfile(user);
+    const token = await newToken(user);
+    vi.mocked(dispatchRun).mockResolvedValueOnce({ ok: false, error: "n8n webhook could not be reached" });
+
+    const res = await commit(token.bearer, profileId, [upworkJob()]);
+    expect(res.json.data).toMatchObject({ status: "FAILED", error: "n8n webhook could not be reached" });
+    expect((await staged(profileId)).map((s) => s.status)).toEqual(["PENDING"]);
+  });
+
+  it("screening never rejects for data only the details call supplies, but rejects definite failures", async () => {
+    const user = await createUser("OPERATOR");
+    const profileId = await newProfile(user, (c) => {
+      c.client.minHires = 5; // hires come only from job details
+      c.client.unknownClientDataPolicy = "FAIL"; // the strict pre-Phase-H default
+      c.skills.excludeKeywords = ["WordPress"];
+    });
+    const token = await newToken(user);
+    // Required skills are not in the snippet or the skills list; the full description may have them.
+    const needsDetails = upworkJob({
+      title: "Dashboard build",
+      description: "Build a dashboard.",
+      skills: [],
+    });
+    const excluded = upworkJob({ title: "WordPress site fix" });
+    const cheap = upworkJob({ budget: "100.00" });
+
+    const res = await call(screenJobs, {
+      method: "POST",
+      headers: token.bearer,
+      body: { profileId, origin: "upwork-mcp", jobs: [needsDetails, excluded, cheap] },
+    });
+    expect(res.json.data).toMatchObject({ rejected: 2, detailsWanted: [needsDetails.id] });
+  });
+
+  it("keeps details of a queued job when it is re-imported from search results", async () => {
+    const user = await createUser("OPERATOR");
+    const profileId = await newProfile(user);
+    const token = await newToken(user);
+    await call(createRun, {
+      method: "POST",
+      user,
+      body: { profileId },
+      headers: { "idempotency-key": randomUUID() },
+    });
+    const job = upworkJob();
+    expect((await commit(token.bearer, profileId, [{ ...job, details: details(42) }])).json.data.status).toBe(
+      "QUEUED",
+    );
+    await commit(token.bearer, profileId, [job]);
+
+    const [row] = await staged(profileId);
+    expect(row!.payload).toMatchObject({ clientHires: 42, sourceMetadata: { detailsFetched: true } });
+  });
+
+  it("starts the follow-up as an importing user who can still run", async () => {
+    const owner = await createUser("OPERATOR");
+    const admin = await createUser("ADMIN");
+    const profileId = await newProfile(owner);
+    const ownerToken = await newToken(owner);
+    const adminToken = await newToken(admin);
+    const manual = await call(createRun, {
+      method: "POST",
+      user: owner,
+      body: { profileId },
+      headers: { "idempotency-key": randomUUID() },
+    });
+    await commit(ownerToken.bearer, profileId, [upworkJob()]);
+    await getDb().update(users).set({ role: "VIEWER" }).where(eq(users.id, owner.id));
+    await commit(adminToken.bearer, profileId, [upworkJob()]);
+
+    await execute(manual.json.data.id);
+    const followUp = (await runsOf(profileId)).find(
+      (r) => r.idempotencyKey === `follow-up:${manual.json.data.id}`,
+    );
+    expect(followUp).toMatchObject({ requestedBy: admin.id, status: "QUEUED" });
   });
 });
 
