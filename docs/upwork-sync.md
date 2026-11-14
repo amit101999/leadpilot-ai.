@@ -72,6 +72,9 @@ The import script needs no `npm install` (Node built-ins only, Node ≥ 22.12), 
 
 Setup, once LeadPilot is deployed at a public HTTPS address ([deployment.md](deployment.md#cloudflare-tunnel)):
 
+0. On claude.ai: connect GitHub (`/web-setup` in Claude Code, or claude.ai/connect-github) so the cloud can clone
+   this repository, and add the Upwork connector under **Customize → Connectors**. Routines can only use claude.ai
+   connectors, not MCP servers configured locally in Claude Code. (On 2026-11-14 neither was connected.)
 1. On the live site, **Settings → Import tokens**: create a token used only by the routine (e.g. named
    `cloud-routine`), so it can be revoked on its own.
 2. In the cloud environment of Claude Code on the web: set `LEADPILOT_URL=https://APP_DOMAIN` and

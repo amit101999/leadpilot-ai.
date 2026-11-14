@@ -1117,10 +1117,15 @@ Integration, e2e and build were not reported as re-run for this change.
 - Whether a cloud routine can use the claude.ai Upwork connector and reach the LeadPilot domain (no public deployment
   yet).
 - The routine itself: not created.
+- Blockers found 2026-11-14 while preparing a one-off test routine: the Upwork connector is **not** in the claude.ai
+  connector list that routines can use (only Claude-Docs, Canva, Zoho-Projects, bvk, Zoho-CRM), and GitHub is not
+  connected to the Claude account, so the cloud cannot clone the repository. No test routine was created.
 
 ### Open items
 
 - Decide `UPWORK_SYNC_SCHEDULED_ALLOWED` (developer).
+- Connect Upwork at claude.ai/customize/connectors and GitHub (`/web-setup` or claude.ai/connect-github), then run
+  the one-off connector test (developer).
 - After the VPS and tunnel exist: create the routine, issue a dedicated import token, test a scheduled run end to end.
 
 ## Environment notes
@@ -1128,7 +1133,7 @@ Integration, e2e and build were not reported as re-run for this change.
 - Windows 11, Node 22.17.0, Next.js 16.4.0 (16.4.5 on the Phase H branch), PostgreSQL 16 via Docker (`127.0.0.1:55432`).
 - Docker Desktop: Engine 29.7.2, Compose v5.4.0 (Phase E verification). Image builds need several GB free on C:.
 - Remote `origin` is configured on GitHub; `main` and `worktree-cloudflare-deploy` are
-  pushed. `ci-cd` and `cloud-routine-sync` are not pushed (2026-11-14).
+  pushed. `cloud-routine-sync` is pushed to origin (contains the `ci-cd` commits); the `ci-cd` branch itself is not pushed (2026-11-14).
 - Phase G: the Turbopack build passed in the worktree because it had its own `npm ci` `node_modules` (earlier worktrees
   used a junction outside the project root, which Turbopack rejects).
 - No OpenAI, SMTP or Upwork API credentials; those integrations run in mock mode. WhatsApp was removed on 2026-11-14. Phase H reaches Upwork only
