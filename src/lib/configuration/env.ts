@@ -60,6 +60,30 @@ const envSchema = z.object({
     .default("false")
     .transform((v) => v === "true"),
   MOCK_SOURCE_SCENARIO: z.string().default("default"),
+
+  /** Lets a production build run with mock AI or e-mail (e2e tests, or a deliberate trial before keys exist). */
+  ALLOW_MOCK_PROVIDERS: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+});
+
+/**
+ * Fails closed in production: a forgotten setting must not quietly turn into fake scores or e-mails that
+ * are never sent. The app then fails its health check, so a deploy stops with this message in the logs.
+ */
+const envSchemaWithGuards = envSchema.superRefine((config, ctx) => {
+  if (config.NODE_ENV !== "production" || config.ALLOW_MOCK_PROVIDERS) return;
+  for (const name of ["AI_PROVIDER", "EMAIL_PROVIDER"] as const) {
+    if (config[name] === "mock") {
+      ctx.addIssue({
+        code: "custom",
+        path: [name],
+        message:
+          "is 'mock' in production; set the real provider, or ALLOW_MOCK_PROVIDERS=true to run with mocks",
+      });
+    }
+  }
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -72,7 +96,7 @@ let cached: Env | undefined;
  */
 export function env(): Env {
   if (cached) return cached;
-  const parsed = envSchema.safeParse(process.env);
+  const parsed = envSchemaWithGuards.safeParse(process.env);
   if (!parsed.success) {
     const problems = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
     throw new Error(`Invalid environment configuration: ${problems}`);

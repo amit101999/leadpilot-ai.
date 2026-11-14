@@ -38,6 +38,8 @@ x-app-env: &app-env
   SMTP_TIMEOUT_MS: ${SMTP_TIMEOUT_MS:-15000}
   UPWORK_SYNC_SCHEDULED_ALLOWED: ${UPWORK_SYNC_SCHEDULED_ALLOWED:-false}
   AI_PROVIDER: ${AI_PROVIDER:-mock}
+  # Production refuses mock AI/e-mail unless this is "true" (src/lib/configuration/env.ts).
+  ALLOW_MOCK_PROVIDERS: ${ALLOW_MOCK_PROVIDERS:-false}
   OPENAI_API_KEY: ${OPENAI_API_KEY:-}
   OPENAI_MODEL: ${OPENAI_MODEL:-}
   OPENAI_TIMEOUT_MS: ${OPENAI_TIMEOUT_MS:-30000}
@@ -51,7 +53,7 @@ x-app-env: &app-env
 
 services:
   postgres:
-    image: postgres:16.6-alpine
+    image: postgres:16.16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-leadpilot}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}

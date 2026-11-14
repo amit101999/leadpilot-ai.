@@ -3,7 +3,7 @@
 #   runner   (default) - production server from Next's standalone output, non-root
 #   migrator           - applies migrations / runs the seed (needs dev dependencies + sources)
 
-ARG NODE_IMAGE=node:22.23.3-alpine3.24
+ARG NODE_IMAGE=node:22.23.5-alpine3.24
 
 FROM ${NODE_IMAGE} AS deps
 WORKDIR /app

@@ -52,6 +52,8 @@ export default defineConfig({
       APP_BASE_URL: BASE_URL,
       // Never call real services from tests, whatever .env says.
       AI_PROVIDER: "mock",
+      // A production build refuses mock providers unless allowed (src/lib/configuration/env.ts).
+      ALLOW_MOCK_PROVIDERS: "true",
       EMAIL_PROVIDER: "mock",
       JOB_SOURCE_PROVIDER: "mock",
       RUN_EXECUTOR: "inprocess",

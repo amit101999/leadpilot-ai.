@@ -41,7 +41,7 @@ Files: [`Dockerfile`](../Dockerfile), [`docker-compose.yml`](../docker-compose.y
 
 | Service      | Image                      | Kind     | Purpose                                                                                                                    |
 | ------------ | -------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `postgres`   | `postgres:16.6-alpine`     | long-run | Application database. Volume `postgres-data`.                                                                              |
+| `postgres`   | `postgres:16.16-alpine`    | long-run | Application database. Volume `postgres-data`.                                                                              |
 | `migrate`    | `leadpilot-migrator:local` | one-shot | Runs `npm run db:migrate` (idempotent). `web` starts only after it exits with 0.                                           |
 | `web`        | `leadpilot-web:local`      | long-run | Next.js standalone server as the non-root `node` user. Health check: `GET /api/health`.                                    |
 | `n8n-import` | `n8nio/n8n:2.42.7`         | one-shot | Creates the webhook credential from `N8N_WEBHOOK_SECRET`, imports and publishes the run workflow. `n8n` waits for it.      |
@@ -137,6 +137,10 @@ _instead of_ `docker-compose.prod.yml`.
    - Service: Type **HTTP**, URL **`caddy:80`**.
 4. Save. Cloudflare creates the DNS record for the subdomain itself; existing records (e.g. your other website) are
    untouched. Nothing changes at the registrar (GoDaddy).
+5. **SSL/TLS → Edge Certificates → Always Use HTTPS: On** (for the domain). Without it, Cloudflare also serves the site
+   over plain HTTP, where login fails (the session cookie is `Secure` and the CSRF check expects `https://APP_DOMAIN`).
+   Caddy also tells the app every request is HTTPS (`X-Forwarded-Proto: https`); the app's redirects are relative,
+   so they keep the browser on `https://`.
 
 ### 2. Configure and start
 
@@ -193,7 +197,8 @@ git push ──► GitHub Actions
               ├─ quality       format:check, lint, typecheck, test:unit
               ├─ integration   test:integration against a Postgres service container
               ├─ e2e           test:e2e (Playwright, Chromium) against a Postgres service container
-              └─ build         next build; `docker compose config` for the base, prod and cloudflare files
+              └─ build         next build; Docker images (runner, migrator; not pushed);
+                               `docker compose config` for the base, prod and cloudflare files
                     │ all green, push to main, DEPLOY_ENABLED=true
                     ▼
               deploy ──ssh via cloudflared──► Cloudflare Access (service token) ──► SSH tunnel ──► server :22
@@ -217,13 +222,23 @@ git push ──► GitHub Actions
    hand) and refuses commits that are not on `origin/main`.
 2. Takes a lock (`.deploy.lock`), so two deploys never overlap.
 3. Refuses to run if tracked files were edited on the server.
-4. Backs up the database with `scripts/backup-db.sh` (skipped only when Postgres is not running, i.e. the first
-   deploy). A failed backup stops the deploy before anything changes.
-5. Checks out the commit and runs `docker compose up -d --build --remove-orphans`. The `migrate` service applies new
-   migrations before `web` starts.
-6. Waits up to 300 s (`DEPLOY_HEALTH_TIMEOUT`) until every container is healthy, running, or (one-shots) exited with 0.
+4. Checks out the commit and builds the images (`docker compose build`) while the running version keeps serving. A
+   failed build stops here and leaves the running stack untouched.
+5. Waits for runs in progress (`RUNNING` in the `runs` table) to finish, checking every 10 s for up to 600 s
+   (`DEPLOY_RUN_WAIT_SECONDS`): a restart would stop a run half-way and it would need **Resume** in the app. After the
+   limit it deploys anyway and logs a warning.
+6. Backs up the database with `scripts/backup-db.sh` (skipped only when Postgres is not running, i.e. the first
+   deploy). A failed backup stops the deploy before the restart.
+7. Runs `docker compose up -d --remove-orphans`. The `migrate` service applies new migrations before `web` starts.
+8. Waits up to 300 s (`DEPLOY_HEALTH_TIMEOUT`) until every container is healthy, running, or (one-shots) exited with 0.
    Otherwise it prints `docker compose ps` and the last 100 log lines of `migrate` and `web`, and the GitHub run fails.
-7. Writes the commit to `.deployed-sha` and removes dangling images.
+9. Writes the commit to `.deployed-sha` and removes dangling images.
+
+**Mock providers are refused in production.** The app checks its settings on the first request: with
+`NODE_ENV=production` (always the case in the Docker image) it refuses `AI_PROVIDER=mock` or `EMAIL_PROVIDER=mock`
+unless `ALLOW_MOCK_PROVIDERS=true`. `/api/health` then fails, so step 8 fails and the printed `web` log names the
+setting. Set the real providers (`AI_PROVIDER=openai`, `EMAIL_PROVIDER=smtp` and their keys), or set
+`ALLOW_MOCK_PROVIDERS=true` on purpose for a trial without them.
 
 There is **no automatic rollback**, because migrations only go forward. To go back, open the GitHub run of the previous
 good commit and choose **Re-run all jobs**, or on the server run `scripts/deploy.sh <previous sha>`. This is safe when
@@ -344,6 +359,10 @@ push to `main`. The deploy still runs only after every check passes.
 - "tracked files were changed on the server": someone edited files in `/opt/leadpilot`; `git status`, then move the
   change into the repository (configuration belongs in `.env`).
 - "another deploy is running": a previous deploy still holds `.deploy.lock` (it is released when that process ends).
+- Health timeout with "is 'mock' in production" in the `web` log: set the real `AI_PROVIDER`/`EMAIL_PROVIDER` in the
+  server's `.env`, or `ALLOW_MOCK_PROVIDERS=true` on purpose ([above](#what-scriptsdeploysh-does)).
+- "N run(s) still running … deploying anyway": a run took longer than `DEPLOY_RUN_WAIT_SECONDS`; if it stopped, open
+  it in the app and click **Resume**.
 - Health timeout: read the printed `migrate`/`web` logs; on a 2 GB server the build may be slow or killed for lack of
   memory (add swap).
 
@@ -479,6 +498,18 @@ build in this mode (the development PC lacked free memory for the image build).
 | Same: first deploy (no Postgres, backup skipped), redeploy (backup taken), `.deployed-sha` written                                                                        | ✅                              |
 | Same: `compose up` failing, `migrate` exiting 1, `web` unhealthy, health timeout                                                                                          | ✅ exit 1 with diagnostics      |
 | `docker compose config` for base, prod and cloudflare files with placeholder values                                                                                       | ✅                              |
+
+Deployment-readiness fixes (2026-11-14, later the same day):
+
+| Check                                                                                                                                                                                                                 | Result                                                                               |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `docker build --target runner` / `--target migrator` of the current code (Node 22.23.5)                                                                                                                               | ✅ both build (web image 353 MB)                                                     |
+| Web image, `NODE_ENV=production`, mock providers, no `ALLOW_MOCK_PROVIDERS`                                                                                                                                           | ✅ `/api/health` 500; log names `AI_PROVIDER` and `EMAIL_PROVIDER`                   |
+| Same with `ALLOW_MOCK_PROVIDERS=true`, and with real provider settings                                                                                                                                                | ✅ 200                                                                               |
+| Login redirect from the web image                                                                                                                                                                                     | ✅ relative `Location: /login?...` (keeps the browser's scheme)                      |
+| `deploy/Caddyfile.cloudflare` through Caddy 2.11.7: client sends `X-Forwarded-Proto: http` and a spoofed `X-Forwarded-For`                                                                                            | ✅ app receives `https` and the `CF-Connecting-IP` address only; `caddy validate` ✅ |
+| `deploy.sh` harness: builds before restarting; failed build leaves the stack untouched; waits while runs are `RUNNING` (2 → 1 → 0), deploys after `DEPLOY_RUN_WAIT_SECONDS`, does not wait when the count query fails | ✅                                                                                   |
+| Integration and e2e tests on `postgres:16.16-alpine` (Next.js 16.4.6)                                                                                                                                                 | ✅ 74/74 and 19/19                                                                   |
 
 Not verified: a run on GitHub's runners, a real deploy over the SSH tunnel and Access service token, and `deploy.sh`
 against a real Docker stack on a Linux server. These need the domain and server from [One-time setup](#one-time-setup).

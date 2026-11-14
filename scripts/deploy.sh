@@ -6,12 +6,14 @@
 #
 # By hand, on the server:   scripts/deploy.sh "$(git rev-parse origin/main)"
 #
-# Steps: check the SHA is on origin/main -> back up the database -> check out the commit -> rebuild and restart the
-# stack (migrations run first through the `migrate` service) -> wait until every service is healthy.
+# Steps: check the SHA is on origin/main -> check out the commit -> build the images (the old version keeps serving)
+# -> wait for running runs to finish -> back up the database -> restart the stack (migrations run first through the
+# `migrate` service) -> wait until every service is healthy.
 # Expects the server's .env to set COMPOSE_FILE and COMPOSE_PROFILES (docs/deployment.md, "CI/CD").
 set -euo pipefail
 
 HEALTH_TIMEOUT_SECONDS="${DEPLOY_HEALTH_TIMEOUT:-300}"
+RUN_WAIT_SECONDS="${DEPLOY_RUN_WAIT_SECONDS:-600}"
 
 log() { printf '[deploy %s] %s\n' "$(date -u +%H:%M:%S)" "$*"; }
 fail() { log "ERROR: $*"; exit 1; }
@@ -40,6 +42,26 @@ check_services() {
   return "$status"
 }
 
+# Restarting `web` stops a run that is in progress; it then waits for its lease to expire and a manual Resume.
+# So give running runs time to finish first. Never blocks forever: after the limit the deploy goes ahead.
+wait_for_running_runs() {
+  local deadline=$((SECONDS + RUN_WAIT_SECONDS)) running
+  while :; do
+    running="$(docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAq'       <<< "select count(*) from runs where status = 'RUNNING';" 2> /dev/null | tr -d '[:space:]')" || running=""
+    if ! [[ "$running" =~ ^[0-9]+$ ]]; then
+      log "Could not count running runs (empty database?); not waiting"
+      return 0
+    fi
+    [ "$running" -eq 0 ] && return 0
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      log "WARNING: $running run(s) still running after ${RUN_WAIT_SECONDS}s; deploying anyway. Resume them in the app if they stop."
+      return 0
+    fi
+    log "Waiting for $running running run(s) to finish before restarting"
+    sleep 10
+  done
+}
+
 main() {
   local sha="${1:-${SSH_ORIGINAL_COMMAND:-}}"
   [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || fail "expected a full 40-character commit SHA, got '${sha:0:60}'"
@@ -60,18 +82,23 @@ main() {
   git merge-base --is-ancestor "$sha" origin/main || fail "commit $sha is not on origin/main"
   [ -z "$(git status --porcelain --untracked-files=no)" ] || fail "tracked files were changed on the server; refusing to overwrite them"
 
+  log "Checking out $sha (was $(git rev-parse HEAD))"
+  git checkout --quiet --detach "$sha"
+
+  # Build while the old version keeps serving; only the restart below interrupts anything.
+  log "Building images"
+  docker compose build || { show_diagnostics; exit 1; }
+
   if docker compose ps --status running --services | grep -qx postgres; then
+    wait_for_running_runs
     log "Backing up the database"
     scripts/backup-db.sh
   else
     log "Postgres is not running (first deploy?); skipping the backup"
   fi
 
-  log "Checking out $sha (was $(git rev-parse HEAD))"
-  git checkout --quiet --detach "$sha"
-
-  log "Building and starting the stack"
-  docker compose up --detach --build --remove-orphans || { show_diagnostics; exit 1; }
+  log "Starting the stack"
+  docker compose up --detach --remove-orphans || { show_diagnostics; exit 1; }
 
   log "Waiting up to ${HEALTH_TIMEOUT_SECONDS}s for all services to become healthy"
   local deadline=$((SECONDS + HEALTH_TIMEOUT_SECONDS)) result

@@ -58,7 +58,8 @@ What protects LeadPilot today, where it lives in the code, and the risks that re
 **Secrets and logging**
 
 - Configuration comes from the environment and is validated at startup (`src/lib/configuration/env.ts`); errors name
-  the variable, never its value.
+  the variable, never its value. In production it fails closed on mock AI or e-mail providers unless
+  `ALLOW_MOCK_PROVIDERS=true`, so a missing setting cannot silently produce fake scores or unsent alerts.
 - pino redacts passwords, tokens, access tokens, authorization headers and cookies by path. Provider errors are passed
   through `sanitizeErrorMessage` before storage, which removes tokens, e-mails and phone numbers.
 - Recipient phone numbers and e-mail addresses are never returned in full by the API (masked) and never logged.
