@@ -11,24 +11,35 @@
  *
  * Files for a profile: .upwork-sync/<profileId>/jobs.json (array of search items, as returned by
  * Upwork) and .upwork-sync/<profileId>/details/<jobId>.json (raw `find_jobs get` responses).
- * Settings: LEADPILOT_URL (default http://localhost:3000) and LEADPILOT_IMPORT_TOKEN, from .env.
+ * Settings: LEADPILOT_URL (default http://localhost:3000; must be https:// unless localhost) and
+ * LEADPILOT_IMPORT_TOKEN, from .env or the process environment (e.g. a Claude cloud routine).
  */
-import "dotenv/config";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { chunkJobs, slimJob } from "./lib/import-payload.mjs";
+import { resolveLeadPilotUrl } from "./lib/leadpilot-url.mjs";
+
+// Node's built-in loader (no npm install needed, e.g. in a Claude cloud routine); like dotenv it
+// never overrides variables already set in the environment.
+if (existsSync(".env")) process.loadEnvFile(".env");
 
 const WORK_DIR = resolve(".upwork-sync");
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const JOB_ID = /^[A-Za-z0-9~]{1,64}$/;
 
-const baseUrl = (process.env.LEADPILOT_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const token = process.env.LEADPILOT_IMPORT_TOKEN;
 
 function fail(message) {
   console.error(`leadpilot-import: ${message}`);
   process.exit(1);
+}
+
+let baseUrl;
+try {
+  baseUrl = resolveLeadPilotUrl(process.env.LEADPILOT_URL);
+} catch (error) {
+  fail(error.message);
 }
 
 /** Results go to stdout as JSON for the agent to read. */
