@@ -40,7 +40,8 @@ npm run dev                     # http://localhost:3000
 Everything runs with mock providers by default (`AI_PROVIDER=mock`, `EMAIL_PROVIDER=mock`,
 `JOB_SOURCE_PROVIDER=mock`), so no external service is called.
 
-Full Docker stack and production: [docs/deployment.md](docs/deployment.md).
+Full Docker stack and production: [docs/deployment.md](docs/deployment.md). CI/CD: GitHub Actions tests every push
+and deploys `main` to the server through a Cloudflare Tunnel ([docs/deployment.md#cicd](docs/deployment.md#cicd)).
 
 ## Commands
 
@@ -54,6 +55,7 @@ Full Docker stack and production: [docs/deployment.md](docs/deployment.md).
 | `npm run test:e2e`                               | Playwright against a production build                |
 | `npm run test:live`                              | Opt-in checks against real services (`LIVE_TESTS=1`) |
 | `scripts/backup-db.sh` / `scripts/restore-db.sh` | Database backup and restore (Docker stack)           |
+| `scripts/deploy.sh <sha>`                        | Production deploy on the server (run by CI/CD)       |
 
 ## Stack
 
@@ -72,7 +74,7 @@ Vitest and Playwright · Docker Compose and Caddy.
 | [n8n/documentation/README.md](n8n/documentation/README.md) | The n8n run workflow                                       |
 | [docs/upwork-access.md](docs/upwork-access.md)             | Why live Upwork discovery is blocked and what unblocks it  |
 | [docs/upwork-sync.md](docs/upwork-sync.md)                 | Importing real Upwork jobs through Claude + Upwork MCP     |
-| [docs/deployment.md](docs/deployment.md)                   | Docker, production, backups                                |
+| [docs/deployment.md](docs/deployment.md)                   | Docker, production, CI/CD, Cloudflare Tunnel, backups      |
 | [docs/testing.md](docs/testing.md)                         | Test suites and acceptance-scenario mapping                |
 | [docs/troubleshooting.md](docs/troubleshooting.md)         | Common problems and fixes                                  |
 | [docs/progress/PROGRESS.md](docs/progress/PROGRESS.md)     | What was built in each phase, decisions and verification   |

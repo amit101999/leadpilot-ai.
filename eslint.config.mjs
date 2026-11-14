@@ -15,6 +15,8 @@ const config = [
       "next-env.d.ts",
       // Upwork sync working files (job data, local one-off scripts); gitignored.
       ".upwork-sync/**",
+      // Git worktrees used during development; each is linted in its own checkout. Gitignored.
+      ".claude/worktrees/**",
     ],
   },
   {

@@ -1,0 +1,204 @@
+# CI/CD for LeadPilot. See docs/deployment.md, "CI/CD".
+#
+#   pull request   -> quality, integration, e2e, build
+#   push to main   -> the same checks, then deploy (only when every check passed and DEPLOY_ENABLED is "true")
+#
+# Deploy runs scripts/deploy.sh on the server over SSH through a Cloudflare Tunnel protected by Cloudflare Access.
+# No application secret is stored in GitHub: they live only in the server's .env.
+name: CI/CD
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # A newer push to the same PR/branch supersedes the running checks. Deploys have their own group below.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  NODE_VERSION: "22.23.3" # same as the Dockerfile
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  quality:
+    name: Format, lint, types, unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:unit
+
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16.6-alpine
+        env:
+          POSTGRES_USER: leadpilot
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: leadpilot_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U leadpilot -d leadpilot_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      # Throwaway values for this job only. DATABASE_URL must differ from TEST_DATABASE_URL (setup.ts refuses otherwise);
+      # it is replaced by TEST_DATABASE_URL before any connection is made.
+      TEST_DATABASE_URL: postgres://leadpilot:ci-only-password@localhost:5432/leadpilot_test
+      DATABASE_URL: postgres://unused:unused@localhost:5432/unused
+      AUTH_SECRET: ci-only-auth-secret-0123456789abcdef0123456789
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run test:integration
+
+  e2e:
+    name: End-to-end tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16.6-alpine
+        env:
+          POSTGRES_USER: leadpilot
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: leadpilot_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U leadpilot -d leadpilot_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgres://leadpilot:ci-only-password@localhost:5432/leadpilot_test
+      DATABASE_URL: postgres://unused:unused@localhost:5432/unused
+      AUTH_SECRET: ci-only-auth-secret-0123456789abcdef0123456789
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-test-results
+          path: test-results/
+          retention-days: 7
+
+  build:
+    name: Production build and Compose files
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - name: Validate Compose files
+        env:
+          # Placeholders only: `config` checks syntax, merging and required variables; nothing is started.
+          POSTGRES_PASSWORD: placeholder
+          APP_DOMAIN: leads.example.com
+          ACME_EMAIL: ops@example.com
+          CLOUDFLARE_TUNNEL_TOKEN: placeholder
+        run: |
+          docker compose -f docker-compose.yml --profile stack config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile stack config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.cloudflare.yml --profile stack config --quiet
+
+  deploy:
+    name: Deploy to production
+    needs: [quality, integration, e2e, build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    concurrency:
+      # Never two deploys at once, and never cancel one half-way (migrations may be running).
+      group: production-deploy
+      cancel-in-progress: false
+    env:
+      CLOUDFLARED_VERSION: "2026.10.1"
+      CLOUDFLARED_SHA256: 3bfc539f45d2620c71debb7a86be0efa737ed5ccbad9eb85c787116900e5c586
+    steps:
+      - name: Install cloudflared
+        run: |
+          curl -fsSL -o cloudflared \
+            "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64"
+          echo "${CLOUDFLARED_SHA256}  cloudflared" | sha256sum --check --strict
+          sudo install -m 0755 cloudflared /usr/local/bin/cloudflared
+          rm cloudflared
+
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_HOST: ${{ vars.DEPLOY_SSH_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          for name in DEPLOY_SSH_HOST DEPLOY_SSH_KEY SSH_KNOWN_HOSTS; do
+            if [ -z "${!name}" ]; then echo "::error::$name is not set (see docs/deployment.md, CI/CD)"; exit 1; fi
+          done
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          # The Access service token reaches cloudflared through TUNNEL_SERVICE_TOKEN_ID/SECRET (set on the deploy
+          # step), so it never appears on a command line.
+          cat > ~/.ssh/config <<EOF
+          Host $DEPLOY_SSH_HOST
+            User deploy
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            UserKnownHostsFile ~/.ssh/known_hosts
+            ProxyCommand /usr/local/bin/cloudflared access ssh --hostname %h
+            ServerAliveInterval 30
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Run deploy script on the server
+        env:
+          DEPLOY_SSH_HOST: ${{ vars.DEPLOY_SSH_HOST }}
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        # The server's authorized_keys forces scripts/deploy.sh; the commit SHA is its only input.
+        run: |
+          # shellcheck disable=SC2029 # the SHA is meant to expand here, on the runner
+          ssh "$DEPLOY_SSH_HOST" "$GITHUB_SHA"
+
+      - name: Remove SSH material
+        if: always()
+        run: rm -rf ~/.ssh

@@ -12,7 +12,8 @@ LeadPilot ships as a Docker Compose stack. One `docker-compose.yml` serves four 
 Files: [`Dockerfile`](../Dockerfile), [`docker-compose.yml`](../docker-compose.yml),
 [`docker-compose.prod.yml`](../docker-compose.prod.yml), [`deploy/Caddyfile`](../deploy/Caddyfile),
 [`docker-compose.cloudflare.yml`](../docker-compose.cloudflare.yml), [`deploy/Caddyfile.cloudflare`](../deploy/Caddyfile.cloudflare),
-[`scripts/backup-db.sh`](../scripts/backup-db.sh), [`scripts/restore-db.sh`](../scripts/restore-db.sh).
+[`scripts/backup-db.sh`](../scripts/backup-db.sh), [`scripts/restore-db.sh`](../scripts/restore-db.sh),
+[`scripts/deploy.sh`](../scripts/deploy.sh), [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) ([CI/CD](#cicd)).
 
 ## Architecture
 
@@ -84,7 +85,9 @@ so plain `docker compose up -d --build` uses the production setup.
 ### Updating
 
 `git pull`, then the same `up -d --build` command. `migrate` applies new migrations before the new `web` starts, and
-`n8n-import` re-imports the workflow from `n8n/workflows/leadpilot-run.json`. Take a backup first.
+`n8n-import` re-imports the workflow from `n8n/workflows/leadpilot-run.json`. Take a backup first. With
+[CI/CD](#cicd) this happens automatically: `scripts/deploy.sh` backs up, checks out the commit and restarts the stack
+(the checkout is then a detached commit, so use `scripts/deploy.sh <sha>` rather than `git pull` by hand).
 
 ### The n8n editor
 
@@ -178,6 +181,172 @@ login. Free for up to 50 users.
 3. If **Bot Fight Mode** (Security → Bots) is on, Cloudflare may challenge the script's requests; turn it off for this
    domain if the sync reports HTML or 403 responses.
 
+## CI/CD
+
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) (GitHub Actions) tests every pull request and every push to
+`main`; when everything passes on `main`, it deploys that commit to the server with
+[`scripts/deploy.sh`](../scripts/deploy.sh). It assumes the [Cloudflare Tunnel](#cloudflare-tunnel) setup on a Linux
+server.
+
+```
+git push ──► GitHub Actions
+              ├─ quality       format:check, lint, typecheck, test:unit
+              ├─ integration   test:integration against a Postgres service container
+              ├─ e2e           test:e2e (Playwright, Chromium) against a Postgres service container
+              └─ build         next build; `docker compose config` for the base, prod and cloudflare files
+                    │ all green, push to main, DEPLOY_ENABLED=true
+                    ▼
+              deploy ──ssh via cloudflared──► Cloudflare Access (service token) ──► SSH tunnel ──► server :22
+                                                                                         │
+                                         scripts/deploy.sh <sha> ◄── forced command ─────┘
+                                           backup DB → git checkout <sha> → docker compose up -d --build
+                                           (migrate runs first) → wait until every service is healthy
+```
+
+- The test jobs use throwaway values and mock providers only. **No application secret is stored in GitHub**; they stay
+  in the server's `.env`.
+- Pull requests run the checks but never deploy. A newer push to the same pull request cancels the older run; runs on
+  `main` are never cancelled, and deploys run one at a time.
+- Until the server is ready, leave the repository variable `DEPLOY_ENABLED` unset: the checks still run and the
+  `deploy` job is skipped.
+- The server builds the images itself (as in [Updating](#updating)), so nothing is pushed to a container registry.
+
+### What `scripts/deploy.sh` does
+
+1. Accepts only a full 40-character commit SHA (from `SSH_ORIGINAL_COMMAND`, or as the first argument when run by
+   hand) and refuses commits that are not on `origin/main`.
+2. Takes a lock (`.deploy.lock`), so two deploys never overlap.
+3. Refuses to run if tracked files were edited on the server.
+4. Backs up the database with `scripts/backup-db.sh` (skipped only when Postgres is not running, i.e. the first
+   deploy). A failed backup stops the deploy before anything changes.
+5. Checks out the commit and runs `docker compose up -d --build --remove-orphans`. The `migrate` service applies new
+   migrations before `web` starts.
+6. Waits up to 300 s (`DEPLOY_HEALTH_TIMEOUT`) until every container is healthy, running, or (one-shots) exited with 0.
+   Otherwise it prints `docker compose ps` and the last 100 log lines of `migrate` and `web`, and the GitHub run fails.
+7. Writes the commit to `.deployed-sha` and removes dangling images.
+
+There is **no automatic rollback**, because migrations only go forward. To go back, open the GitHub run of the previous
+good commit and choose **Re-run all jobs**, or on the server run `scripts/deploy.sh <previous sha>`. This is safe when
+the newer commit's migrations only added things; a migration that renamed or dropped something needs a database restore
+([Restoring](#restoring)) from the backup the deploy just took.
+
+### One-time setup
+
+Order: server → domain on Cloudflare → app tunnel → SSH tunnel → GitHub settings.
+
+**1. Server.** Ubuntu 24.04 LTS with at least 2 GB RAM (4 GB, or 2 GB plus swap, for the image build) and Docker Engine
+with the Compose plugin. Firewall: allow no inbound ports at all (both tunnels connect outwards); keep the provider's
+web console for emergencies.
+
+**2. Deploy user and checkout.**
+
+```sh
+sudo adduser --disabled-password --gecos "" deploy
+sudo usermod -aG docker deploy           # docker access is root-equivalent; this user exists only for deploys
+sudo mkdir -p /opt/leadpilot && sudo chown deploy:deploy /opt/leadpilot
+sudo -iu deploy
+ssh-keygen -t ed25519 -f ~/.ssh/github_read -N ""   # read-only key for cloning
+cat ~/.ssh/github_read.pub
+```
+
+In GitHub: repository → **Settings → Deploy keys → Add deploy key**, paste that public key, leave **Allow write
+access** off. Then, still as `deploy`:
+
+```sh
+cat >> ~/.ssh/config <<'EOF'
+Host github.com
+  IdentityFile ~/.ssh/github_read
+  IdentitiesOnly yes
+EOF
+ssh-keyscan github.com >> ~/.ssh/known_hosts
+git clone git@github.com:amit101999/leadpilot-ai.git /opt/leadpilot
+```
+
+Create `/opt/leadpilot/.env` as in [Cloudflare Tunnel → 2](#2-configure-and-start) (`chmod 600 .env`) and add:
+
+```sh
+COMPOSE_FILE=docker-compose.yml:docker-compose.cloudflare.yml
+COMPOSE_PROFILES=stack
+```
+
+**3. App tunnel.** Follow [Cloudflare Tunnel → 1](#1-create-the-tunnel-cloudflare-dashboard). For the first start, run
+`scripts/deploy.sh "$(git rev-parse origin/main)"` as `deploy` in `/opt/leadpilot`, then seed once:
+`docker compose run --rm migrate npm run db:seed`.
+
+**4. SSH tunnel for GitHub Actions.** A second tunnel that runs on the host, not in Docker, so a broken app stack never
+blocks the next deploy.
+
+1. Zero Trust → **Networks → Tunnels → Create a tunnel** → name it `leadpilot-ssh`. Pick the Debian/Ubuntu install
+   command shown there and run it on the server (installs `cloudflared` as a systemd service).
+2. Public hostname: e.g. `ssh-leads.<your domain>`, Service type **SSH**, URL **`localhost:22`**.
+3. Zero Trust → **Access → Service auth → Service tokens → Create**, name `github-deploy`. Copy the **Client ID** and
+   **Client Secret** (the secret is shown once).
+4. Zero Trust → **Access → Applications → Add → Self-hosted**: domain `ssh-leads.<your domain>`; one policy with action
+   **Service Auth**, _Include → Service Token_ = `github-deploy`. Without this application anyone could reach your SSH
+   port through the tunnel.
+
+**5. Deploy key for GitHub Actions** (on your PC, not the server):
+
+```sh
+ssh-keygen -t ed25519 -f leadpilot_deploy -N "" -C github-deploy
+```
+
+On the server, as `deploy`, add one line to `~/.ssh/authorized_keys` (the public key, restricted to the deploy
+script):
+
+```
+command="/opt/leadpilot/scripts/deploy.sh",no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty ssh-ed25519 AAAA...your key... github-deploy
+```
+
+The server's host key for `known_hosts`, printed on the server:
+
+```sh
+for f in /etc/ssh/ssh_host_*_key.pub; do echo "ssh-leads.<your domain> $(cut -d' ' -f1,2 "$f")"; done
+```
+
+**6. GitHub settings.** Repository → **Settings → Secrets and variables → Actions**:
+
+| Kind     | Name                      | Value                                               |
+| -------- | ------------------------- | --------------------------------------------------- |
+| Secret   | `DEPLOY_SSH_KEY`          | contents of the private key file `leadpilot_deploy` |
+| Secret   | `SSH_KNOWN_HOSTS`         | the lines printed in step 5                         |
+| Secret   | `CF_ACCESS_CLIENT_ID`     | service token Client ID                             |
+| Secret   | `CF_ACCESS_CLIENT_SECRET` | service token Client Secret                         |
+| Variable | `DEPLOY_SSH_HOST`         | `ssh-leads.<your domain>`                           |
+| Variable | `DEPLOY_ENABLED`          | `true` (only once everything above works)           |
+
+Then delete `leadpilot_deploy` from your PC. Push a commit to `main` and watch **Actions**.
+
+### Cost
+
+| Item                                  | Cost                                                                                                                                                             |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GitHub repository and Actions         | Free. Private repositories get 2,000 Linux runner minutes a month; one push to `main` uses roughly 12–18 (each job counts).                                      |
+| Cloudflare DNS, HTTPS, Tunnel, Access | Free plan (Access free up to 50 users). Zero Trust sign-up may ask for a card; the Free plan charges nothing.                                                    |
+| Domain                                | About $10–15 a year; required for a Tunnel.                                                                                                                      |
+| Server                                | $0 on Oracle Cloud Always Free (card needed for sign-up; capacity is not guaranteed and idle instances can be reclaimed), or about $5–8 a month for a small VPS. |
+
+Prices as of 2026-11; check the providers' pages. Not part of CI/CD but billed by use: OpenAI and
+the SMTP provider.
+
+Free-plan limit: GitHub branch protection on a private repository needs a paid plan, so GitHub cannot stop a direct
+push to `main`. The deploy still runs only after every check passes.
+
+### Troubleshooting CI/CD
+
+- `deploy` skipped: `DEPLOY_ENABLED` is not `true`, the run is a pull request, or a check failed.
+- "DEPLOY_SSH_HOST is not set" (or another name): add the secret/variable in step 6.
+- `Host key verification failed`: `SSH_KNOWN_HOSTS` does not match the server or uses another hostname than
+  `DEPLOY_SSH_HOST`.
+- `websocket: bad handshake` or a 403 from cloudflared: the service token is wrong, or the Access application's policy
+  is not **Service Auth** with that token.
+- `Permission denied (publickey)`: the `authorized_keys` line is missing or belongs to another user than `deploy`.
+- "tracked files were changed on the server": someone edited files in `/opt/leadpilot`; `git status`, then move the
+  change into the repository (configuration belongs in `.env`).
+- "another deploy is running": a previous deploy still holds `.deploy.lock` (it is released when that process ends).
+- Health timeout: read the printed `migrate`/`web` logs; on a 2 GB server the build may be slow or killed for lack of
+  memory (add swap).
+
 ## Backups
 
 ### What is backed up
@@ -252,6 +421,13 @@ expire. Restoring a dump made by a newer app version than the running one is not
   through. In this mode clients keep their real addresses for rate limiting on Docker Desktop too.
 - `CLOUDFLARE_TUNNEL_TOKEN` lets anyone run your tunnel: treat it like a password and refresh it in the Cloudflare
   dashboard if it leaks.
+- CI/CD ([above](#cicd)): GitHub holds only deploy credentials, never application secrets. The GitHub Actions key can
+  only run `scripts/deploy.sh` (forced command, no forwarding, no terminal), and the script only deploys commits that
+  are already on `main`. The SSH hostname is closed to everyone without the Access service token. The `deploy` user is
+  in the `docker` group, which is root-equivalent, so the remaining risk is anyone who can **push to `main`**: their
+  code runs in production after the checks pass. Keep GitHub access to people you trust and turn on two-factor
+  authentication for the account. Workflow actions are pinned to commit SHAs and the `cloudflared` download is checked
+  against its SHA-256.
 
 ## Verification (2026-10-15)
 
@@ -292,6 +468,20 @@ cron schedule, and n8n crashing in the middle of a run.
 
 Not verified: a real tunnel with a real token and domain, Cloudflare Access with the import bypass, and a full stack
 build in this mode (the development PC lacked free memory for the image build).
+
+### CI/CD (2026-11-14)
+
+| Check                                                                                                                                                                     | Result                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| `actionlint` 1.7.7 on `.github/workflows/ci.yml` (includes shellcheck of every `run` step)                                                                                | ✅                              |
+| `shellcheck` 0.10.0 on `scripts/deploy.sh`                                                                                                                                | ✅                              |
+| `deploy.sh` in a Debian 12 container with a stubbed `docker`: malformed SHA (`main; rm -rf /`), unknown commit, commit not on `main`, edited tracked file, concurrent run | ✅ all refused, nothing changed |
+| Same: first deploy (no Postgres, backup skipped), redeploy (backup taken), `.deployed-sha` written                                                                        | ✅                              |
+| Same: `compose up` failing, `migrate` exiting 1, `web` unhealthy, health timeout                                                                                          | ✅ exit 1 with diagnostics      |
+| `docker compose config` for base, prod and cloudflare files with placeholder values                                                                                       | ✅                              |
+
+Not verified: a run on GitHub's runners, a real deploy over the SSH tunnel and Access service token, and `deploy.sh`
+against a real Docker stack on a Linux server. These need the domain and server from [One-time setup](#one-time-setup).
 
 ## Troubleshooting
 

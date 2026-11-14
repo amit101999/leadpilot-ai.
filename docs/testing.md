@@ -13,6 +13,11 @@ server without an explicit opt-in: the integration setup and the Playwright serv
 
 `npm run test:all` runs every Vitest project (live tests stay skipped) and then Playwright.
 
+GitHub Actions ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) runs format check, lint, typecheck, unit,
+integration and e2e tests plus the production build on every pull request and push to `main`, each test suite with its
+own Postgres 16 service container and throwaway secrets. Live tests never run in CI. See
+[deployment.md, CI/CD](deployment.md#cicd).
+
 ## Setup
 
 1. `docker compose up -d postgres`. On first start, `database/docker/init` also creates the `leadpilot_test`

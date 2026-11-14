@@ -17,3 +17,5 @@ backups
 !.env.example
 docs/progress/activity-log.md
 docs/progress/.activity-state.json
+.deployed-sha
+.deploy.lock
