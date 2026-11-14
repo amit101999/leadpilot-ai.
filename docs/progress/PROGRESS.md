@@ -10,24 +10,24 @@ Last updated: 2026-11-14
 
 Plan: `C:\Users\ACER\.claude\plans\clever-noodling-finch.md`.
 
-| Phase                    | Scope                                                                     | Status                                                                                           |
-| ------------------------ | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Baseline                 | Pre-existing backend core committed                                       | ✅ Done (`703761f`)                                                                              |
-| A. Foundation            | Seed, `.env.example`, page auth proxy, CSRF check                         | ✅ Merged to `main` (`ab4b7e1`); seed verified during B1                                         |
-| B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                     | ✅ Merged to `main` (`0bed021`); Turbopack build verified on main                                |
-| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook      | ✅ Merged to `main` (`41e8d95`); Turbopack build verified on main                                |
-| C1. UI (part 1)          | Design system, app shell, login, Dashboard, Run Agent                     | ✅ Merged to `main` (`71a0b50`); Turbopack build verified on main                                |
-| C2. UI (part 2)          | Search History and run detail, Qualified Leads, All Jobs                  | ✅ Merged to `main` (`d742e0a`); Turbopack build verified on main                                |
-| C3a. UI (part 3a)        | Search Profiles list, editor, version history                             | ✅ Merged to `main` (fast-forward, `e650286` + docs `a82ddab`)                                   |
-| C3b. UI (part 3b)        | Notifications, Integrations, Settings (incl. change password), Audit Logs | ✅ Merged to `main` (fast-forward `a82ddab` → `727c19b`, 2026-10-15); `d18e5f8` + docs `3730daf` |
-| D. n8n                   | Run workflow calling the app's internal step API, lease-safe `/fail`      | ✅ Merged to `main` (same fast-forward); `9cf72ad`                                               |
-| E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                                | ✅ Merged to `main` (same fast-forward); `62d69cc` + `7e34456`                                   |
-| F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                       | ✅ Merged to `main` (same fast-forward); `b806b52` + docs `727c19b`                              |
-| G. Docs and final review | README, `docs/*.md`, full verification                                    | ✅ On `main` (`9b7b102` + PROGRESS `f492a9b`)                                                    |
-| H. Upwork sync           | Upwork sync via Claude + Upwork MCP, import API, e-mail alerts            | ✅ On `main` (`main` is at `fe3500c`, which contains `05b064a`); e2e 19/19 and build passed      |
-| Cloudflare Tunnel        | `docker-compose.cloudflare.yml`, `deploy/Caddyfile.cloudflare`            | ✅ On `main` (`ae68cdf`, 2026-11-11); no real tunnel yet                                         |
-| WhatsApp removal         | E-mail is the only alert channel                                          | ✅ On `main` (`7ad2c19`, 2026-11-14); all checks pass, e2e 19/19                                 |
-| CI/CD                    | GitHub Actions checks + auto-deploy over Cloudflare Tunnel                | 🟡 Committed `a6f76ba` on `ci-cd` (2026-11-14), not pushed or merged; never run on GitHub        |
+| Phase                    | Scope                                                                     | Status                                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Baseline                 | Pre-existing backend core committed                                       | ✅ Done (`703761f`)                                                                                      |
+| A. Foundation            | Seed, `.env.example`, page auth proxy, CSRF check                         | ✅ Merged to `main` (`ab4b7e1`); seed verified during B1                                                 |
+| B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                     | ✅ Merged to `main` (`0bed021`); Turbopack build verified on main                                        |
+| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook      | ✅ Merged to `main` (`41e8d95`); Turbopack build verified on main                                        |
+| C1. UI (part 1)          | Design system, app shell, login, Dashboard, Run Agent                     | ✅ Merged to `main` (`71a0b50`); Turbopack build verified on main                                        |
+| C2. UI (part 2)          | Search History and run detail, Qualified Leads, All Jobs                  | ✅ Merged to `main` (`d742e0a`); Turbopack build verified on main                                        |
+| C3a. UI (part 3a)        | Search Profiles list, editor, version history                             | ✅ Merged to `main` (fast-forward, `e650286` + docs `a82ddab`)                                           |
+| C3b. UI (part 3b)        | Notifications, Integrations, Settings (incl. change password), Audit Logs | ✅ Merged to `main` (fast-forward `a82ddab` → `727c19b`, 2026-10-15); `d18e5f8` + docs `3730daf`         |
+| D. n8n                   | Run workflow calling the app's internal step API, lease-safe `/fail`      | ✅ Merged to `main` (same fast-forward); `9cf72ad`                                                       |
+| E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                                | ✅ Merged to `main` (same fast-forward); `62d69cc` + `7e34456`                                           |
+| F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                       | ✅ Merged to `main` (same fast-forward); `b806b52` + docs `727c19b`                                      |
+| G. Docs and final review | README, `docs/*.md`, full verification                                    | ✅ On `main` (`9b7b102` + PROGRESS `f492a9b`)                                                            |
+| H. Upwork sync           | Upwork sync via Claude + Upwork MCP, import API, e-mail alerts            | ✅ On `main` (`main` is at `fe3500c`, which contains `05b064a`); e2e 19/19 and build passed              |
+| Cloudflare Tunnel        | `docker-compose.cloudflare.yml`, `deploy/Caddyfile.cloudflare`            | ✅ On `main` (`ae68cdf`, 2026-11-11); no real tunnel yet                                                 |
+| WhatsApp removal         | E-mail is the only alert channel                                          | ✅ On `main` (`7ad2c19`, 2026-11-14); all checks pass, e2e 19/19                                         |
+| CI/CD                    | GitHub Actions checks + auto-deploy over Cloudflare Tunnel                | 🟡 `a6f76ba` + review fixes `b3191c0` on `ci-cd` (2026-11-14), not pushed or merged; never run on GitHub |
 
 ## Baseline (pre-existing work, committed 2026-10-11 as `703761f`)
 
@@ -1075,9 +1075,66 @@ Based on `main` `7ad2c19`. **Not pushed and not merged.** Full write-up in `docs
 - Push `ci-cd` and open a PR; the first GitHub run is the first real test of the workflow (developer).
 - Provision the VPS, domain, tunnels and Access service token, then set `DEPLOY_ENABLED` (developer).
 
+## Deployment-readiness review fixes (`b3191c0`, 2026-11-14, branch `ci-cd`)
+
+On top of `a6f76ba`. **Not pushed and not merged.** A read-only deployment-readiness review found five issues; all
+were fixed in this commit.
+
+### Decision (developer, 2026-11-14)
+
+- Production with mock AI or e-mail providers must refuse to start (rather than warn), unless
+  `ALLOW_MOCK_PROVIDERS=true` is set deliberately. Reason (commit message): a missing setting must fail the health check
+  instead of silently producing fake scores and unsent alerts.
+
+### Implemented
+
+1. Versions: Postgres image `16.6-alpine` → `16.16-alpine` (`docker-compose.yml`, both CI service containers; the
+   commit cites 10 patch releases of security fixes); Node `22.23.3` → `22.23.5` (`Dockerfile` `NODE_IMAGE`, CI
+   `NODE_VERSION`); `next` 16.4.6, `react`/`react-dom` 19.3.1, `nodemailer` 10.5.0 (`package.json`, `package-lock.json`).
+2. Mock-provider guard: `src/lib/configuration/env.ts` adds `ALLOW_MOCK_PROVIDERS` (default `false`) and a
+   `superRefine` that rejects `AI_PROVIDER=mock` or `EMAIL_PROVIDER=mock` when `NODE_ENV=production`; `env()` then
+   throws "Invalid environment configuration: ...". Passed to containers in the `x-app-env` anchor
+   (`docker-compose.yml`, default `false`), documented in `.env.example` (name and purpose only); `playwright.config.ts`
+   sets it to `true` for the production-build e2e server. New unit tests: `tests/unit/env.test.ts`.
+3. `scripts/deploy.sh` reordered: check out the commit → `docker compose build` (a failed build leaves the old stack
+   serving) → wait for `RUNNING` runs (`wait_for_running_runs`, limit `DEPLOY_RUN_WAIT_SECONDS`, default 600 s, polls
+   every 10 s; after the limit it logs a warning and deploys anyway; if the count cannot be read it does not wait) →
+   back up → `docker compose up --detach --remove-orphans` → health wait. Reason (script comment): restarting `web`
+   stops a run in progress, which then needs its lease to expire and a manual Resume.
+4. CI `build` job also builds the `runner` and `migrator` Docker images (not pushed); timeout 15 → 25 min.
+5. `deploy/Caddyfile.cloudflare` sets `header_up X-Forwarded-Proto https`; `docs/deployment.md` requires Cloudflare
+   "Always Use HTTPS" (the Secure cookie and CSRF origin check need https).
+   Finding: the app's login redirects are relative, so this header is defence-in-depth only.
+
+- Docs: `docs/deployment.md`, `docs/security.md`, `docs/testing.md`, `.env.example`.
+
+### Verification (2026-11-14, local; reported by the implementing session, not re-run by the tracker)
+
+| Check                                                                                 | Result                                             |
+| ------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `format:check`, `lint`, `typecheck`                                                   | ✅ clean                                           |
+| Unit / integration / e2e (on `postgres:16.16-alpine`)                                 | ✅ 153/153 (148 + new env tests), 74/74, 19/19     |
+| `docker build` of `runner` and `migrator` targets                                     | ✅                                                 |
+| Real `web` image: mock providers without the flag                                     | ✅ health 500 with the clear configuration message |
+| Real `web` image: with `ALLOW_MOCK_PROVIDERS=true`, or with real providers configured | ✅ health 200                                      |
+| Caddy `X-Forwarded-Proto` header test                                                 | ✅                                                 |
+| `deploy.sh` container harness (stubbed `docker`), including the new run-wait cases    | ✅                                                 |
+| `shellcheck`, `actionlint`                                                            | ✅ clean                                           |
+
+### Not verified
+
+- A run on GitHub's runners (including the new Docker image build step).
+- A real deploy (no server or domain yet).
+
+### Open items
+
+- Same as the CI/CD section: push `ci-cd`, open a PR, provision the server and set `DEPLOY_ENABLED` (developer).
+- When the stack first goes live without OpenAI/SMTP credentials, `ALLOW_MOCK_PROVIDERS=true` must be set in the
+  server's `.env`, or the app will fail its health check by design.
+
 ## Environment notes
 
-- Windows 11, Node 22.17.0, Next.js 16.4.0 (16.4.5 on the Phase H branch), PostgreSQL 16 via Docker (`127.0.0.1:55432`).
+- Windows 11, Node 22.17.0, Next.js 16.4.0 (16.4.5 on the Phase H branch; 16.4.6 on `ci-cd` from `b3191c0`; Docker/CI use Node 22.23.5), PostgreSQL 16 via Docker (`127.0.0.1:55432`).
 - Docker Desktop: Engine 29.7.2, Compose v5.4.0 (Phase E verification). Image builds need several GB free on C:.
 - Remote `origin` is configured on GitHub; `main` and `worktree-cloudflare-deploy` are
   pushed. `ci-cd` is not pushed (2026-11-14).
