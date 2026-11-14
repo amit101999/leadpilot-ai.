@@ -4,31 +4,17 @@ import { ownerFilter, requireRole, type Actor } from "@/lib/auth/authorization";
 import type { Database, DbExecutor } from "@/lib/database/client";
 import { notificationRecipients } from "@/lib/database/schema";
 import { notFound } from "@/lib/http/errors";
-import { maskEmail, maskPhone } from "@/lib/security/sanitize";
+import { maskEmail } from "@/lib/security/sanitize";
 import { recordAudit, userActor } from "@/modules/audit/service";
 
-const recipientLabel = z.string().trim().min(1).max(80);
-/** The user confirms the recipient has opted in to receive alerts from this business on this channel. */
-const optInConfirmed = z.boolean();
-
-/** A body without `channel` is a WhatsApp recipient (the original API shape). */
-export const createRecipientSchema = z.union([
-  z.object({
-    channel: z.literal("EMAIL"),
-    label: recipientLabel,
-    email: z.email("Enter a valid e-mail address").trim().toLowerCase().max(254),
-    optInConfirmed,
-  }),
-  z.object({
-    channel: z.literal("WHATSAPP").default("WHATSAPP"),
-    label: recipientLabel,
-    phoneE164: z
-      .string()
-      .trim()
-      .regex(/^\+[1-9]\d{6,14}$/, "Use international E.164 format, e.g. +14155550123"),
-    optInConfirmed,
-  }),
-]);
+/** Alert recipients are e-mail addresses. `channel` is optional and, when sent, must be "EMAIL". */
+export const createRecipientSchema = z.object({
+  channel: z.literal("EMAIL").default("EMAIL"),
+  label: z.string().trim().min(1).max(80),
+  email: z.email("Enter a valid e-mail address").trim().toLowerCase().max(254),
+  /** The user confirms the recipient has opted in to receive alerts from this business. */
+  optInConfirmed: z.boolean(),
+});
 
 export const updateRecipientSchema = z.object({
   label: z.string().trim().min(1).max(80).optional(),
@@ -38,13 +24,12 @@ export const updateRecipientSchema = z.object({
 
 export type RecipientRow = typeof notificationRecipients.$inferSelect;
 
-/** Public view: the full phone number or e-mail address never leaves the server after creation. */
+/** Public view: the full e-mail address never leaves the server after creation. */
 export function toRecipientView(row: RecipientRow) {
   return {
     id: row.id,
     label: row.label,
     channel: row.channel,
-    phoneMasked: row.phoneE164 ? maskPhone(row.phoneE164) : null,
     emailMasked: row.email ? maskEmail(row.email) : null,
     optInConfirmedAt: row.optInConfirmedAt,
     archivedAt: row.archivedAt,
@@ -60,6 +45,7 @@ function scoped(actor: Actor, id: string) {
     : eq(notificationRecipients.id, id);
 }
 
+/** E-mail recipients only: WhatsApp recipients from before WhatsApp alerts were removed stay stored but hidden. */
 export async function listRecipients(db: Database, actor: Actor, includeArchived = false) {
   const owner = ownerFilter(actor);
   const rows = await db
@@ -67,6 +53,7 @@ export async function listRecipients(db: Database, actor: Actor, includeArchived
     .from(notificationRecipients)
     .where(
       and(
+        eq(notificationRecipients.channel, "EMAIL"),
         owner ? eq(notificationRecipients.ownerUserId, owner) : undefined,
         includeArchived ? undefined : isNull(notificationRecipients.archivedAt),
       ),
@@ -103,9 +90,9 @@ export async function createRecipient(
       .values({
         ownerUserId: actor.id,
         label: input.label,
-        channel: input.channel,
-        phoneE164: input.channel === "WHATSAPP" ? input.phoneE164 : null,
-        email: input.channel === "EMAIL" ? input.email : null,
+        channel: "EMAIL",
+        phoneE164: null,
+        email: input.email,
         optInConfirmedAt: input.optInConfirmed ? new Date() : null,
       })
       .returning();
@@ -114,7 +101,7 @@ export async function createRecipient(
       action: "recipient.create",
       entityType: "notification_recipient",
       entityId: row!.id,
-      after: { label: input.label, channel: input.channel, optInConfirmed: input.optInConfirmed },
+      after: { label: input.label, channel: "EMAIL", optInConfirmed: input.optInConfirmed },
       requestId,
     });
     return toRecipientView(row!);

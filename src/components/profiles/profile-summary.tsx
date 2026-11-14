@@ -54,8 +54,8 @@ export function ProfileSummary({ config, detailed = false }: { config: ProfileCo
       ),
     ],
     [
-      "WhatsApp alerts",
-      notifications.whatsappEnabled ? `On, up to ${notifications.maxPerRun} per run` : "Off for this profile",
+      "E-mail alerts",
+      notifications.emailEnabled ? `On, up to ${notifications.maxPerRun} per run` : "Off for this profile",
     ],
   ];
 

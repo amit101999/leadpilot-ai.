@@ -7,8 +7,9 @@ import type { NotificationStatus } from "@/types/domain";
  * RESERVED -> SENDING is committed *before* the provider call. If the process
  * dies or the call times out after the request may have reached the provider,
  * the row becomes UNCERTAIN and is never retried automatically: the provider
- * may already have delivered it. Only delivery-status webhooks or an explicit,
- * audited operator action move it on.
+ * may already have delivered it. Only an explicit, audited operator action
+ * moves it on. DELIVERED and READ came from WhatsApp delivery receipts (removed);
+ * they remain so older records keep a valid status.
  */
 export const NOTIFICATION_TRANSITIONS: TransitionMap<NotificationStatus> = {
   RESERVED: ["SENDING", "CANCELLED"],
@@ -40,6 +41,3 @@ export const RECLAIMABLE_NOTIFICATION_STATUSES: readonly NotificationStatus[] = 
   "FAILED_PERMANENT",
   "CANCELLED",
 ];
-
-/** Successful delivery states only advance (SENT < DELIVERED < READ); stale webhooks never regress them. */
-export const DELIVERY_ORDER: Partial<Record<NotificationStatus, number>> = { SENT: 1, DELIVERED: 2, READ: 3 };

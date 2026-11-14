@@ -6,7 +6,7 @@ LeadPilot can run a search in two ways, chosen by `RUN_EXECUTOR`:
 - `n8n`: the web app hands the run to n8n, and n8n drives it step by step.
 
 n8n only orchestrates. Every business rule (discovery, filters, AI scoring, selection,
-WhatsApp alerts) stays in the app behind the signed endpoint
+e-mail alerts) stays in the app behind the signed endpoint
 `POST /api/internal/runs/:id/steps/:step`. Both executors call the same `runStep` function
 (`src/modules/runs/engine/index.ts`), so a run behaves the same either way.
 
@@ -174,7 +174,7 @@ Checked on 2026-10-13 against `n8nio/n8n:2.42.7`, with the app built for product
 | Duplicate while another executor holds the lease    | Step call 409 `LEASE_HELD` → **Leave run to its owner**; run stayed RUNNING with its original owner                                                                                                             |
 
 Not verified: a real n8n crash mid-run followed by **Resume**, and runs against live
-OpenAI/WhatsApp providers.
+OpenAI/e-mail providers.
 
 **Known quirk:** the webhook replies 200, not 202. Setting a custom response code
 (`options.responseCode`) had no effect in 2.42.7. The app accepts any 2xx (`response.ok` in

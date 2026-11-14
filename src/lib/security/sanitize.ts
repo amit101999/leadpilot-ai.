@@ -26,12 +26,6 @@ export function sanitizeErrorMessage(error: unknown, maxLength = 500): string {
   return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
 }
 
-/** Masks a phone number for display: +15551234567 -> +1•••••••567 */
-export function maskPhone(phone: string): string {
-  if (phone.length <= 5) return "•••";
-  return `${phone.slice(0, 2)}${"•".repeat(Math.max(3, phone.length - 5))}${phone.slice(-3)}`;
-}
-
 /** "jane.doe@example.com" -> "j•••@example.com". The domain stays visible so recipients can be told apart. */
 export function maskEmail(email: string): string {
   const at = email.lastIndexOf("@");

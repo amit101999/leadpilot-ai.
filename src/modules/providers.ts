@@ -5,11 +5,8 @@ import { OpenAiEvaluator } from "@/modules/ai/openai-evaluator";
 import { MockJobSourceProvider } from "@/modules/job-sources/mock-provider";
 import type { JobSourceProvider } from "@/modules/job-sources/types";
 import { UpworkJobSourceProvider } from "@/modules/job-sources/upwork-provider";
-import { CloudWhatsAppProvider } from "@/modules/notifications/cloud-whatsapp";
 import type { EmailProvider } from "@/modules/notifications/email-provider";
 import { MockEmailProvider } from "@/modules/notifications/mock-email";
-import { MockWhatsAppProvider } from "@/modules/notifications/mock-whatsapp";
-import type { WhatsAppProvider } from "@/modules/notifications/provider";
 import { SmtpEmailProvider } from "@/modules/notifications/smtp-email";
 
 /**
@@ -21,7 +18,6 @@ import { SmtpEmailProvider } from "@/modules/notifications/smtp-email";
 export interface Providers {
   jobSource: JobSourceProvider;
   ai: AiEvaluator;
-  whatsapp: WhatsAppProvider;
   email: EmailProvider;
 }
 
@@ -44,21 +40,6 @@ export function getProviders(): Providers {
       config.AI_PROVIDER === "openai"
         ? new OpenAiEvaluator(config.OPENAI_API_KEY, config.OPENAI_MODEL, config.OPENAI_TIMEOUT_MS)
         : new MockAiEvaluator(),
-    whatsapp:
-      config.WHATSAPP_PROVIDER === "cloud"
-        ? new CloudWhatsAppProvider({
-            accessToken: config.WHATSAPP_ACCESS_TOKEN,
-            phoneNumberId: config.WHATSAPP_PHONE_NUMBER_ID,
-            graphApiVersion: config.WHATSAPP_GRAPH_API_VERSION,
-            language: config.WHATSAPP_TEMPLATE_LANGUAGE,
-            templates: {
-              lead: config.WHATSAPP_TEMPLATE_NAME,
-              summary: config.WHATSAPP_SUMMARY_TEMPLATE_NAME,
-              test: config.WHATSAPP_TEST_TEMPLATE_NAME,
-            },
-            timeoutMs: config.WHATSAPP_TIMEOUT_MS,
-          })
-        : new MockWhatsAppProvider(),
     email:
       config.EMAIL_PROVIDER === "smtp"
         ? new SmtpEmailProvider({

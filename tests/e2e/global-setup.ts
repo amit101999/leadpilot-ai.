@@ -31,7 +31,6 @@ export default async function globalSetup(): Promise<void> {
       DATABASE_URL: url,
       SEED_ADMIN_EMAIL: E2E_ADMIN.email,
       SEED_ADMIN_PASSWORD: E2E_ADMIN.password,
-      WHATSAPP_DEFAULT_RECIPIENT: "",
     },
   });
 

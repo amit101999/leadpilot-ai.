@@ -64,6 +64,10 @@ export const qualificationDecision = pgEnum("qualification_decision", [
   "AI_ERROR",
 ]);
 
+/**
+ * Alerts are sent by e-mail only. "WHATSAPP" (and the WhatsApp phone column and column defaults below)
+ * remain so records from before WhatsApp alerts were removed stay valid; the app never writes them.
+ */
 export const notificationChannel = pgEnum("notification_channel", ["WHATSAPP", "EMAIL"]);
 
 export const stagedJobStatus = pgEnum("staged_job_status", ["PENDING", "CONSUMED"]);

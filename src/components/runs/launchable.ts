@@ -12,7 +12,7 @@ export function toLaunchable(profiles: ProfileRow[]): LaunchableProfile[] {
         id: p.id,
         name: p.name,
         isDefault: p.isDefault,
-        whatsappEnabled: config.notifications.whatsappEnabled,
+        emailEnabled: config.notifications.emailEnabled,
         maxAlerts: config.notifications.maxPerRun,
       };
     });

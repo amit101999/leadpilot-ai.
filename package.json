@@ -2,7 +2,7 @@
   "name": "leadpilot-ai",
   "version": "0.1.0",
   "private": true,
-  "description": "On-demand Upwork lead discovery, qualification and WhatsApp notification platform",
+  "description": "On-demand Upwork lead discovery, qualification and e-mail alert platform",
   "engines": {
     "node": ">=22.12.0"
   },

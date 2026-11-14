@@ -29,8 +29,7 @@ type EditorOutput = z.output<typeof editorSchema>;
 export interface RecipientOption {
   id: string;
   label: string;
-  channel: "WHATSAPP" | "EMAIL";
-  /** Masked phone number or e-mail address. */
+  /** Masked e-mail address. */
   address: string;
 }
 
@@ -161,8 +160,7 @@ export function ProfileEditor({
     (sum, v) => sum + (Number.isFinite(Number(v)) ? Number(v) : 0),
     0,
   );
-  const optedIn = recipients.filter((r) => r.channel === "WHATSAPP");
-  const emailOptions = recipients.filter((r) => r.channel === "EMAIL");
+  const emailOptions = recipients;
 
   const section = (children: ReactNode) => (
     <div className="grid gap-5 px-4 py-5 lg:max-w-3xl">{children}</div>
@@ -703,33 +701,6 @@ export function ProfileEditor({
       content: section(
         <>
           <Field
-            id={id("recipient")}
-            label="WhatsApp recipient"
-            hint={
-              optedIn.length === 0
-                ? "No recipient with confirmed opt-in yet. Add one and confirm opt-in in Settings."
-                : "Only recipients who agreed to receive WhatsApp messages are listed."
-            }
-            error={err("notifications", "recipientId")}
-          >
-            <Select
-              id={id("recipient")}
-              {...register("configuration.notifications.recipientId", { setValueAs: nullableText })}
-            >
-              <option value="">No recipient</option>
-              {optedIn.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.label} ({r.address})
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Checkbox
-            label="Send WhatsApp alerts for qualified leads"
-            hint="Requires a recipient above."
-            {...register("configuration.notifications.whatsappEnabled")}
-          />
-          <Field
             id={id("emailRecipient")}
             label="E-mail recipient"
             hint={
@@ -753,7 +724,7 @@ export function ProfileEditor({
           </Field>
           <Checkbox
             label="Send e-mail alerts for qualified leads"
-            hint="Requires an e-mail recipient above. The per-run limit applies to each channel."
+            hint="Requires an e-mail recipient above."
             {...register("configuration.notifications.emailEnabled")}
           />
           <div className="grid gap-4 sm:grid-cols-2">
@@ -780,11 +751,12 @@ export function ProfileEditor({
             </Field>
           </div>
           <Checkbox
-            label="Send a summary after every run"
+            label="E-mail a summary after every run"
+            hint="Sent to the e-mail recipient above while e-mail alerts are on."
             {...register("configuration.notifications.sendRunSummary")}
           />
           <Checkbox
-            label="Send an alert when a run fails or finishes with errors"
+            label="E-mail an alert when a run fails or finishes with errors"
             {...register("configuration.notifications.alertOnFailure")}
           />
         </>,

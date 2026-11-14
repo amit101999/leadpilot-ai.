@@ -120,7 +120,7 @@ export default async function DashboardPage() {
       <Panel
         id="daily"
         title="Last 30 days"
-        description="Qualified leads and WhatsApp alerts sent per day (UTC)."
+        description="Qualified leads and e-mail alerts sent per day (UTC)."
       >
         <div className="px-4 py-4">
           <DailyChart data={data.daily} />
@@ -294,6 +294,6 @@ const INTEGRATION_NAMES: Record<string, string> = {
   database: "Database",
   job_source: "Job source",
   ai: "AI scoring",
-  whatsapp: "WhatsApp",
+  email: "E-mail",
   n8n: "n8n workflows",
 };

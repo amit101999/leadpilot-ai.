@@ -16,7 +16,7 @@ export default async function NewProfilePage() {
   const { actor } = await requireUser();
   if (!hasRole(actor, "OPERATOR")) notFound();
   const recipients = toRecipientOptions(await listRecipients(getDb(), actor));
-  // Start from the initial business defaults (editable); WhatsApp starts off until a recipient is chosen.
+  // Start from the initial business defaults (editable); e-mail alerts start off until a recipient is chosen.
   const configuration = defaultProfileConfig(null);
 
   return (

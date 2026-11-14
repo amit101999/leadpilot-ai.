@@ -3,32 +3,33 @@ import { GET as listRecipients, POST as createRecipient } from "@/app/api/recipi
 import { PATCH as patchRecipient } from "@/app/api/recipients/[id]/route";
 import { call, createUser } from "./helpers";
 
-const PHONE = "+14155550123";
+const ADDRESS = "jane.doe@example.com";
 
 describe("recipients API", () => {
-  it("never returns the full phone number", async () => {
+  it("never returns the full e-mail address", async () => {
     const user = await createUser("OPERATOR");
     const created = await call(createRecipient, {
       method: "POST",
       user,
-      body: { label: "Me", phoneE164: PHONE, optInConfirmed: false },
+      body: { label: "Me", email: ADDRESS, optInConfirmed: false },
     });
     expect(created.status).toBe(200);
-    expect(JSON.stringify(created.json)).not.toContain(PHONE);
+    expect(JSON.stringify(created.json)).not.toContain(ADDRESS);
+    expect(created.json.data.emailMasked).toBe("j•••@example.com");
 
     const list = await call(listRecipients, { user });
     expect(list.json.data).toHaveLength(1);
-    expect(JSON.stringify(list.json)).not.toContain(PHONE);
+    expect(JSON.stringify(list.json)).not.toContain(ADDRESS);
   });
 
-  it("rejects numbers that are not E.164", async () => {
+  it("rejects invalid e-mail addresses and phone numbers", async () => {
     const user = await createUser("OPERATOR");
-    const res = await call(createRecipient, {
-      method: "POST",
-      user,
-      body: { label: "Bad", phoneE164: "4155550123", optInConfirmed: true },
-    });
-    expect(res.status).toBe(400);
+    for (const body of [
+      { label: "Bad", email: "not-an-address", optInConfirmed: true },
+      { label: "Phone", phoneE164: "+14155550123", optInConfirmed: true },
+    ]) {
+      expect((await call(createRecipient, { method: "POST", user, body })).status).toBe(400);
+    }
   });
 
   it("confirms opt-in, and another user cannot modify the recipient", async () => {
@@ -37,7 +38,7 @@ describe("recipients API", () => {
     const created = await call(createRecipient, {
       method: "POST",
       user: owner,
-      body: { label: "Owner phone", phoneE164: PHONE, optInConfirmed: false },
+      body: { label: "Owner address", email: ADDRESS, optInConfirmed: false },
     });
     const id = created.json.data.id as string;
 

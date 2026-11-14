@@ -1,12 +1,13 @@
 # Testing
 
-Four suites, all run with mock providers unless stated otherwise. No suite calls a real job source, AI model or
-WhatsApp number without an explicit opt-in.
+Four suites, all run with mock providers unless stated otherwise. No suite calls a real job source, AI model or mail
+server without an explicit opt-in: the integration setup and the Playwright server force `AI_PROVIDER`,
+`EMAIL_PROVIDER` and `JOB_SOURCE_PROVIDER` to `mock` whatever `.env` says.
 
 | Suite       | Command                    | Runner                        | Needs                                | Count (2026-10-15)          |
 | ----------- | -------------------------- | ----------------------------- | ------------------------------------ | --------------------------- |
-| Unit        | `npm run test:unit`        | Vitest, project `unit`        | nothing                              | 161 tests                   |
-| Integration | `npm run test:integration` | Vitest, project `integration` | Postgres and `TEST_DATABASE_URL`     | 76 tests                    |
+| Unit        | `npm run test:unit`        | Vitest, project `unit`        | nothing                              | 148 tests                   |
+| Integration | `npm run test:integration` | Vitest, project `integration` | Postgres and `TEST_DATABASE_URL`     | 74 tests                    |
 | End to end  | `npm run test:e2e`         | Playwright (Chromium)         | Postgres and `TEST_DATABASE_URL`     | 19 tests                    |
 | Live        | `npm run test:live`        | Vitest, project `live`        | `LIVE_TESTS=1` plus real credentials | 3 tests, skipped by default |
 
@@ -29,11 +30,10 @@ Pure functions, no database or network:
   (`scoring-eligibility.test.ts`).
 - Money, state machines, HMAC signing, CSV formula-injection protection, URL validation and error redaction
   (`primitives.test.ts`).
-- WhatsApp template parameters and previews (`whatsapp-message.test.ts`), the WhatsApp status webhook parser
-  (`whatsapp-webhook.test.ts`).
-- The external adapters with an injected `fetch`: Cloud WhatsApp request shape and the accepted / rejected /
-  uncertain classification (`cloud-whatsapp.test.ts`); OpenAI request shape (`store: false`, strict JSON schema),
-  rate-limit / server-error / timeout classification and connection states (`openai-evaluator.test.ts`).
+- Lead and run-summary e-mail content: field order, hourly rates, one-line values (`lead-message.test.ts`); HTML
+  escaping, safe links and SMTP outcome classification (`email.test.ts`).
+- The OpenAI adapter with an injected `fetch`: request shape (`store: false`, strict JSON schema), rate-limit /
+  server-error / timeout classification and connection states (`openai-evaluator.test.ts`).
 - The n8n workflow file's structure and signing (`n8n-workflow.test.ts`), CSRF origin check, login redirects, list
   parameters, audit and profile diffs.
 
@@ -47,8 +47,8 @@ with `setProvidersForTesting` (for example a scripted mock scenario from
 
 Covered: authentication and sessions, password change, profiles (versions, optimistic locking, archive, duplicate),
 recipients, runs (idempotency, concurrent double submit, snapshot, cancel, end-to-end mock run), the run pipeline
-(blocked source, deduplication), notifications (limits, reruns, concurrency, failures, uncertain sends, the WhatsApp
-webhook), integrations, dashboard, exports, audit log, the n8n internal endpoints, and the database's own immutability
+(blocked source, deduplication), e-mail notifications (limits, reruns, concurrency, failures, uncertain sends, the run
+summary e-mail, refusal of WhatsApp recipients), integrations, dashboard, exports, audit log, the n8n internal endpoints, and the database's own immutability
 guards.
 
 ## End-to-end tests (`tests/e2e`)
@@ -73,9 +73,8 @@ $env:LIVE_TESTS=1; npm run test:live              # PowerShell
 
 - OpenAI: the key and model are accepted, and one sample evaluation passes the strict output schema (one small paid
   request).
-- WhatsApp Cloud API: the access token is accepted for the phone number id. No message is sent.
-
-Not yet run against real services: no OpenAI or WhatsApp credentials were available.
+  Not yet run against real services. Separately, the OpenAI key was checked with one request, and the Gmail SMTP login
+  and a test e-mail were checked from the Integrations page.
 
 ## Acceptance scenarios
 
@@ -120,6 +119,6 @@ behaviour.
 
 ## Not covered
 
-- Live OpenAI, WhatsApp and Upwork behaviour (no credentials; Upwork discovery is intentionally blocked).
+- Live OpenAI scoring and lead e-mails inside a real run; direct Upwork API discovery (intentionally blocked).
 - n8n crashing in the middle of a run and resuming (the lease logic is covered by integration tests only).
 - Production infrastructure (Let's Encrypt, a Linux host, reboots): see `docs/deployment.md`.

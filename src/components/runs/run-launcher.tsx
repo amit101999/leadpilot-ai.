@@ -12,7 +12,7 @@ export interface LaunchableProfile {
   id: string;
   name: string;
   isDefault: boolean;
-  whatsappEnabled: boolean;
+  emailEnabled: boolean;
   maxAlerts: number;
 }
 
@@ -114,9 +114,9 @@ export function RunLauncher({
               <>
                 The agent will search the job source with <strong className="text-ink">{profile.name}</strong>
                 , check every job against its rules and score the rest with AI.{" "}
-                {profile.whatsappEnabled
-                  ? `Up to ${profile.maxAlerts} qualified leads will be sent to WhatsApp.`
-                  : "WhatsApp alerts are turned off for this profile."}
+                {profile.emailEnabled
+                  ? `Up to ${profile.maxAlerts} qualified leads will be e-mailed to you.`
+                  : "E-mail alerts are turned off for this profile; leads appear in LeadPilot only."}
               </>
             )
           }

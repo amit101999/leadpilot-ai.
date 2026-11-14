@@ -11,7 +11,7 @@ export interface OutboundEmail {
 }
 
 /**
- * E-mail delivery, classified like WhatsApp sends so the same retry rules apply:
+ * E-mail delivery, classified so the notification retry rules apply:
  * accepted (the server took the message), rejected (definitely not sent), or
  * uncertain (the connection broke after the message may have been handed over).
  */

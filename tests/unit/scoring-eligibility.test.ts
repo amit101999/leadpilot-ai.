@@ -179,9 +179,20 @@ describe("profile configuration validation", () => {
     }
   });
 
-  it("requires a recipient when WhatsApp is enabled", () => {
+  it("requires a recipient when e-mail alerts are enabled", () => {
+    expect(config.notifications.emailEnabled).toBe(true);
     const bad = structuredClone(config);
-    bad.notifications.recipientId = null;
+    bad.notifications.emailRecipientId = null;
     expect(profileConfigSchema.safeParse(bad).success).toBe(false);
+  });
+
+  it("still loads configurations saved with the removed WhatsApp settings", () => {
+    const old = {
+      ...structuredClone(config),
+      notifications: { ...config.notifications, whatsappEnabled: true, recipientId: RECIPIENT },
+    };
+    const parsed = profileConfigSchema.safeParse(old);
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.notifications).not.toHaveProperty("whatsappEnabled");
   });
 });

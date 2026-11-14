@@ -1,7 +1,7 @@
 # LeadPilot AI
 
 LeadPilot finds freelance job postings that fit a saved search profile, filters them with strict business rules, has
-an AI model score the ones that pass, and sends the best leads to WhatsApp. One person or a small team runs it: they
+an AI model score the ones that pass, and e-mails the best leads. One person or a small team runs it: they
 define what a good job looks like once, start a run (from the UI or through n8n), and get a short list of qualified
 leads with the reasons behind each decision.
 
@@ -18,8 +18,7 @@ leads with the reasons behind each decision.
 | Runs            | ✅ Seven idempotent stages with leases; in-process or n8n executor; cancel; live progress (2 s polling)                                                                                                                 |
 | Hard filters    | ✅ Budget, fixed-price/hourly, payment verification, currency, skills/keywords, keyword coverage %, client conditions, URLs                                                                                             |
 | AI scoring      | ✅ Mock evaluator; OpenAI adapter (strict JSON schema), unit-tested with mocked HTTP, not run live                                                                                                                      |
-| WhatsApp alerts | ✅ Mock provider; Cloud API adapter and status webhook, unit/integration-tested, not run live                                                                                                                           |
-| E-mail alerts   | ✅ Mock provider; SMTP adapter (nodemailer), unit/integration-tested, not run against a real mailbox                                                                                                                    |
+| E-mail alerts   | ✅ The only alert channel (leads, run summaries, failure alerts). Mock provider; SMTP adapter (nodemailer), unit/integration-tested; a real test e-mail was accepted by Gmail SMTP. WhatsApp alerts were removed        |
 | Job source      | ✅ Upwork sync (Claude + Upwork MCP → import API), import side integration-tested, live search verified, full live import not yet. ⚠️ Direct Upwork API adapter reports `NOT_AUTHORIZED` by design; mock feed for demos |
 | UI              | ✅ Dashboard, Run Agent, History, Leads, All Jobs, Profiles, Notifications, Integrations, Settings, Audit                                                                                                               |
 | Auth            | ✅ Email + password (argon2), server-side sessions, roles VIEWER < OPERATOR < ADMIN                                                                                                                                     |
@@ -38,7 +37,7 @@ npm run db:seed                 # first admin + a starter profile
 npm run dev                     # http://localhost:3000
 ```
 
-Everything runs with mock providers by default (`AI_PROVIDER=mock`, `WHATSAPP_PROVIDER=mock`,
+Everything runs with mock providers by default (`AI_PROVIDER=mock`, `EMAIL_PROVIDER=mock`,
 `JOB_SOURCE_PROVIDER=mock`), so no external service is called.
 
 Full Docker stack and production: [docs/deployment.md](docs/deployment.md).
@@ -71,7 +70,6 @@ Vitest and Playwright · Docker Compose and Caddy.
 | [docs/api.md](docs/api.md)                                 | Every endpoint, auth rules, errors, rate limits            |
 | [docs/security.md](docs/security.md)                       | Threat model, controls in place, known risks               |
 | [n8n/documentation/README.md](n8n/documentation/README.md) | The n8n run workflow                                       |
-| [docs/whatsapp.md](docs/whatsapp.md)                       | WhatsApp Cloud API setup, templates, delivery guarantees   |
 | [docs/upwork-access.md](docs/upwork-access.md)             | Why live Upwork discovery is blocked and what unblocks it  |
 | [docs/upwork-sync.md](docs/upwork-sync.md)                 | Importing real Upwork jobs through Claude + Upwork MCP     |
 | [docs/deployment.md](docs/deployment.md)                   | Docker, production, backups                                |

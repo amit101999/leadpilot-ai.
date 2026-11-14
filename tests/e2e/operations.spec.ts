@@ -5,26 +5,26 @@ import { openApp, signIn, waitForHydrated, waitForHydratedForm } from "./helpers
 
 const BASE_URL = "http://localhost:3100";
 
-/** A unique valid E.164 number so reruns never collide. */
-function uniquePhone(): string {
-  return `+1415${String(Math.floor(Math.random() * 10_000_000)).padStart(7, "0")}`;
+/** A unique e-mail address so reruns never collide (example.com never receives mail). */
+function uniqueEmail(): string {
+  return `e2e-${randomUUID().slice(0, 8)}@example.com`;
 }
 
 /** Creates an opted-in recipient through the API (same-origin request with the shared session). */
 async function createOptedInRecipient(page: Page, label: string) {
   const response = await page.request.post("/api/recipients", {
     headers: { origin: BASE_URL },
-    data: { label, phoneE164: uniquePhone(), optInConfirmed: true },
+    data: { label, email: uniqueEmail(), optInConfirmed: true },
   });
   expect(response.status()).toBe(200);
   return (await response.json()).data as { id: string };
 }
 
-test("recipient opt-in, WhatsApp on a profile, a run, and the alerts on the Notifications page", async ({
+test("recipient opt-in, e-mail alerts on a profile, a run, and the alerts on the Notifications page", async ({
   page,
 }) => {
   await openApp(page);
-  const label = `E2E phone ${randomUUID().slice(0, 4)}`;
+  const label = `E2E inbox ${randomUUID().slice(0, 4)}`;
 
   // Settings: add a recipient without opt-in, then confirm it with the explicit statement.
   await page.goto("/settings");
@@ -32,14 +32,14 @@ test("recipient opt-in, WhatsApp on a profile, a run, and the alerts on the Noti
   await page.getByRole("button", { name: "Add recipient" }).click();
   // Exact: Settings also has a "Token name" field (import tokens).
   await page.getByLabel("Name", { exact: true }).fill(label);
-  await page.getByLabel("WhatsApp number").fill(uniquePhone());
+  await page.getByLabel("E-mail address").fill(uniqueEmail());
   await page.getByRole("button", { name: "Save recipient" }).click();
   const row = page.locator("#recipients li").filter({ hasText: label });
   await expect(row.getByText("Opt-in not confirmed")).toBeVisible();
   await row.getByRole("button", { name: "Confirm opt-in" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("button", { name: "Confirm opt-in" })).toBeDisabled();
-  await dialog.getByLabel("This person agreed to receive WhatsApp messages from us").check();
+  await dialog.getByLabel("This person agreed to receive lead alert e-mails from us").check();
   await dialog.getByRole("button", { name: "Confirm opt-in" }).click();
   await expect(row.getByText("Opt-in confirmed")).toBeVisible();
 
@@ -48,10 +48,10 @@ test("recipient opt-in, WhatsApp on a profile, a run, and the alerts on the Noti
   await waitForHydratedForm(page);
   await page.getByLabel("Profile name").fill(`E2E alerts ${randomUUID().slice(0, 6)}`);
   await page.getByRole("tab", { name: "Notifications" }).click();
-  const recipientSelect = page.getByLabel("WhatsApp recipient");
+  const recipientSelect = page.getByLabel("E-mail recipient", { exact: true });
   const recipientValue = await recipientSelect.locator("option", { hasText: label }).getAttribute("value");
   await recipientSelect.selectOption(recipientValue!);
-  await page.getByLabel("Send WhatsApp alerts for qualified leads").check();
+  await page.getByLabel("Send e-mail alerts for qualified leads").check();
   await page.getByRole("button", { name: "Create profile" }).click();
   await expect(page).toHaveURL(/\/profiles\/[0-9a-f-]{36}$/);
   const profileId = page.url().split("/").pop();
@@ -63,9 +63,9 @@ test("recipient opt-in, WhatsApp on a profile, a run, and the alerts on the Noti
   await page.getByRole("dialog").getByRole("button", { name: "Start run" }).click();
   await expect(page.getByText("This run has finished")).toBeVisible({ timeout: 90_000 });
 
-  // The alerts are listed, marked sent (mock provider), never with the full phone number.
+  // The alerts are listed and marked sent (mock provider).
   await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Notifications" }).click();
-  const table = page.getByRole("table", { name: "WhatsApp alerts" });
+  const table = page.getByRole("table", { name: "Alerts" });
   await expect(table.getByText(label).first()).toBeVisible();
   await expect(table.getByText("Sent", { exact: true }).first()).toBeVisible();
   await page.getByLabel("Status").selectOption({ label: "Failed" });
@@ -102,10 +102,10 @@ test("the alert limit holds, and a rerun of the same profile sends no repeat ale
   await waitForHydratedForm(page);
   await page.getByLabel("Profile name").fill(`E2E limit ${randomUUID().slice(0, 6)}`);
   await page.getByRole("tab", { name: "Notifications" }).click();
-  const recipientSelect = page.getByLabel("WhatsApp recipient");
+  const recipientSelect = page.getByLabel("E-mail recipient", { exact: true });
   const recipientValue = await recipientSelect.locator("option", { hasText: label }).getAttribute("value");
   await recipientSelect.selectOption(recipientValue!);
-  await page.getByLabel("Send WhatsApp alerts for qualified leads").check();
+  await page.getByLabel("Send e-mail alerts for qualified leads").check();
   await page.getByLabel("Maximum alerts per run").fill("2");
   await page.getByRole("button", { name: "Create profile" }).click();
   await expect(page).toHaveURL(/\/profiles\/[0-9a-f-]{36}$/);
@@ -126,7 +126,7 @@ test("the alert limit holds, and a rerun of the same profile sends no repeat ale
   expect(new Set(jobIds).size).toBe(jobIds.length);
 });
 
-test("integrations: test the database connection and send a WhatsApp test message", async ({ page }) => {
+test("integrations: test the database connection and send a test e-mail", async ({ page }) => {
   await openApp(page);
   await createOptedInRecipient(page, `E2E test target ${randomUUID().slice(0, 4)}`);
   await page.goto("/integrations");
@@ -139,10 +139,10 @@ test("integrations: test the database connection and send a WhatsApp test messag
   const upwork = page.locator("#integration-job_source");
   await expect(upwork).toContainText("Live Upwork search is blocked");
 
-  const whatsapp = page.locator("#integration-whatsapp");
-  await whatsapp.getByRole("button", { name: "Send test message" }).click();
+  const email = page.locator("#integration-email");
+  await email.getByRole("button", { name: "Send test message" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Send test message" }).click();
-  await expect(page.getByText("Mock provider: the test message was recorded, not sent.")).toBeVisible();
+  await expect(page.getByText("Mock provider: the test e-mail was recorded, not sent.")).toBeVisible();
 });
 
 test("audit log lists entries and filters them by action", async ({ page }) => {

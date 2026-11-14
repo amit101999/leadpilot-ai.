@@ -61,10 +61,10 @@ describe("diffConfigs", () => {
     const before = defaultProfileConfig(null);
     const after = defaultProfileConfig("7d0c2b9a-2c5e-4c1f-9a3e-1b2c3d4e5f60");
     const changes = diffConfigs(before, after, () => "Amit (masked)");
-    expect(changes.find((c) => c.label === "Alert recipient")).toMatchObject({
+    expect(changes.find((c) => c.label === "E-mail recipient")).toMatchObject({
       before: "None",
       after: "Amit (masked)",
     });
-    expect(changes.find((c) => c.label === "WhatsApp alerts")).toMatchObject({ before: "Off", after: "On" });
+    expect(changes.find((c) => c.label === "E-mail alerts")).toMatchObject({ before: "Off", after: "On" });
   });
 });

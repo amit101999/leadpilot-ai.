@@ -4,27 +4,29 @@ Curated record of what has been built, decided and verified. Maintained by the
 `project-tracker` subagent (`.claude/agents/project-tracker.md`). The raw,
 automatic history is in `activity-log.md` (local, gitignored).
 
-Last updated: 2026-11-04
+Last updated: 2026-11-14
 
 ## Phase status
 
 Plan: `C:\Users\ACER\.claude\plans\clever-noodling-finch.md`.
 
-| Phase                    | Scope                                                                     | Status                                                                                             |
-| ------------------------ | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| Baseline                 | Pre-existing backend core committed                                       | ✅ Done (`703761f`)                                                                                |
-| A. Foundation            | Seed, `.env.example`, page auth proxy, CSRF check                         | ✅ Merged to `main` (`ab4b7e1`); seed verified during B1                                           |
-| B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                     | ✅ Merged to `main` (`0bed021`); Turbopack build verified on main                                  |
-| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook      | ✅ Merged to `main` (`41e8d95`); Turbopack build verified on main                                  |
-| C1. UI (part 1)          | Design system, app shell, login, Dashboard, Run Agent                     | ✅ Merged to `main` (`71a0b50`); Turbopack build verified on main                                  |
-| C2. UI (part 2)          | Search History and run detail, Qualified Leads, All Jobs                  | ✅ Merged to `main` (`d742e0a`); Turbopack build verified on main                                  |
-| C3a. UI (part 3a)        | Search Profiles list, editor, version history                             | ✅ Merged to `main` (fast-forward, `e650286` + docs `a82ddab`)                                     |
-| C3b. UI (part 3b)        | Notifications, Integrations, Settings (incl. change password), Audit Logs | ✅ Merged to `main` (fast-forward `a82ddab` → `727c19b`, 2026-10-15); `d18e5f8` + docs `3730daf`   |
-| D. n8n                   | Run workflow calling the app's internal step API, lease-safe `/fail`      | ✅ Merged to `main` (same fast-forward); `9cf72ad`                                                 |
-| E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                                | ✅ Merged to `main` (same fast-forward); `62d69cc` + `7e34456`                                     |
-| F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                       | ✅ Merged to `main` (same fast-forward); `b806b52` + docs `727c19b`                                |
-| G. Docs and final review | README, `docs/*.md`, full verification                                    | ✅ On `main` (`9b7b102` + PROGRESS `f492a9b`)                                                      |
-| H. Upwork sync           | Upwork sync via Claude + Upwork MCP, import API, e-mail alerts            | ✅ Committed `05b064a` on `worktree-phase-h-upwork-import`; e2e 19/19 and build passed; not merged |
+| Phase                    | Scope                                                                     | Status                                                                                              |
+| ------------------------ | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Baseline                 | Pre-existing backend core committed                                       | ✅ Done (`703761f`)                                                                                 |
+| A. Foundation            | Seed, `.env.example`, page auth proxy, CSRF check                         | ✅ Merged to `main` (`ab4b7e1`); seed verified during B1                                            |
+| B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                     | ✅ Merged to `main` (`0bed021`); Turbopack build verified on main                                   |
+| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook      | ✅ Merged to `main` (`41e8d95`); Turbopack build verified on main                                   |
+| C1. UI (part 1)          | Design system, app shell, login, Dashboard, Run Agent                     | ✅ Merged to `main` (`71a0b50`); Turbopack build verified on main                                   |
+| C2. UI (part 2)          | Search History and run detail, Qualified Leads, All Jobs                  | ✅ Merged to `main` (`d742e0a`); Turbopack build verified on main                                   |
+| C3a. UI (part 3a)        | Search Profiles list, editor, version history                             | ✅ Merged to `main` (fast-forward, `e650286` + docs `a82ddab`)                                      |
+| C3b. UI (part 3b)        | Notifications, Integrations, Settings (incl. change password), Audit Logs | ✅ Merged to `main` (fast-forward `a82ddab` → `727c19b`, 2026-10-15); `d18e5f8` + docs `3730daf`    |
+| D. n8n                   | Run workflow calling the app's internal step API, lease-safe `/fail`      | ✅ Merged to `main` (same fast-forward); `9cf72ad`                                                  |
+| E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                                | ✅ Merged to `main` (same fast-forward); `62d69cc` + `7e34456`                                      |
+| F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                       | ✅ Merged to `main` (same fast-forward); `b806b52` + docs `727c19b`                                 |
+| G. Docs and final review | README, `docs/*.md`, full verification                                    | ✅ On `main` (`9b7b102` + PROGRESS `f492a9b`)                                                       |
+| H. Upwork sync           | Upwork sync via Claude + Upwork MCP, import API, e-mail alerts            | ✅ On `main` (`main` is at `fe3500c`, which contains `05b064a`); e2e 19/19 and build passed         |
+| Cloudflare Tunnel        | `docker-compose.cloudflare.yml`, `deploy/Caddyfile.cloudflare`            | ✅ Committed `ae68cdf` on `worktree-cloudflare-deploy` (2026-11-11); not merged; no real tunnel yet |
+| WhatsApp removal         | E-mail is the only alert channel                                          | 🟡 Committed in `worktree-cloudflare-deploy` (2026-11-14), not merged; all checks pass, e2e 19/19   |
 
 ## Baseline (pre-existing work, committed 2026-10-11 as `703761f`)
 
@@ -212,10 +214,11 @@ Finding during testing: run summaries (`alertOnFailure`) are separate messages a
 
 ### Open items and risks
 
-- A status webhook that arrives while a row is still `SENDING` is ignored (`SENDING → DELIVERED` is not an allowed
+- Obsolete since 2026-11-14 (WhatsApp and its webhook removed): a status webhook that arrived while a row was still `SENDING` was ignored (`SENDING → DELIVERED` is not an allowed
   transition). A later `read` still advances it, but if the recipient has read receipts off, the row can stay
   `SENT` although it was delivered. Not handled yet.
-- UNCERTAIN reconciliation only works with the real Cloud provider, which echoes `biz_opaque_callback_data`.
+- ~~UNCERTAIN reconciliation only works with the real Cloud provider~~: WhatsApp removed 2026-11-14; there is no
+  delivery-status webhook any more.
 - `integration_status` is shared by all users; it holds only non-secret configuration and results.
 
 ## Phase C: UI, grilled decisions (accepted by the developer 2026-10-11, "accept all")
@@ -726,7 +729,7 @@ Full write-up, including the acceptance-scenario mapping, in `docs/testing.md`.
 ### Open items
 
 - Confirm the numbering and wording of the ten inferred acceptance scenarios (developer).
-- Not covered: live OpenAI, WhatsApp and Upwork; n8n crashing mid-run followed by resume; production infrastructure.
+- Not covered: live OpenAI, WhatsApp (removed 2026-11-14) and Upwork; n8n crashing mid-run followed by resume; production infrastructure.
 - Live tests have never run against real services (no credentials).
 - ~~Merge pending, to be done by the developer~~: on 2026-10-15, at the developer's request, the Phase G session
   fast-forwarded `main` from `a82ddab` to `727c19b` (C3b, D, E, F). The developer's 4 uncommitted `.claude/skills`
@@ -793,7 +796,7 @@ UI or API; no data-retention policy; live OpenAI, WhatsApp and Upwork integratio
 
 - ~~Fast-forward `main` to `9b7b102` plus this PROGRESS commit~~: `main` is at `f492a9b` (Phase H's base).
 - Developer to confirm the numbering and wording of the ten inferred acceptance scenarios (Phase F).
-- Live OpenAI and WhatsApp: blocked on credentials. Live Upwork discovery: BLOCKED until an approved API key with
+- Live OpenAI: blocked on credentials. ~~Live WhatsApp~~: WhatsApp removed on 2026-11-14 (see below). Live Upwork discovery: BLOCKED until an approved API key with
   job-search scope, a confirmed data contract and a live adapter exist (`docs/upwork-access.md`). Phase H adds an
   interim bridge (Claude + Upwork MCP); the direct API adapter is still blocked.
 - Production on a real Linux host with a Let's Encrypt certificate: not verified.
@@ -918,13 +921,103 @@ Live run details (dev database):
 
 ### Open items
 
-- Merge to `main` (developer).
-- Run the Playwright e2e suite, an uninterrupted agent run from search to import, and an unattended Task Scheduler run.
+- ~~Merge to `main` (developer)~~: `main` is at `fe3500c` (Phase H plus the review fixes of 2026-11-11), per `git log main`.
+- ~~Run the Playwright e2e suite~~ (19/19 on 2026-11-07, `0538af8`). Still to run: an uninterrupted agent run from search to import, and an unattended Task Scheduler run.
 - Live OpenAI scoring and a real SMTP e-mail: not verified.
 - Decide on `UPWORK_SYNC_SCHEDULED_ALLOWED` after reading section 4.1 of Upwork's API & MCP Terms of Use (so far only
   quoted by a third party).
 - The developer's Upwork account has 0 Connects, so applying to jobs is not possible yet.
 - Optional clean-up: the test profile and import token in the dev database; the pre-migration dump.
+
+## Cloudflare Tunnel deployment (`ae68cdf`, 2026-11-11, `worktree-cloudflare-deploy`)
+
+Based on `main` `fe3500c`. **Not merged to `main`.** A commit with the same message and author date (`8a3f980`) is on
+branch `ci-cd`. Full write-up in `docs/deployment.md`, section "Cloudflare Tunnel" (setup, Cloudflare Access with an
+import-API bypass, verification table "Cloudflare Tunnel (2026-11-11)").
+
+### Implemented
+
+- `docker-compose.cloudflare.yml` (used instead of `docker-compose.prod.yml`, not with it): `!reset` ports on postgres,
+  web and n8n, so no port is published; `web` gets `APP_BASE_URL=https://${APP_DOMAIN}`; an internal, HTTP-only `caddy`
+  (`caddy:2.11.7-alpine`); `cloudflared` (`cloudflare/cloudflared:2026.10.1`, `tunnel --no-autoupdate run`,
+  `TUNNEL_TOKEN` from `CLOUDFLARE_TUNNEL_TOKEN`; Compose refuses to start without it).
+- `deploy/Caddyfile.cloudflare`: `auto_https off`, `admin off`; `/api/internal/*` answered 404; HSTS `max-age=31536000`
+  without `includeSubDomains`; `Server` removed; `trusted_proxies static private_ranges` with
+  `client_ip_headers CF-Connecting-IP`, and `X-Forwarded-For` / `X-Real-IP` replaced with that address before
+  `reverse_proxy web:3000`. Reason (stated in the file): Cloudflare appends to a client-sent `X-Forwarded-For`, so its
+  first entry, which `clientIp()` reads, is spoofable.
+- `src/lib/http/api.ts`: comment on `clientIp()` only, naming both Caddyfiles.
+- Fix in `docker-compose.yml`: `EMAIL_PROVIDER`, `SMTP_*`, `EMAIL_FROM`, `SMTP_TIMEOUT_MS` and
+  `UPWORK_SYNC_SCHEDULED_ALLOWED` were never passed to the app containers; now in the `x-app-env` anchor.
+- Docs: `docs/deployment.md` "Cloudflare Tunnel"; `.env.example` (names only), `README.md`,
+  `docs/{architecture,security,upwork-sync}.md`.
+
+### Verification (actual results, as recorded in `docs/deployment.md`)
+
+| Check                                                                                   | Result                                                                      |
+| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `docker compose ... -f docker-compose.cloudflare.yml --profile stack config`            | ✅ valid; no service publishes a port; e-mail settings reach the containers |
+| Missing `CLOUDFLARE_TUNNEL_TOKEN`                                                       | ✅ Compose refuses to start                                                 |
+| `caddy validate` of `deploy/Caddyfile.cloudflare` (Caddy 2.11.7)                        | ✅                                                                          |
+| Header rewrite with an echo backend (`CF-Connecting-IP` plus spoofed XFF / `X-Real-IP`) | ✅ backend saw only the `CF-Connecting-IP` value                            |
+| `POST /api/internal/...` through that Caddy                                             | ✅ 404; HSTS set, `Server` removed                                          |
+| `cloudflare/cloudflared:2026.10.1` runs; an invalid token is rejected                   | ✅                                                                          |
+
+### Open items
+
+- Not verified: a real tunnel with a real token and domain, Cloudflare Access with the import bypass, and a full stack
+  image build in this mode (the development PC lacked free memory for the image build).
+- Merge to `main` (developer).
+
+## WhatsApp removal: e-mail is the only alert channel (2026-11-14, uncommitted in `worktree-cloudflare-deploy`)
+
+**Uncommitted working-tree changes** on top of `ae68cdf`.
+
+### Decision (developer, 2026-11-14)
+
+Remove all WhatsApp code, but keep the database enum value `WHATSAPP` and the WhatsApp columns so old rows still load
+(comment on `notificationChannel` in `src/lib/database/schema.ts`; no migration). Keep the dormant Upwork API adapter.
+This supersedes the WhatsApp parts of Phase A decision 4, Phase B decision 3, Phase B2 decisions 2, 5 and 6, and Phase
+C3 decision 8.
+
+### Implemented
+
+- Deleted: `src/modules/notifications/{cloud-whatsapp,mock-whatsapp,webhook}.ts`, the delivery-status webhook route
+  `src/app/api/webhooks/whatsapp/route.ts`, the Meta signature helper and `maskPhone` (in
+  `src/lib/security/{hmac,sanitize}.ts`), the `WHATSAPP_*` variables (`src/lib/configuration/env.ts`, `.env.example`,
+  `docker-compose.yml`), `docs/whatsapp.md`, `tests/unit/{cloud-whatsapp,whatsapp-webhook}.test.ts`;
+  `tests/unit/whatsapp-message.test.ts` renamed to `tests/unit/lead-message.test.ts`.
+- Run summary and failure alert go by e-mail to the profile's e-mail recipient (`src/modules/runs/engine/finalization.ts`,
+  `buildRunSummaryEmail` in `src/modules/notifications/message.ts`).
+- Recipients API and UI are e-mail only: `channel` must be `"EMAIL"` (`src/modules/notifications/recipients.ts`), so a
+  WhatsApp recipient is refused with 400; old WhatsApp recipients stay stored but are hidden.
+- Profile configuration drops `whatsappEnabled` / `recipientId`; configurations saved earlier still parse
+  (`src/modules/profiles/config-schema.ts`).
+- Integrations are `database`, `job_source`, `ai`, `email`, `n8n` (`INTEGRATIONS` in `src/modules/integrations/service.ts`);
+  the test-message route is `POST /api/integrations/email/test` (any other provider gets 404).
+- `database/seeds/seed.ts` no longer creates a WhatsApp recipient.
+- UI pages and components, `n8n/documentation/README.md`,
+  `docs/{api,architecture,database,security,testing,troubleshooting,upwork-sync}.md`, `README.md` and the
+  `package.json` description updated.
+- Fix: `tests/integration/setup.ts` and `playwright.config.ts` now force `EMAIL_PROVIDER=mock`. Before, a `.env` with
+  `EMAIL_PROVIDER=smtp` could make the tests send real e-mail.
+
+### Verification (as reported by the implementing session; not re-run by the tracker)
+
+| Check                   | Result                                                |
+| ----------------------- | ----------------------------------------------------- |
+| Prettier, ESLint, `tsc` | ✅ clean                                              |
+| Unit tests              | ✅ 148/148 (156 before; WhatsApp unit tests deleted)  |
+| Integration tests       | ✅ 74/74                                              |
+| `next build --webpack`  | ✅                                                    |
+| Playwright e2e          | ✅ 19/19 (two selectors made exact after a first run) |
+| Dev database check      | ✅ no WhatsApp recipients or notifications existed    |
+
+### Open items
+
+- ~~Commit the changes and record the e2e result.~~ Done 2026-11-14 (e2e 19/19).
+- Merge to `main` (developer).
+- The `WHATSAPP` enum value, the phone column and the `WHATSAPP` column defaults stay in the schema by decision.
 
 ## Environment notes
 
@@ -933,7 +1026,7 @@ Live run details (dev database):
 - No git remote configured; nothing has been pushed.
 - Phase G: the Turbopack build passed in the worktree because it had its own `npm ci` `node_modules` (earlier worktrees
   used a junction outside the project root, which Turbopack rejects).
-- No OpenAI, WhatsApp, SMTP or Upwork API credentials; those integrations run in mock mode. Phase H reaches Upwork only
+- No OpenAI, SMTP or Upwork API credentials; those integrations run in mock mode. WhatsApp was removed on 2026-11-14. Phase H reaches Upwork only
   through Claude's Upwork connector (developer's Freelancer account).
 - Port 3000 on the developer's machine was in use by the developer's own `next` server (started from the main
   checkout on 2026-10-11 22:11) and was left running. C2 previews used port 3200 with `APP_BASE_URL` overridden to

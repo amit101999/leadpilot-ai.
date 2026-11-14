@@ -1,7 +1,7 @@
 # Architecture
 
 One Next.js application serves the UI and the JSON API. PostgreSQL holds all state. External services (job source,
-AI model, WhatsApp) sit behind provider interfaces chosen by environment variables, with mocks as the default. n8n is
+AI model, e-mail) sit behind provider interfaces chosen by environment variables, with mocks as the default. n8n is
 an optional orchestrator that drives runs through the app's own API; it holds no business logic.
 
 ```
@@ -13,7 +13,7 @@ an optional orchestrator that drives runs through the app's own API; it holds no
                                ├─► Job source provider ──► mock feed | Upwork API (blocked) | imported jobs
                                │     ▲ Claude + Upwork MCP ──Bearer token──► /api/import/* (docs/upwork-sync.md)
                                ├─► AI evaluator ─────────► mock | OpenAI Responses API
-                               ├─► WhatsApp provider ────► mock | WhatsApp Cloud API ──► status webhook back
+                               ├─► E-mail provider ──────► mock | SMTP (e.g. Gmail)
                                │
                                └─► n8n webhook (RUN_EXECUTOR=n8n)
                                      n8n ──HMAC-signed──► /api/internal/runs/:id/steps/:step
@@ -36,7 +36,7 @@ an optional orchestrator that drives runs through the app's own API; it holds no
 
 Route handlers use one of three wrappers from `src/lib/http/api.ts`: `userRoute(minRole, …)` (session cookie, role
 check, same-origin check on state-changing methods), `internalRoute` (HMAC-signed, for n8n) and `publicRoute` (login,
-logout, health, the WhatsApp webhook, which verifies its own signature). The wrappers also attach a request id and turn
+logout, health); the import API uses `tokenRoute` (Bearer import token). The wrappers also attach a request id and turn
 every error into the standard error JSON.
 
 ## Run lifecycle
@@ -86,23 +86,21 @@ Transitions are declared in `src/modules/runs/transitions.ts`; any other transit
 
 ## Notifications and delivery guarantees
 
-Alerts go out on each channel the profile enables: WhatsApp (Cloud API) and/or e-mail (SMTP), each with its own
-opted-in recipient (`src/modules/notifications/channels.ts`). Selection reserves at most `maxPerRun` notification rows
-per channel, under a per-channel, per-recipient advisory lock. A unique index on `(job_id, channel, recipient_id)`
-makes "never alert the same job to the same recipient on the same channel twice" a database guarantee, even for
-concurrent runs. Sending is claim → send → record. The provider classifies every result (SMTP replies are mapped the
-same way: 5xx and login errors are permanent, 4xx and failed connections retryable, a dropped connection uncertain):
+Alerts are e-mails (SMTP) to the profile's opted-in e-mail recipient (`src/modules/notifications/channels.ts`); the
+same recipient gets the optional run summary and failure alert. WhatsApp alerts were removed; their old rows stay in
+the database (channel `WHATSAPP`) and are never sent. Selection reserves at most `maxPerRun` notification rows under a
+per-recipient advisory lock. A unique index on `(job_id, channel, recipient_id)` makes "never alert the same job to
+the same recipient twice" a database guarantee, even for concurrent runs. Sending is claim → send → record. The SMTP
+provider classifies every result (`classifySmtpError` in `src/modules/notifications/smtp-email.ts`):
 
-- **accepted** (message id returned): `SENT`, later `DELIVERED` / `READ` from the status webhook.
-- **rejected**: `FAILED_RETRYABLE` (429, 5xx, connection refused before sending), retried automatically within the
-  run with exponential backoff (2 s doubling, at most 30 s) up to 3 attempts; then, or for other errors,
-  `FAILED_PERMANENT`, which an operator can retry manually.
-- **uncertain** (timeout, dropped connection, 2xx without id): `UNCERTAIN`. Never retried automatically. A manual
-  retry is allowed only after 15 minutes and with an explicit "the recipient did not get it" confirmation. A later
-  status webhook carrying `biz_opaque_callback_data` reconciles it.
+- **accepted** (the mail server took the message): `SENT`. Not proof that it reached the inbox.
+- **rejected**: `FAILED_RETRYABLE` (4xx replies, connection refused or DNS failure before sending), retried
+  automatically within the run with exponential backoff (2 s doubling, at most 30 s) up to 3 attempts; then, or for
+  5xx and login errors, `FAILED_PERMANENT`, which an operator can retry manually.
+- **uncertain** (timeout, connection dropped mid-session): `UNCERTAIN`. Never retried automatically. A manual retry is
+  allowed only after 15 minutes and with an explicit "the recipient did not get it" confirmation.
 
-The guarantee is **at most once per (job, channel, recipient), with reconciliation of ambiguous sends**, not exactly
-once. Details: [whatsapp.md](whatsapp.md).
+The guarantee is **at most once per (job, recipient)**, not exactly once: an uncertain send may or may not have arrived.
 
 ## Key design decisions
 

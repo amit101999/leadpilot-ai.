@@ -3,12 +3,8 @@ import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { env } from "@/lib/configuration/env";
 import { jobs, notifications, qualifications, runJobs } from "@/lib/database/schema";
 import type { RiskFlag } from "@/modules/ai/output-schema";
-import {
-  enabledChannels,
-  type ChannelTarget,
-  type NotificationChannel,
-} from "@/modules/notifications/channels";
-import { buildLeadEmail, buildLeadMessage } from "@/modules/notifications/message";
+import { enabledChannels, type ChannelTarget } from "@/modules/notifications/channels";
+import { buildLeadEmail } from "@/modules/notifications/message";
 import { getRecipientForSend } from "@/modules/notifications/recipients";
 import { RECLAIMABLE_NOTIFICATION_STATUSES } from "@/modules/notifications/transitions";
 import { rankCandidates } from "@/modules/qualification/ranking";
@@ -66,20 +62,17 @@ export async function selectStep(ctx: RunContext): Promise<StageResponse> {
   }
 
   const targets = enabledChannels(config);
-  // Per candidate and channel: why it was or was not reserved. Joined into one note per job at the end.
-  const notes = new Map<string, Map<NotificationChannel, string>>();
-  const note = (runJobId: string, channel: NotificationChannel, text: string) => {
-    if (!notes.has(runJobId)) notes.set(runJobId, new Map());
-    notes.get(runJobId)!.set(channel, text);
-  };
+  // Per candidate: why it was or was not reserved.
+  const notes = new Map<string, string>();
+  const note = (runJobId: string, text: string) => notes.set(runJobId, text);
 
   const limit = config.notifications.maxPerRun;
   const metrics: Record<string, unknown> = { qualified: ranked.length, limit };
   // Whole-channel skips (disabled, recipient unavailable, no opt-in) become run warnings.
   const skipWarnings: string[] = [];
   if (targets.length === 0) {
-    const reason = "Not sent: notifications are disabled for this profile";
-    for (const c of ranked) note(c.runJobId, "WHATSAPP", reason);
+    const reason = "Not sent: e-mail alerts are disabled for this profile";
+    for (const c of ranked) note(c.runJobId, reason);
     metrics.skipped = reason;
     skipWarnings.push(reason);
   }
@@ -88,19 +81,16 @@ export async function selectStep(ctx: RunContext): Promise<StageResponse> {
   for (const target of targets) {
     const skipReason = await notificationSkipReason(ctx, target);
     if (skipReason) {
-      for (const c of ranked) note(c.runJobId, target.channel, skipReason);
+      for (const c of ranked) note(c.runJobId, skipReason);
       metrics[target.channel] = { reserved: 0, skipped: skipReason };
-      skipWarnings.push(targets.length > 1 ? `${CHANNEL_LABEL[target.channel]}: ${skipReason}` : skipReason);
+      skipWarnings.push(skipReason);
       continue;
     }
     metrics[target.channel] = await reserveForChannel(ctx, target, ranked, limit, baseUrl, note);
   }
 
-  for (const [runJobId, byChannel] of notes) {
-    await db
-      .update(runJobs)
-      .set({ notificationNote: joinNotes(byChannel) })
-      .where(eq(runJobs.id, runJobId));
+  for (const [runJobId, text] of notes) {
+    await db.update(runJobs).set({ notificationNote: text }).where(eq(runJobs.id, runJobId));
   }
   if (ranked.length > 0) {
     for (const message of skipWarnings) {
@@ -128,7 +118,7 @@ async function reserveForChannel(
   ranked: Ranked,
   limit: number,
   baseUrl: string,
-  note: (runJobId: string, channel: NotificationChannel, text: string) => void,
+  note: (runJobId: string, text: string) => void,
 ) {
   const { db, run, snapshot } = ctx;
   const config = snapshot.configuration;
@@ -164,12 +154,12 @@ async function reserveForChannel(
         )
         .limit(1);
       if (existing?.runId === run.id && existing.status !== "CANCELLED") {
-        note(candidate.runJobId, channel, "Reserved for notification");
+        note(candidate.runJobId, "Reserved for notification");
         continue;
       }
       if (slots <= 0) {
         overLimit += 1;
-        note(candidate.runJobId, channel, `Not sent: per-run notification limit of ${limit} reached`);
+        note(candidate.runJobId, `Not sent: per-run notification limit of ${limit} reached`);
         continue;
       }
 
@@ -191,17 +181,12 @@ async function reserveForChannel(
         jobUrl: candidate.job.jobUrl ?? "",
         dashboardUrl: `${baseUrl}/jobs/${candidate.jobId}`,
       };
-      const message = buildLeadMessage(input, config.notifications.messageFormat);
-      const payload =
-        channel === "EMAIL"
-          ? { kind: "lead", email: buildLeadEmail(input, config.notifications.messageFormat) }
-          : { kind: "lead", templateParams: message.templateParams };
-      // WhatsApp keys keep their original form so claims made before e-mail existed stay recognisable.
-      const keySource =
-        channel === "WHATSAPP"
-          ? `${run.id}:${candidate.jobId}:${recipientId}`
-          : `${run.id}:${candidate.jobId}:${recipientId}:${channel}`;
-      const idempotencyKey = createHash("sha256").update(keySource).digest("hex").slice(0, 40);
+      const email = buildLeadEmail(input, config.notifications.messageFormat);
+      const payload = { kind: "lead", email };
+      const idempotencyKey = createHash("sha256")
+        .update(`${run.id}:${candidate.jobId}:${recipientId}:${channel}`)
+        .digest("hex")
+        .slice(0, 40);
       const values = {
         jobId: candidate.jobId,
         runId: run.id,
@@ -210,7 +195,7 @@ async function reserveForChannel(
         status: "RESERVED" as const,
         attempts: 0,
         idempotencyKey,
-        messagePreview: message.previewText,
+        messagePreview: email.text,
         payload,
         reservedAt: new Date(),
         nextAttemptAt: null,
@@ -235,26 +220,14 @@ async function reserveForChannel(
       if (claimed.length > 0) {
         slots -= 1;
         reserved += 1;
-        note(candidate.runJobId, channel, "Reserved for notification");
+        note(candidate.runJobId, "Reserved for notification");
       } else {
         claimedElsewhere += 1;
-        note(
-          candidate.runJobId,
-          channel,
-          "Not sent: already notified or claimed by another run for this recipient",
-        );
+        note(candidate.runJobId, "Not sent: already notified or claimed by another run for this recipient");
       }
     }
     return { reserved, claimedElsewhere, overLimit };
   });
-}
-
-const CHANNEL_LABEL: Record<NotificationChannel, string> = { WHATSAPP: "WhatsApp", EMAIL: "E-mail" };
-
-/** One channel keeps the original wording; several are prefixed so each outcome stays readable. */
-function joinNotes(byChannel: Map<NotificationChannel, string>): string {
-  if (byChannel.size === 1) return [...byChannel.values()][0]!;
-  return [...byChannel.entries()].map(([channel, text]) => `${CHANNEL_LABEL[channel]}: ${text}`).join("; ");
 }
 
 async function notificationSkipReason(ctx: RunContext, target: ChannelTarget): Promise<string | null> {

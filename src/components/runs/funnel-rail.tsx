@@ -15,7 +15,7 @@ const STEPS: Array<{ key: keyof FunnelCounts; label: string }> = [
   { key: "passedFilters", label: "Passed rules" },
   { key: "evaluated", label: "AI evaluated" },
   { key: "qualified", label: "Qualified" },
-  { key: "notified", label: "Sent to WhatsApp" },
+  { key: "notified", label: "E-mailed" },
 ];
 
 /**

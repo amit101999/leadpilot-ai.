@@ -7,7 +7,6 @@ import { Panel } from "@/components/ui/panel";
 import { Time } from "@/components/ui/time";
 import { hasRole } from "@/lib/auth/authorization";
 import { requireUser } from "@/lib/auth/current-user";
-import { env } from "@/lib/configuration/env";
 import { getDb } from "@/lib/database/client";
 import { getIntegrationStatuses } from "@/modules/integrations/service";
 import { listRecipients } from "@/modules/notifications/recipients";
@@ -39,7 +38,6 @@ export default async function IntegrationsPage() {
     listRecipients(db, actor),
   ]);
   const canTest = hasRole(actor, "OPERATOR");
-  const webhookUrl = `${env().APP_BASE_URL.replace(/\/$/, "")}/api/webhooks/whatsapp`;
 
   const info: Record<string, { title: string; setup: ReactNode }> = {
     database: {
@@ -108,31 +106,6 @@ export default async function IntegrationsPage() {
         <>
           Set <Vars names={["AI_PROVIDER", "OPENAI_API_KEY", "OPENAI_MODEL"]} />. Create a project-scoped key
           on the OpenAI platform. The test retrieves the model, which is free and proves the key works.
-        </>
-      ),
-    },
-    whatsapp: {
-      title: "WhatsApp Business Cloud API",
-      setup: (
-        <>
-          <p>
-            Set{" "}
-            <Vars
-              names={[
-                "WHATSAPP_PROVIDER",
-                "WHATSAPP_ACCESS_TOKEN",
-                "WHATSAPP_PHONE_NUMBER_ID",
-                "WHATSAPP_TEMPLATE_NAME",
-                "WHATSAPP_SUMMARY_TEMPLATE_NAME",
-              ]}
-            />{" "}
-            from Meta Business Manager. Alerts use approved message templates.
-          </p>
-          <p className="mt-1">
-            For delivery updates, register <code className="text-xs">{webhookUrl}</code> in the Meta app and
-            set <Vars names={["WHATSAPP_WEBHOOK_VERIFY_TOKEN", "WHATSAPP_APP_SECRET"]} />. Without the app
-            secret every update is refused.
-          </p>
         </>
       ),
     },
@@ -205,14 +178,11 @@ export default async function IntegrationsPage() {
               </dl>
               <div className="flex flex-col gap-3 text-[13px] text-muted">
                 <div>{meta.setup}</div>
-                {(status.name === "whatsapp" || status.name === "email") && canTest && (
+                {status.name === "email" && canTest && (
                   <div className="flex flex-col items-start gap-1">
                     <TestMessageButton
-                      channel={status.name}
-                      recipients={toRecipientOptions(recipients).filter(
-                        (r) => r.channel === (status.name === "email" ? "EMAIL" : "WHATSAPP"),
-                      )}
-                      isMock={providers[status.name].isMock}
+                      recipients={toRecipientOptions(recipients)}
+                      isMock={providers.email.isMock}
                     />
                   </div>
                 )}

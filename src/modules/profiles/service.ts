@@ -54,7 +54,6 @@ async function assertRecipientUsable(
   config: ProfileConfig,
 ): Promise<void> {
   const selected = [
-    { id: config.notifications.recipientId, channel: "WHATSAPP" as const, field: "recipientId" },
     { id: config.notifications.emailRecipientId, channel: "EMAIL" as const, field: "emailRecipientId" },
   ];
   for (const { id, channel, field } of selected) {
@@ -197,8 +196,6 @@ export async function duplicateProfile(
   const config = parseStoredConfig(source.configuration);
   // The copy belongs to the acting user; drop a recipient that belongs to someone else.
   if (source.ownerUserId !== actor.id) {
-    config.notifications.recipientId = null;
-    config.notifications.whatsappEnabled = false;
     config.notifications.emailRecipientId = null;
     config.notifications.emailEnabled = false;
   }

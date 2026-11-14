@@ -41,13 +41,6 @@ export function verifySignature(
   return safeEqualHex(expected, provided) ? { ok: true } : { ok: false, reason: "signature mismatch" };
 }
 
-/** Meta webhook signature: `sha256=<hex HMAC of raw body with the app secret>`. */
-export function verifyMetaSignature(appSecret: string, body: string, header: string | null): boolean {
-  if (!header?.startsWith("sha256=")) return false;
-  const expected = createHmac("sha256", appSecret).update(body).digest("hex");
-  return safeEqualHex(expected, header.slice("sha256=".length));
-}
-
 function safeEqualHex(expected: string, provided: string): boolean {
   if (!/^[0-9a-f]+$/i.test(provided) || provided.length !== expected.length) return false;
   return timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(provided, "hex"));

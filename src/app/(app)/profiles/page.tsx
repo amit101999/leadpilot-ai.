@@ -98,8 +98,8 @@ export default async function ProfilesPage({
                       {config.budget.fixedMin
                         ? `from ${formatMoney(config.budget.fixedMin, config.budget.currency)}`
                         : "any budget"}
-                      ; score {config.ai.minScore}+; WhatsApp{" "}
-                      {config.notifications.whatsappEnabled
+                      ; score {config.ai.minScore}+; e-mail alerts{" "}
+                      {config.notifications.emailEnabled
                         ? `on (up to ${config.notifications.maxPerRun})`
                         : "off"}
                     </p>

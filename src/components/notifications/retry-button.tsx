@@ -19,8 +19,8 @@ function formatWait(ms: number): string {
 
 /**
  * Manual resend. Failed sends can be retried directly. A send with unknown
- * delivery may already have reached the phone, so it waits 15 minutes for a
- * WhatsApp status update and then needs an explicit confirmation.
+ * delivery may already have reached the inbox, so it waits 15 minutes and
+ * then needs an explicit confirmation.
  */
 export function RetryButton({
   notification,
@@ -53,7 +53,7 @@ export function RetryButton({
       });
       toast.success(
         result.status === "SENT"
-          ? "Resent. WhatsApp accepted the message."
+          ? "Resent. The mail server accepted the e-mail."
           : `Retry finished with status: ${result.status.toLowerCase().replace(/_/g, " ")}.`,
       );
       setOpen(false);
@@ -67,7 +67,7 @@ export function RetryButton({
 
   if (waiting) {
     return (
-      <Button variant="secondary" size="sm" disabled title="Waiting for a delivery update from WhatsApp">
+      <Button variant="secondary" size="sm" disabled title="Waiting in case the first e-mail still arrives">
         <RotateCcw />
         Retry in {formatWait(eligibleAt - now)}
       </Button>
@@ -92,7 +92,7 @@ export function RetryButton({
           title="Resend this alert?"
           description={
             mode === "confirm-after-wait"
-              ? "The first attempt timed out, so WhatsApp may already have delivered it and no update arrived. Resend only if you know it was not received."
+              ? "The first attempt was interrupted, so the e-mail may already have been delivered. Resend only if you know it was not received."
               : "The alert will be sent again to the same recipient. The recipient's opt-in is checked first."
           }
         >

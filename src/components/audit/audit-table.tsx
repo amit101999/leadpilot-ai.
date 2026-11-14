@@ -40,7 +40,7 @@ export const AUDIT_ACTIONS = [
   "notification.retry",
   "notification.reconciled",
   "notification.failed",
-  "whatsapp.test_message",
+  "email.test_message",
 ];
 
 const ENTITY_TYPES = [
@@ -54,6 +54,7 @@ const ENTITY_TYPES = [
 const ACTOR_LABEL: Record<string, string> = {
   SYSTEM: "System",
   EXECUTOR: "Run executor",
+  // Older entries only: WhatsApp delivery updates, removed together with WhatsApp alerts.
   WEBHOOK: "WhatsApp webhook",
 };
 

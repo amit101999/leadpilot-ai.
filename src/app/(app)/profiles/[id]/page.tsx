@@ -38,7 +38,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
   const archived = Boolean(profile.archivedAt);
   const recipientName = (id: string) => {
     const r = recipientViews.find((v) => v.id === id);
-    return r ? `${r.label} (${r.phoneMasked})` : "A removed recipient";
+    return r ? `${r.label} (${r.emailMasked})` : "A removed recipient";
   };
 
   // Newest first; each version is compared with the one before it.

@@ -104,9 +104,9 @@ export async function getNotification(db: Database, actor: Actor, id: string) {
 /**
  * Operator retry. FAILED_RETRYABLE: any time. FAILED_PERMANENT: re-reserved
  * first (the only transition the state machine allows), typically after the
- * cause was fixed. UNCERTAIN: only after UNCERTAIN_RETRY_WAIT_MS without a
- * status webhook and with the operator's explicit confirmation that the
- * recipient did not receive it, because the original may have been delivered.
+ * cause was fixed. UNCERTAIN: only after UNCERTAIN_RETRY_WAIT_MS and with the
+ * operator's explicit confirmation that the recipient did not receive it,
+ * because the original may have been delivered.
  * Sent, delivered and read messages are never resent.
  */
 export async function retryNotification(
@@ -129,7 +129,7 @@ export async function retryNotification(
     if (waitLeftMs > 0) {
       throw new AppError(
         "INVALID_STATE",
-        "The previous send may still be delivered. Wait for a delivery update before retrying.",
+        "The previous send may still be delivered. Wait, and check the inbox, before retrying.",
         { retryAfterSeconds: Math.ceil(waitLeftMs / 1000) },
       );
     }
@@ -174,7 +174,7 @@ export async function retryNotification(
 }
 
 /**
- * Sends the provider's connection-test template to an opted-in recipient.
+ * Sends a connection-test e-mail to an opted-in recipient.
  * Not a lead notification: recorded in the audit log only.
  */
 export async function sendTestMessage(
@@ -183,39 +183,26 @@ export async function sendTestMessage(
   actor: Actor,
   recipientId: string,
   requestId?: string,
-  expectedChannel?: "WHATSAPP" | "EMAIL",
 ) {
   requireRole(actor, "OPERATOR");
   const recipient = await getRecipient(db, actor, recipientId);
-  if (expectedChannel && recipient.channel !== expectedChannel) {
-    throw new AppError(
-      "VALIDATION_ERROR",
-      `Choose a ${expectedChannel === "EMAIL" ? "e-mail" : "WhatsApp"} recipient`,
-    );
+  if (recipient.channel !== "EMAIL" || !recipient.email) {
+    throw new AppError("VALIDATION_ERROR", "Choose an e-mail recipient");
   }
   if (recipient.archivedAt) throw new AppError("INVALID_STATE", "This recipient is archived");
   if (!recipient.optInConfirmedAt) {
     throw new AppError("INVALID_STATE", "Confirm the recipient's opt-in before sending a test");
   }
-  const provider = recipient.channel === "EMAIL" ? providers.email : providers.whatsapp;
+  const provider = providers.email;
   let outcome;
   try {
-    outcome =
-      recipient.channel === "EMAIL"
-        ? await providers.email.send({
-            to: recipient.email!,
-            subject: "LeadPilot AI connection test",
-            text: "This is a test message from LeadPilot AI. Lead alerts will arrive at this address.",
-            html: "<p>This is a test message from LeadPilot AI. Lead alerts will arrive at this address.</p>",
-            idempotencyKey: `test-${randomUUID()}`,
-          })
-        : await providers.whatsapp.send({
-            to: recipient.phoneE164!,
-            kind: "test",
-            templateParams: [],
-            previewText: "LeadPilot AI connection test",
-            idempotencyKey: `test-${randomUUID()}`,
-          });
+    outcome = await provider.send({
+      to: recipient.email,
+      subject: "LeadPilot AI connection test",
+      text: "This is a test message from LeadPilot AI. Lead alerts will arrive at this address.",
+      html: "<p>This is a test message from LeadPilot AI. Lead alerts will arrive at this address.</p>",
+      idempotencyKey: `test-${randomUUID()}`,
+    });
   } catch (error) {
     outcome = { kind: "uncertain" as const, error: sanitizeErrorMessage(error) };
   }
@@ -229,7 +216,7 @@ export async function sendTestMessage(
         };
   await recordAudit(db, {
     actor: userActor(actor.id),
-    action: recipient.channel === "EMAIL" ? "email.test_message" : "whatsapp.test_message",
+    action: "email.test_message",
     entityType: "notification_recipient",
     entityId: recipientId,
     after: { status: result.status, provider: provider.id },

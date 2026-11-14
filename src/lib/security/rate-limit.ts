@@ -15,7 +15,7 @@ export const RATE_LIMITS = {
   passwordChange: { name: "password-change", limit: 5, windowSeconds: 15 * 60 },
   runCreate: { name: "run-create", limit: 10, windowSeconds: 60 },
   notificationRetry: { name: "notification-retry", limit: 20, windowSeconds: 60 },
-  whatsappTest: { name: "whatsapp-test", limit: 3, windowSeconds: 10 * 60 },
+  testMessage: { name: "test-message", limit: 3, windowSeconds: 10 * 60 },
   integrationCheck: { name: "integration-check", limit: 20, windowSeconds: 60 },
   export: { name: "export", limit: 10, windowSeconds: 60 },
   /** All import-token calls together; one sync makes a handful per profile. */

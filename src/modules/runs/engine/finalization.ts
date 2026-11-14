@@ -5,7 +5,7 @@ import { agentRuns, notificationAttempts, notifications, runStages } from "@/lib
 import { sanitizeErrorMessage } from "@/lib/security/sanitize";
 import { recordAudit } from "@/modules/audit/service";
 import { afterRunEnded } from "@/modules/imports/follow-up";
-import { buildRunSummaryMessage } from "@/modules/notifications/message";
+import { buildRunSummaryEmail } from "@/modules/notifications/message";
 import { getRecipientForSend } from "@/modules/notifications/recipients";
 import type { Providers } from "@/modules/providers";
 import type { RunStage, RunStatus } from "@/types/domain";
@@ -155,8 +155,8 @@ async function settleUnsentNotifications(db: Database, runId: string): Promise<v
 }
 
 /**
- * Optional run-summary / failure alert. Sent at most once per run (guarded by
- * summary_notification being null) and never affects the run's own status.
+ * Optional run-summary / failure alert e-mail to the profile's e-mail recipient. Sent at most
+ * once per run (guarded by summary_notification being null) and never affects the run's status.
  */
 async function maybeSendRunSummary(db: Database, providers: Providers, run: RunRow): Promise<void> {
   if (run.summaryNotification) return;
@@ -164,8 +164,8 @@ async function maybeSendRunSummary(db: Database, providers: Providers, run: RunR
   const n = snapshot.configuration.notifications;
   const failed =
     run.status === "FAILED" || run.status === "COMPLETED_WITH_ERRORS" || run.status === "BLOCKED_SOURCE";
-  const wanted = n.whatsappEnabled && n.recipientId && (n.sendRunSummary || (n.alertOnFailure && failed));
-  if (!wanted || !n.recipientId) return;
+  const wanted = n.emailEnabled && (n.sendRunSummary || (n.alertOnFailure && failed));
+  if (!wanted || !n.emailRecipientId) return;
 
   // Claim the summary slot first so concurrent finalizers cannot double-send.
   const [claimed] = await db
@@ -175,12 +175,18 @@ async function maybeSendRunSummary(db: Database, providers: Providers, run: RunR
     .returning({ id: agentRuns.id });
   if (!claimed) return;
 
-  const recipient = await getRecipientForSend(db, n.recipientId);
+  const recipient = await getRecipientForSend(db, n.emailRecipientId);
   let result: Record<string, unknown>;
-  if (!recipient || !recipient.optInConfirmedAt || recipient.archivedAt || !recipient.phoneE164) {
+  if (
+    !recipient ||
+    !recipient.optInConfirmedAt ||
+    recipient.archivedAt ||
+    recipient.channel !== "EMAIL" ||
+    !recipient.email
+  ) {
     result = { status: "SKIPPED", reason: "Recipient unavailable or not opted in" };
   } else {
-    const message = buildRunSummaryMessage({
+    const message = buildRunSummaryEmail({
       status: run.status,
       discovered: run.sourceCount,
       qualified: run.qualifiedCount,
@@ -190,11 +196,9 @@ async function maybeSendRunSummary(db: Database, providers: Providers, run: RunR
       runUrl: `${env().APP_BASE_URL.replace(/\/$/, "")}/history/${run.id}`,
     });
     try {
-      const outcome = await providers.whatsapp.send({
-        to: recipient.phoneE164,
-        kind: "summary",
-        templateParams: message.templateParams,
-        previewText: message.previewText,
+      const outcome = await providers.email.send({
+        to: recipient.email,
+        ...message,
         idempotencyKey: `summary-${run.id}`,
       });
       result =

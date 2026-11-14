@@ -9,7 +9,7 @@ function demoNotice(): string | null {
   const mocked = [
     providers.jobSource.getCapabilities().isMock && "the job source (no live Upwork data)",
     providers.ai.isMock && "AI scoring",
-    providers.whatsapp.isMock && "WhatsApp (messages are recorded, not sent)",
+    providers.email.isMock && "e-mail (alerts are recorded, not sent)",
   ].filter((v): v is string => Boolean(v));
   if (mocked.length === 0) return null;
   const list = mocked.length === 1 ? mocked[0] : `${mocked.slice(0, -1).join(", ")} and ${mocked.at(-1)}`;

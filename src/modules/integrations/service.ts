@@ -13,7 +13,7 @@ import type { IntegrationState } from "@/types/domain";
  * Only non-secret data is stored or returned.
  */
 
-export const INTEGRATIONS = ["database", "job_source", "ai", "whatsapp", "email", "n8n"] as const;
+export const INTEGRATIONS = ["database", "job_source", "ai", "email", "n8n"] as const;
 export type IntegrationName = (typeof INTEGRATIONS)[number];
 
 export const STALE_AFTER_MS = 60 * 60_000;
@@ -35,8 +35,6 @@ function describe(name: IntegrationName, providers: Providers): Record<string, u
       return { provider: providers.jobSource.id, isMock: providers.jobSource.getCapabilities().isMock };
     case "ai":
       return { provider: providers.ai.id, model: providers.ai.model, isMock: providers.ai.isMock };
-    case "whatsapp":
-      return { provider: providers.whatsapp.id, isMock: providers.whatsapp.isMock };
     case "email":
       return { provider: providers.email.id, isMock: providers.email.isMock };
     case "n8n":
@@ -63,9 +61,8 @@ async function runCheck(db: Database, providers: Providers, name: IntegrationNam
       const result = await providers.ai.checkConnection();
       return { state: result.state, message: result.message, metadata };
     }
-    case "whatsapp":
     case "email": {
-      const result = await providers[name].checkConnection();
+      const result = await providers.email.checkConnection();
       return {
         state: result.state,
         message: result.message,

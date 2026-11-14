@@ -41,32 +41,14 @@ export function TestConnectionButton({ name, label }: { name: string; label: str
   );
 }
 
-/** Sends WhatsApp's connection-test template to an opted-in recipient, after confirmation. */
-const TEST_TEXT = {
-  whatsapp: {
-    name: "WhatsApp",
-    accepted: "WhatsApp accepted the test message. Check the phone to confirm it arrived.",
-    live: "WhatsApp's connection-test template will be sent to the recipient below. Limited to 3 per 10 minutes.",
-  },
-  email: {
-    name: "E-mail",
-    accepted:
-      "The mail server accepted the test e-mail. Check the inbox (and spam folder) to confirm it arrived.",
-    live: "A short test e-mail will be sent to the recipient below. Limited to 3 per 10 minutes.",
-  },
-} as const;
-
-/** Sends a connection test on one channel to an opted-in recipient of that channel. */
+/** Sends a test e-mail to an opted-in recipient, after confirmation. */
 export function TestMessageButton({
-  channel,
   recipients,
   isMock,
 }: {
-  channel: "whatsapp" | "email";
   recipients: Array<{ id: string; label: string; address: string }>;
   isMock: boolean;
 }) {
-  const text = TEST_TEXT[channel];
   const selectId = useId();
   const [open, setOpen] = useState(false);
   const [recipientId, setRecipientId] = useState(recipients[0]?.id ?? "");
@@ -76,16 +58,18 @@ export function TestMessageButton({
     setBusy(true);
     try {
       const result = await apiFetch<{ status: string; error: string | null; isMock: boolean }>(
-        `/api/integrations/${channel}/test`,
+        "/api/integrations/email/test",
         { method: "POST", body: { recipientId } },
       );
       if (result.status === "ACCEPTED") {
         toast.success(
-          result.isMock ? "Mock provider: the test message was recorded, not sent." : text.accepted,
+          result.isMock
+            ? "Mock provider: the test e-mail was recorded, not sent."
+            : "The mail server accepted the test e-mail. Check the inbox (and spam folder) to confirm it arrived.",
         );
         setOpen(false);
       } else {
-        toast.error(`${text.name} did not accept the test message: ${result.error ?? result.status}`);
+        toast.error(`The mail server did not accept the test e-mail: ${result.error ?? result.status}`);
       }
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "The test message could not be sent.");
@@ -105,11 +89,11 @@ export function TestMessageButton({
       )}
       <Dialog open={open} onOpenChange={(next) => !busy && setOpen(next)}>
         <DialogContent
-          title={`Send a${channel === "email" ? "n e-mail" : " WhatsApp"} test message?`}
+          title="Send a test e-mail?"
           description={
             isMock
-              ? `${text.name} is in mock mode, so nothing is actually sent; the attempt is recorded.`
-              : text.live
+              ? "E-mail is in mock mode, so nothing is actually sent; the attempt is recorded."
+              : "A short test e-mail will be sent to the recipient below. Limited to 3 per 10 minutes."
           }
         >
           <div className="mb-4 flex flex-col gap-1.5">

@@ -66,7 +66,6 @@ describe("integrations", () => {
       "database",
       "job_source",
       "ai",
-      "whatsapp",
       "email",
       "n8n",
     ]);
@@ -78,7 +77,7 @@ describe("integrations", () => {
       database: "CONNECTED",
       job_source: "MOCK",
       ai: "MOCK",
-      whatsapp: "MOCK",
+      email: "MOCK",
       n8n: "NOT_CONFIGURED",
     };
     for (const [name, state] of Object.entries(expected)) {
@@ -132,17 +131,17 @@ describe("integrations", () => {
     ).toBe(403);
   });
 
-  it("sends a WhatsApp test only to an opted-in recipient and audits it", async () => {
+  it("sends a test e-mail only to an opted-in recipient and audits it", async () => {
     const user = await createUser("OPERATOR");
     const pending = await call(createRecipient, {
       method: "POST",
       user,
-      body: { label: "Not opted in", phoneE164: "+14155550100", optInConfirmed: false },
+      body: { label: "Not opted in", email: "pending@example.com", optInConfirmed: false },
     });
     const blocked = await call(testMessage, {
       method: "POST",
       user,
-      params: { provider: "whatsapp" },
+      params: { provider: "email" },
       body: { recipientId: pending.json.data.id },
     });
     expect(blocked.status).toBe(409);
@@ -150,26 +149,28 @@ describe("integrations", () => {
     const ok = await call(createRecipient, {
       method: "POST",
       user,
-      body: { label: "Opted in", phoneE164: "+14155550101", optInConfirmed: true },
+      body: { label: "Opted in", email: "opted-in@example.com", optInConfirmed: true },
     });
     const sent = await call(testMessage, {
       method: "POST",
       user,
-      params: { provider: "whatsapp" },
+      params: { provider: "email" },
       body: { recipientId: ok.json.data.id },
     });
     expect(sent.status).toBe(200);
     expect(sent.json.data).toMatchObject({ status: "ACCEPTED", isMock: true });
     const audit = await getDb().select().from(auditTable).where(eq(auditTable.entityId, ok.json.data.id));
-    expect(audit.some((a) => a.action === "whatsapp.test_message")).toBe(true);
+    expect(audit.some((a) => a.action === "email.test_message")).toBe(true);
 
-    const wrongProvider = await call(testMessage, {
-      method: "POST",
-      user,
-      params: { provider: "ai" },
-      body: { recipientId: ok.json.data.id },
-    });
-    expect(wrongProvider.status).toBe(404);
+    for (const provider of ["ai", "whatsapp"]) {
+      const wrongProvider = await call(testMessage, {
+        method: "POST",
+        user,
+        params: { provider },
+        body: { recipientId: ok.json.data.id },
+      });
+      expect(wrongProvider.status).toBe(404);
+    }
   });
 });
 
@@ -187,7 +188,7 @@ describe("dashboard, exports and audit", () => {
     expect(mine.json.data.daily).toHaveLength(30);
     expect(mine.json.data.daily.at(-1).runs).toBe(1);
     expect(mine.json.data.daily[0].day).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect(mine.json.data.integrations).toHaveLength(6);
+    expect(mine.json.data.integrations).toHaveLength(5);
 
     const stranger = await createUser("OPERATOR");
     const theirs = await call(dashboard, { user: stranger });

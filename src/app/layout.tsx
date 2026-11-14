@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "sw
 
 export const metadata: Metadata = {
   title: { default: "LeadPilot AI", template: "%s | LeadPilot AI" },
-  description: "Finds Upwork jobs that match your rules and sends the best ones to WhatsApp.",
+  description: "Finds Upwork jobs that match your rules and e-mails you the best ones.",
   robots: { index: false, follow: false },
 };
 

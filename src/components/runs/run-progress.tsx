@@ -62,7 +62,7 @@ const STAGE_LABELS: Record<string, string> = {
   HARD_FILTERS: "Apply rules",
   AI_EVALUATION: "Score with AI",
   SELECTION: "Rank and pick leads",
-  NOTIFICATION: "Send WhatsApp alerts",
+  NOTIFICATION: "Send e-mail alerts",
   FINALIZATION: "Finish run",
 };
 

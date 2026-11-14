@@ -43,8 +43,6 @@ const LABELS: Array<[string, string]> = [
   ["ai.riskSensitivity", "Risk sensitivity"],
   ["ai.disqualifyingRiskFlags", "Disqualifying risk flags"],
   ["ai.maxRetries", "AI retries on invalid output"],
-  ["notifications.whatsappEnabled", "WhatsApp alerts"],
-  ["notifications.recipientId", "Alert recipient"],
   ["notifications.emailEnabled", "E-mail alerts"],
   ["notifications.emailRecipientId", "E-mail recipient"],
   ["search.keywords", "Search keywords"],
@@ -101,7 +99,7 @@ export function describeValue(
   currency?: string,
 ): string {
   if (value === null || value === undefined || value === "") return "None";
-  if (path === "notifications.recipientId" || path === "notifications.emailRecipientId") {
+  if (path === "notifications.emailRecipientId") {
     return recipientName?.(String(value)) ?? "Selected recipient";
   }
   if (MONEY_PATHS.has(path)) return formatMoney(String(value), currency ?? "USD");

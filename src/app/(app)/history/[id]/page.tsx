@@ -28,7 +28,7 @@ const STAGE_LABELS: Record<string, string> = {
   HARD_FILTERS: "Apply rules",
   AI_EVALUATION: "Score with AI",
   SELECTION: "Rank and pick leads",
-  NOTIFICATION: "Send WhatsApp alerts",
+  NOTIFICATION: "Send e-mail alerts",
   FINALIZATION: "Finish run",
 };
 
@@ -134,15 +134,15 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
 
       <Panel
         id="notifications"
-        title="WhatsApp alerts"
-        description="Sent means WhatsApp accepted the message; delivered and read come from WhatsApp status updates."
+        title="Alerts"
+        description="Sent means the mail server accepted the e-mail; it is not proof that it reached the inbox."
       >
         {notifications.items.length === 0 ? (
           <EmptyState title="No alerts were reserved in this run" />
         ) : (
           <div className="relative overflow-x-auto">
             <table className="tabular w-full text-left text-[13px]">
-              <caption className="sr-only">WhatsApp alerts for this run</caption>
+              <caption className="sr-only">Alerts for this run</caption>
               <thead className="text-muted">
                 <tr className="border-b border-line">
                   <th scope="col" className="px-4 py-2 font-medium">
@@ -233,11 +233,6 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
               <dd>
                 {snapshot.data.providers.ai}: {snapshot.data.providers.aiModel}
                 {snapshot.data.providers.aiIsMock && " (mock)"}
-              </dd>
-              <dt className="text-muted">WhatsApp</dt>
-              <dd>
-                {snapshot.data.providers.whatsapp}
-                {snapshot.data.providers.whatsappIsMock && " (mock)"}
               </dd>
               <dt className="text-muted">Prompt and rubric</dt>
               <dd>

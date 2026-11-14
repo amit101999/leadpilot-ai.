@@ -30,7 +30,7 @@ export default async function RunAgentPage({
         <h1 className="text-[28px] leading-tight font-semibold">Run Agent</h1>
         <p className="mt-1 max-w-prose text-sm text-muted">
           A run searches the job source once, checks every job against the profile&apos;s rules, scores the
-          rest with AI and sends the best matches to WhatsApp. The settings are frozen when the run starts.
+          rest with AI and e-mails you the best matches. The settings are frozen when the run starts.
         </p>
       </header>
 

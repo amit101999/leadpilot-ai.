@@ -29,24 +29,6 @@ const envSchema = z.object({
   OPENAI_MODEL: optionalString,
   OPENAI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(30000),
 
-  WHATSAPP_PROVIDER: z.enum(["mock", "cloud"]).default("mock"),
-  WHATSAPP_ACCESS_TOKEN: optionalString,
-  WHATSAPP_PHONE_NUMBER_ID: optionalString,
-  WHATSAPP_BUSINESS_ACCOUNT_ID: optionalString,
-  WHATSAPP_DEFAULT_RECIPIENT: optionalString,
-  WHATSAPP_WEBHOOK_VERIFY_TOKEN: optionalString,
-  WHATSAPP_APP_SECRET: optionalString,
-  WHATSAPP_TEMPLATE_NAME: optionalString,
-  WHATSAPP_SUMMARY_TEMPLATE_NAME: optionalString,
-  /** Meta provisions "hello_world" (no parameters) on new WhatsApp Business accounts. */
-  WHATSAPP_TEST_TEMPLATE_NAME: z.string().default("hello_world"),
-  WHATSAPP_TEMPLATE_LANGUAGE: z.string().default("en_US"),
-  WHATSAPP_GRAPH_API_VERSION: z
-    .string()
-    .regex(/^v\d+\.\d+$/)
-    .default("v21.0"),
-  WHATSAPP_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(15000),
-
   EMAIL_PROVIDER: z.enum(["mock", "smtp"]).default("mock"),
   SMTP_HOST: optionalString,
   SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),

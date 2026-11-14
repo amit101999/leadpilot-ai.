@@ -137,12 +137,12 @@ export const profileConfigSchema = z
       disqualifyingRiskFlags: termList(30),
       maxRetries: z.number().int().min(0).max(3),
     }),
+    // Configurations saved while WhatsApp alerts existed also hold `whatsappEnabled` and `recipientId`;
+    // unknown keys are dropped when parsing, so those versions still load.
     notifications: z.object({
-      whatsappEnabled: z.boolean(),
-      recipientId: z.uuid().nullable(),
       emailEnabled: z.boolean().default(false),
       emailRecipientId: z.uuid().nullable().default(null),
-      /** Shared by all channels: at most this many leads are alerted per run, on each enabled channel. */
+      /** At most this many leads are alerted per run. */
       maxPerRun: z.number().int().min(1).max(50),
       messageFormat: z.enum(["STANDARD", "COMPACT"]),
       sendRunSummary: z.boolean(),
@@ -188,13 +188,6 @@ export const profileConfigSchema = z
         message: `Keywords cannot be both included and excluded: ${overlap.join(", ")}`,
       });
     }
-    if (config.notifications.whatsappEnabled && !config.notifications.recipientId) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["notifications", "recipientId"],
-        message: "Select a recipient or disable WhatsApp notifications",
-      });
-    }
     if (config.notifications.emailEnabled && !config.notifications.emailRecipientId) {
       ctx.addIssue({
         code: "custom",
@@ -225,7 +218,7 @@ export type ProfileConfig = z.infer<typeof profileConfigSchema>;
 export type ProfileConfigInput = z.input<typeof profileConfigSchema>;
 
 /** Initial business configuration ("Web & Zoho Development"). Defaults only — never hardcoded rules. */
-export function defaultProfileConfig(recipientId: string | null = null): ProfileConfig {
+export function defaultProfileConfig(emailRecipientId: string | null = null): ProfileConfig {
   return {
     schemaVersion: CONFIG_SCHEMA_VERSION,
     general: { maxJobsToEvaluate: 50 },
@@ -282,10 +275,8 @@ export function defaultProfileConfig(recipientId: string | null = null): Profile
       maxRetries: 2,
     },
     notifications: {
-      whatsappEnabled: recipientId !== null,
-      recipientId,
-      emailEnabled: false,
-      emailRecipientId: null,
+      emailEnabled: emailRecipientId !== null,
+      emailRecipientId,
       maxPerRun: 10,
       messageFormat: "STANDARD",
       sendRunSummary: false,

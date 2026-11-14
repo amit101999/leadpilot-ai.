@@ -28,15 +28,16 @@ Docker and production problems see also [deployment.md](deployment.md#troublesho
 | Many jobs end as `AI_ERROR`                                                   | The AI returned invalid output or timed out after `maxRetries`. Check the Integrations page and `OPENAI_MODEL` / `OPENAI_TIMEOUT_MS`                           |
 | Nothing qualifies                                                             | Usually hard filters: budget minimum, fixed-price only and payment verification are strict by default. The job detail page lists each failed check             |
 
-## WhatsApp
+## E-mail alerts
 
-| Symptom                             | Cause and fix                                                                                                                        |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| No alerts sent                      | WhatsApp is off on the profile, no recipient is selected, or the recipient's opt-in is not confirmed                                 |
-| `FAILED_PERMANENT` with HTTP 400    | Template name, language or parameter count does not match the approved template ([whatsapp.md](whatsapp.md#setup))                   |
-| `UNCERTAIN`                         | The request timed out or the connection dropped. Wait for a status webhook; after 15 minutes an operator can retry with confirmation |
-| Webhook calls answer 401            | `WHATSAPP_APP_SECRET` is missing or wrong                                                                                            |
-| Integrations shows `NOT_CONFIGURED` | The listed variables are missing; the message names them                                                                             |
+| Symptom                              | Cause and fix                                                                                                                            |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| No alerts sent                       | E-mail alerts are off on the profile, no e-mail recipient is selected, or the recipient's opt-in is not confirmed                        |
+| Alerts are recorded but never arrive | `EMAIL_PROVIDER` is `mock` (the banner at the top of the app says so). Set `EMAIL_PROVIDER=smtp` and the `SMTP_*` values                 |
+| `FAILED_PERMANENT`, login/auth error | Wrong `SMTP_USER` / `SMTP_PASSWORD`. For Gmail use an app password (Google account → Security → App passwords), not the account password |
+| `SENT` but not in the inbox          | The server accepted it; check the spam folder and that `EMAIL_FROM` matches the SMTP account                                             |
+| `UNCERTAIN`                          | The connection dropped mid-send. It may have arrived; after 15 minutes an operator can retry with confirmation                           |
+| Integrations shows `NOT_CONFIGURED`  | The listed variables are missing; the message names them                                                                                 |
 
 ## Sign-in
 

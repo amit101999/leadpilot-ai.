@@ -93,25 +93,25 @@ parses and validates input with zod, calls a module in `src/modules`, and return
 
 ### Notifications and recipients
 
-| Method | Path                           | Access   | Purpose                                                                                                                                    |
-| ------ | ------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| GET    | `/api/notifications`           | VIEWER   | Own alerts, filterable by status                                                                                                           |
-| POST   | `/api/notifications/:id/retry` | OPERATOR | Retry a failed alert; an `UNCERTAIN` one only after 15 minutes and with `confirmNotReceived: true`. Rate limited                           |
-| GET    | `/api/recipients`              | VIEWER   | Own recipients (phone numbers and e-mail addresses masked)                                                                                 |
-| POST   | `/api/recipients`              | OPERATOR | WhatsApp: `{ label, phoneE164, optInConfirmed }` (E.164, `channel` optional); e-mail: `{ channel: "EMAIL", label, email, optInConfirmed }` |
-| PATCH  | `/api/recipients/:id`          | OPERATOR | `{ label?, optInConfirmed?, archived? }`: rename, confirm opt-in, archive                                                                  |
+| Method | Path                           | Access   | Purpose                                                                                                                    |
+| ------ | ------------------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/notifications`           | VIEWER   | Own alerts, filterable by status                                                                                           |
+| POST   | `/api/notifications/:id/retry` | OPERATOR | Retry a failed alert; an `UNCERTAIN` one only after 15 minutes and with `confirmNotReceived: true`. Rate limited           |
+| GET    | `/api/recipients`              | VIEWER   | Own e-mail recipients (addresses masked)                                                                                   |
+| POST   | `/api/recipients`              | OPERATOR | `{ label, email, optInConfirmed }` (`channel` optional, must be `"EMAIL"`). Phone/WhatsApp recipients are refused with 400 |
+| PATCH  | `/api/recipients/:id`          | OPERATOR | `{ label?, optInConfirmed?, archived? }`: rename, confirm opt-in, archive                                                  |
 
 ### Integrations and administration
 
-| Method | Path                                      | Access   | Purpose                                                                             |
-| ------ | ----------------------------------------- | -------- | ----------------------------------------------------------------------------------- |
-| GET    | `/api/integrations/status`                | VIEWER   | Stored state of database, job source, AI, WhatsApp, e-mail, n8n (no external calls) |
-| POST   | `/api/integrations/:provider/check`       | OPERATOR | Live connection check for one integration; result stored. Rate limited              |
-| POST   | `/api/integrations/{whatsapp,email}/test` | OPERATOR | Send a test to an opted-in recipient of that channel (audited). Rate limited        |
-| GET    | `/api/import-tokens`                      | OPERATOR | Own import tokens (never the token itself)                                          |
-| POST   | `/api/import-tokens`                      | OPERATOR | `{ name }` → 201 with `data.token`, shown once (audited). Rate limited              |
-| POST   | `/api/import-tokens/:id/revoke`           | OPERATOR | Revoke an own token immediately (audited)                                           |
-| GET    | `/api/audit-logs`                         | ADMIN    | Audit log, filterable by action, actor and date                                     |
+| Method | Path                                | Access   | Purpose                                                                   |
+| ------ | ----------------------------------- | -------- | ------------------------------------------------------------------------- |
+| GET    | `/api/integrations/status`          | VIEWER   | Stored state of database, job source, AI, e-mail, n8n (no external calls) |
+| POST   | `/api/integrations/:provider/check` | OPERATOR | Live connection check for one integration; result stored. Rate limited    |
+| POST   | `/api/integrations/email/test`      | OPERATOR | Send a test e-mail to an opted-in recipient (audited). Rate limited       |
+| GET    | `/api/import-tokens`                | OPERATOR | Own import tokens (never the token itself)                                |
+| POST   | `/api/import-tokens`                | OPERATOR | `{ name }` → 201 with `data.token`, shown once (audited). Rate limited    |
+| POST   | `/api/import-tokens/:id/revoke`     | OPERATOR | Revoke an own token immediately (audited)                                 |
+| GET    | `/api/audit-logs`                   | ADMIN    | Audit log, filterable by action, actor and date                           |
 
 ### Job import (Upwork sync agent)
 
@@ -135,8 +135,6 @@ by index and skipped; the rest are imported.
 | ------ | ------------------------------------ | ---------------------------- | --------------------------------------------------------------------------- |
 | POST   | `/api/internal/runs/:id/steps/:step` | HMAC (`INTERNAL_API_SECRET`) | Run one pipeline step (n8n). See [n8n docs](../n8n/documentation/README.md) |
 | POST   | `/api/internal/runs/:id/fail`        | HMAC (`INTERNAL_API_SECRET`) | Mark a run failed from n8n's error branch; honours the lease                |
-| GET    | `/api/webhooks/whatsapp`             | verify token                 | Meta's subscription handshake (`hub.verify_token` must match)               |
-| POST   | `/api/webhooks/whatsapp`             | `X-Hub-Signature-256`        | Delivery status updates; signature checked with `WHATSAPP_APP_SECRET`       |
 
 Caddy answers `/api/internal/*` with 404 in production, so these routes are reachable only on the Docker network.
 
@@ -150,7 +148,7 @@ Fixed windows stored in Postgres (`src/lib/security/rate-limit.ts`), so they hol
 | Password change     | 5 per 15 minutes  | user                           |
 | Start run           | 10 per minute     | user                           |
 | Notification retry  | 20 per minute     | user                           |
-| WhatsApp test       | 3 per 10 minutes  | user                           |
+| Test e-mail         | 3 per 10 minutes  | user                           |
 | Integration check   | 20 per minute     | user                           |
 | CSV export          | 10 per minute     | user                           |
 | Import API          | 60 per minute     | import token                   |

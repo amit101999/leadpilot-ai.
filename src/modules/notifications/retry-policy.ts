@@ -3,7 +3,7 @@
  * countdown). No server-only imports: this module is bundled for the browser.
  */
 
-/** An UNCERTAIN send may still arrive; a manual retry must wait this long for a status webhook first. */
+/** An UNCERTAIN send may still arrive; a manual retry must wait this long first. */
 export const UNCERTAIN_RETRY_WAIT_MS = 15 * 60_000;
 
 export type RetryMode = "retry" | "confirm-after-wait" | "none";

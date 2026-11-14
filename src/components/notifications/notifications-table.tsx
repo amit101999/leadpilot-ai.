@@ -65,7 +65,10 @@ function columns(canOperate: boolean): ColumnDef<NotificationRow, unknown>[] {
       cell: ({ row }) => (
         <div>
           {row.original.recipientLabel}
-          <div className="text-muted">WhatsApp</div>
+          {/* Alerts are e-mail; WhatsApp rows can only be older records. */}
+          <div className="text-muted">
+            {row.original.channel === "EMAIL" ? "E-mail" : "WhatsApp (older alert)"}
+          </div>
         </div>
       ),
     },
@@ -158,11 +161,11 @@ export function NotificationsTable({
         columns={columns(canOperate)}
         data={rows}
         meta={meta}
-        caption="WhatsApp alerts"
+        caption="Alerts"
         defaultSort={{ key: "createdAt", dir: "desc" }}
         empty={
           <EmptyState title="No alerts match these filters">
-            Alerts appear when a run qualifies leads for a profile with WhatsApp turned on.
+            Alerts appear when a run qualifies leads for a profile with e-mail alerts turned on.
           </EmptyState>
         }
       />

@@ -456,7 +456,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           </ul>
         </Panel>
 
-        <Panel id="alerts" title="WhatsApp alerts" description="Sent means WhatsApp accepted the message.">
+        <Panel id="alerts" title="Alerts" description="Sent means the mail server accepted the e-mail.">
           {notifications.length === 0 ? (
             <EmptyState title="No alert for this job" />
           ) : (

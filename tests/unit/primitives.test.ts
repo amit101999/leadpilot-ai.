@@ -1,13 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { centsToString, convertCents, formatMoney, toCents } from "@/lib/money/decimal";
 import { escapeCsvCell, toCsv } from "@/lib/security/csv";
-import { signPayload, verifyMetaSignature, verifySignature } from "@/lib/security/hmac";
-import { maskPhone, sanitizeErrorMessage } from "@/lib/security/sanitize";
+import { signPayload, verifySignature } from "@/lib/security/hmac";
+import { sanitizeErrorMessage } from "@/lib/security/sanitize";
 import { isSafeLinkHref, validateJobUrl } from "@/lib/security/url";
 import { allowedFrom, assertTransition, canTransition } from "@/lib/state-machine";
 import { NOTIFICATION_TRANSITIONS } from "@/modules/notifications/transitions";
 import { RUN_JOB_TRANSITIONS, RUN_TRANSITIONS } from "@/modules/runs/transitions";
-import { createHmac } from "node:crypto";
 
 describe("money", () => {
   it("parses decimals exactly", () => {
@@ -59,14 +58,6 @@ describe("HMAC signing", () => {
     expect(verifySignature(secret, "{}", null).ok).toBe(false);
     expect(verifySignature(secret, "{}", "garbage").ok).toBe(false);
   });
-
-  it("verifies Meta webhook signatures", () => {
-    const body = '{"entry":[]}';
-    const sig = "sha256=" + createHmac("sha256", "appsecret").update(body).digest("hex");
-    expect(verifyMetaSignature("appsecret", body, sig)).toBe(true);
-    expect(verifyMetaSignature("appsecret", body + " ", sig)).toBe(false);
-    expect(verifyMetaSignature("appsecret", body, null)).toBe(false);
-  });
 });
 
 describe("CSV export", () => {
@@ -94,6 +85,5 @@ describe("URL and sanitization", () => {
       new Error("401 Bearer abc.def.ghi for user@example.com phone +15551234567 key sk-abcdefghijklmnop"),
     );
     expect(text).not.toMatch(/abc\.def|user@example|5551234567|sk-abcdef/);
-    expect(maskPhone("+15551234567")).toBe("+1•••••••567");
   });
 });

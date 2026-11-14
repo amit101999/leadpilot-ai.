@@ -82,7 +82,7 @@ export async function notifyStep(ctx: RunContext): Promise<StageResponse> {
  */
 export async function deliverNotification(
   db: Database,
-  providers: Pick<Providers, "whatsapp" | "email">,
+  providers: Pick<Providers, "email">,
   notification: NotificationRow,
   options: { manual: boolean; allowedFrom?: NotificationStatus[] },
 ): Promise<NotificationStatus | null> {
@@ -155,44 +155,34 @@ export async function deliverNotification(
   return status;
 }
 
-/** Hands the reserved message to the provider for its channel; the payload was built at selection time. */
+/** Hands the reserved e-mail to the provider; the message was built at selection time. */
 async function sendOnChannel(
-  providers: Pick<Providers, "whatsapp" | "email">,
+  providers: Pick<Providers, "email">,
   claimed: NotificationRow,
   recipient: RecipientRow,
 ): Promise<SendOutcome> {
-  if (claimed.channel === "EMAIL") {
-    const payload = claimed.payload as { email?: { subject: string; text: string; html: string } };
-    if (!recipient.email || !payload.email) {
-      return {
-        kind: "rejected",
-        retryable: false,
-        httpStatus: null,
-        error: "E-mail recipient or message missing",
-      };
-    }
-    return providers.email.send({
-      to: recipient.email,
-      ...payload.email,
-      idempotencyKey: claimed.idempotencyKey,
-    });
-  }
-  if (!recipient.phoneE164) {
+  if (claimed.channel !== "EMAIL") {
+    // Records from before WhatsApp alerts were removed cannot be sent any more.
     return {
       kind: "rejected",
       retryable: false,
       httpStatus: null,
-      error: "WhatsApp recipient has no phone number",
+      error: "WhatsApp alerts are no longer sent",
     };
   }
-  const payload = claimed.payload as { templateParams?: string[] };
-  return providers.whatsapp.send({
-    to: recipient.phoneE164,
-    kind: "lead",
-    templateParams: payload.templateParams ?? [],
-    previewText: claimed.messagePreview,
+  const payload = claimed.payload as { email?: { subject: string; text: string; html: string } };
+  if (!recipient.email || !payload.email) {
+    return {
+      kind: "rejected",
+      retryable: false,
+      httpStatus: null,
+      error: "E-mail recipient or message missing",
+    };
+  }
+  return providers.email.send({
+    to: recipient.email,
+    ...payload.email,
     idempotencyKey: claimed.idempotencyKey,
-    callbackData: claimed.idempotencyKey,
   });
 }
 

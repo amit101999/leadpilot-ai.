@@ -8,17 +8,13 @@ import { getProviders } from "@/modules/providers";
 
 const body = z.object({ recipientId: uuidParam });
 
-const TEST_CHANNELS = { whatsapp: "WHATSAPP", email: "EMAIL" } as const;
-
 /**
- * POST /api/integrations/{whatsapp|email}/test: sends a connection test to an
- * opted-in recipient of that channel. Lives under [provider] so it does not
- * shadow /api/integrations/[provider]/check.
+ * POST /api/integrations/email/test: sends a test e-mail to an opted-in recipient.
+ * Lives under [provider] so it does not shadow /api/integrations/[provider]/check.
  */
 export const POST = userRoute("OPERATOR", async ({ req, db, actor, params, requestId }) => {
-  const channel = TEST_CHANNELS[params.provider as keyof typeof TEST_CHANNELS];
-  if (!channel) throw notFound("Integration test");
-  await enforceRateLimit(db, RATE_LIMITS.whatsappTest, `user:${actor.id}`);
+  if (params.provider !== "email") throw notFound("Integration test");
+  await enforceRateLimit(db, RATE_LIMITS.testMessage, `user:${actor.id}`);
   const { recipientId } = await parseJson(req, body);
-  return sendTestMessage(db, getProviders(), actor, recipientId, requestId, channel);
+  return sendTestMessage(db, getProviders(), actor, recipientId, requestId);
 });

@@ -14,8 +14,9 @@ if (testUrl === process.env.DATABASE_URL) {
 process.env.DATABASE_URL = testUrl;
 process.env.APP_BASE_URL = "http://localhost:3000";
 process.env.LOG_LEVEL = "silent";
+// Never call real services from tests, whatever .env says (it may hold live SMTP or OpenAI settings).
 process.env.AI_PROVIDER = "mock";
-process.env.WHATSAPP_PROVIDER = "mock";
+process.env.EMAIL_PROVIDER = "mock";
 process.env.JOB_SOURCE_PROVIDER = "mock";
 process.env.RUN_EXECUTOR = "inprocess";
 

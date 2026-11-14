@@ -17,7 +17,7 @@ Task Scheduler (hourly) or you ─► scripts/upwork-sync.ps1 ─► claude -p "
   4. Upwork MCP find_jobs get for detailsWanted (≤ 15)            → .upwork-sync/<profile>/details/<id>.json
   5. node scripts/leadpilot-import.mjs commit        POST /api/import/jobs        → staged jobs + run STARTED/QUEUED/FAILED
   6. node scripts/leadpilot-import.mjs status        POST /api/import/sync-status → last sync time for the schedule
-LeadPilot run (source "upwork-import"): discovery reads the staged jobs → existing pipeline → e-mail/WhatsApp alerts
+LeadPilot run (source "upwork-import"): discovery reads the staged jobs → existing pipeline → e-mail alerts
 ```
 
 Code: agent instructions `.claude/skills/upwork-sync/SKILL.md`; bridge script `scripts/leadpilot-import.mjs`;

@@ -33,8 +33,8 @@ export default async function NotificationsPage({
       <header>
         <h1 className="text-[28px] leading-tight font-semibold">Notifications</h1>
         <p className="mt-1 max-w-prose text-sm text-muted">
-          Every WhatsApp alert and what happened to it. Sent means WhatsApp accepted the message; delivered
-          and read come only from WhatsApp&apos;s own status updates.
+          Every e-mail alert and what happened to it. Sent means the mail server accepted the e-mail; it is
+          not proof that it reached the inbox.
         </p>
       </header>
       <Panel id="notifications">

@@ -51,7 +51,7 @@ export default async function SettingsPage() {
       <Panel
         id="recipients"
         title="Alert recipients"
-        description="WhatsApp numbers and e-mail addresses that receive lead alerts. Choose them for each profile on the Search Profiles page."
+        description="E-mail addresses that receive lead alerts. Choose them for each profile on the Search Profiles page."
       >
         <RecipientsManager recipients={recipients} canEdit={hasRole(actor, "OPERATOR")} />
       </Panel>

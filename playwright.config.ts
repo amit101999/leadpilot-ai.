@@ -3,7 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 /**
  * Browser smoke tests. They run against TEST_DATABASE_URL (reset and seeded in
- * global-setup) with mock providers, so no real job source, AI or WhatsApp is
+ * global-setup) with mock providers, so no real job source, AI or e-mail is
  * ever called. They test a production build (`next build` + `next start`):
  * on-demand compilation in `next dev` made runs slow and flaky. The build uses
  * webpack because Turbopack refuses a node_modules that is a symlink/junction
@@ -50,8 +50,9 @@ export default defineConfig({
       NEXT_DIST_DIR: ".next-e2e",
       DATABASE_URL: testDatabaseUrl,
       APP_BASE_URL: BASE_URL,
+      // Never call real services from tests, whatever .env says.
       AI_PROVIDER: "mock",
-      WHATSAPP_PROVIDER: "mock",
+      EMAIL_PROVIDER: "mock",
       JOB_SOURCE_PROVIDER: "mock",
       RUN_EXECUTOR: "inprocess",
       LOG_LEVEL: "warn",

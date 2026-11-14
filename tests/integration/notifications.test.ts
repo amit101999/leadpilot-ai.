@@ -4,44 +4,41 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/modules/runs/executor", () => ({ dispatchRun: vi.fn(async () => ({ ok: true })) }));
 
-process.env.WHATSAPP_APP_SECRET = "test-app-secret";
-process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN = "test-verify-token";
-
 import { GET as listNotifications } from "@/app/api/notifications/route";
 import { POST as retry } from "@/app/api/notifications/[id]/retry/route";
 import { POST as createProfile } from "@/app/api/profiles/route";
 import { POST as createRecipient } from "@/app/api/recipients/route";
 import { GET as runNotifications } from "@/app/api/runs/[id]/notifications/route";
 import { POST as createRun } from "@/app/api/runs/route";
-import { GET as verifyWebhook, POST as webhook } from "@/app/api/webhooks/whatsapp/route";
 import { getDb } from "@/lib/database/client";
-import { agentRuns, auditLogs, notifications } from "@/lib/database/schema";
-import { createHmac } from "node:crypto";
+import { agentRuns, notifications } from "@/lib/database/schema";
 import { defaultProfileConfig } from "@/modules/profiles/config-schema";
 import { MockJobSourceProvider } from "@/modules/job-sources/mock-provider";
-import type { MockWhatsAppProvider } from "@/modules/notifications/mock-whatsapp";
+import type { MockEmailProvider } from "@/modules/notifications/mock-email";
 import { getProviders, setProvidersForTesting } from "@/modules/providers";
 import { runInProcess } from "@/modules/runs/engine";
 import { call, createUser, type TestUser } from "./helpers";
 
-const PHONE = "+14155550123";
-const whatsapp = () => getProviders().whatsapp as MockWhatsAppProvider;
-/** Lead alerts only; run summaries (alertOnFailure / sendRunSummary) are separate messages. */
-const leadMessages = () => whatsapp().sent.filter((m) => m.kind === "lead");
+const ADDRESS = "alerts-me@example.com";
+const email = () => getProviders().email as MockEmailProvider;
+const isSummary = (m: { idempotencyKey: string }) => m.idempotencyKey.startsWith("summary-");
+/** Lead alerts only; run summaries (alertOnFailure / sendRunSummary) are separate e-mails. */
+const leadMessages = () => email().sent.filter((m) => !isSummary(m));
 
-async function setup(user: TestUser, maxPerRun = 10) {
+async function setup(user: TestUser, maxPerRun = 10, sendRunSummary = false) {
   const recipient = await call(createRecipient, {
     method: "POST",
     user,
-    body: { label: "Me", phoneE164: PHONE, optInConfirmed: true },
+    body: { label: "Me", email: ADDRESS, optInConfirmed: true },
   });
   const recipientId = recipient.json.data.id as string;
-  return { recipientId, profileId: await addProfile(user, recipientId, maxPerRun) };
+  return { recipientId, profileId: await addProfile(user, recipientId, maxPerRun, sendRunSummary) };
 }
 
-async function addProfile(user: TestUser, recipientId: string, maxPerRun: number) {
+async function addProfile(user: TestUser, recipientId: string, maxPerRun: number, sendRunSummary = false) {
   const config = defaultProfileConfig(recipientId);
   config.notifications.maxPerRun = maxPerRun;
+  config.notifications.sendRunSummary = sendRunSummary;
   const profile = await call(createProfile, {
     method: "POST",
     user,
@@ -71,30 +68,7 @@ async function executeRun(user: TestUser, profileId: string) {
   return runId;
 }
 
-function signedWebhook(body: unknown, secret = "test-app-secret") {
-  const raw = JSON.stringify(body);
-  const signature = `sha256=${createHmac("sha256", secret).update(raw).digest("hex")}`;
-  return { raw, signature };
-}
-
-async function postWebhook(body: unknown, signature?: string) {
-  const signed = signedWebhook(body);
-  return call(webhook, {
-    method: "POST",
-    origin: null,
-    body,
-    headers: { "x-hub-signature-256": signature ?? signed.signature },
-  });
-}
-
-function statusPayload(statuses: unknown[]) {
-  return {
-    object: "whatsapp_business_account",
-    entry: [{ id: "WABA", changes: [{ field: "messages", value: { statuses } }] }],
-  };
-}
-
-beforeEach(() => whatsapp().reset());
+beforeEach(() => email().reset());
 afterEach(() => setProvidersForTesting(undefined));
 
 describe("notifications", () => {
@@ -106,7 +80,7 @@ describe("notifications", () => {
     expect(first.status).toBe(200);
     const sent = first.json.data.filter((n: { status: string }) => n.status === "SENT");
     expect(sent.length).toBeGreaterThan(0);
-    expect(JSON.stringify(first.json)).not.toContain(PHONE);
+    expect(JSON.stringify(first.json)).not.toContain(ADDRESS);
 
     const secondRun = await executeRun(user, profileId);
     const second = await call(runNotifications, { user, params: { id: secondRun } });
@@ -121,8 +95,8 @@ describe("notifications", () => {
     const list = await call(runNotifications, { user, params: { id: runId } });
     expect(list.json.data.length).toBeLessThanOrEqual(2);
     expect(leadMessages().length).toBeLessThanOrEqual(2);
-    // The limit covers lead alerts only; a failure summary (alertOnFailure) is a separate message.
-    const summaries = whatsapp().sent.filter((m) => m.kind === "summary");
+    // The limit covers lead alerts only; a failure summary (alertOnFailure) is a separate e-mail.
+    const summaries = email().sent.filter(isSummary);
     expect(summaries.length).toBeLessThanOrEqual(1);
   });
 
@@ -171,7 +145,7 @@ describe("notifications", () => {
     // Which run wins each job depends on timing; the guarantees are "at most once per job" and the limits.
     expect(rows.length).toBeGreaterThanOrEqual(10);
     expect(rows.length).toBeLessThanOrEqual(15);
-    const previews = leadMessages().map((m) => m.previewText);
+    const previews = leadMessages().map((m) => m.text);
     expect(new Set(previews).size).toBe(previews.length);
 
     const runs = await getDb()
@@ -184,11 +158,11 @@ describe("notifications", () => {
   it("keeps the qualification when a send fails and allows a manual retry (acceptance #11)", async () => {
     const user = await createUser("OPERATOR");
     const { profileId } = await setup(user, 1);
-    whatsapp().queueOutcome({
+    email().queueOutcome({
       kind: "rejected",
       retryable: false,
-      httpStatus: 400,
-      error: "Template rejected",
+      httpStatus: null,
+      error: "550 Mailbox unavailable",
     });
     const runId = await executeRun(user, profileId);
     const [failed] = (await call(runNotifications, { user, params: { id: runId } })).json.data;
@@ -205,7 +179,7 @@ describe("notifications", () => {
   it("does not retry an uncertain send early or without confirmation (acceptance #16)", async () => {
     const user = await createUser("OPERATOR");
     const { profileId } = await setup(user, 1);
-    whatsapp().queueOutcome({ kind: "uncertain", error: "timeout" });
+    email().queueOutcome({ kind: "uncertain", error: "timeout" });
     const runId = await executeRun(user, profileId);
     const [uncertain] = (await call(runNotifications, { user, params: { id: runId } })).json.data;
     expect(uncertain.status).toBe("UNCERTAIN");
@@ -254,72 +228,29 @@ describe("notifications", () => {
   });
 });
 
-describe("WhatsApp status webhook", () => {
-  it("advances SENT -> DELIVERED -> READ and ignores backwards or unknown updates", async () => {
+describe("run summary e-mail", () => {
+  it("e-mails one summary per run to the profile's e-mail recipient when enabled", async () => {
     const user = await createUser("OPERATOR");
-    const { profileId } = await setup(user, 1);
+    const { profileId } = await setup(user, 1, true);
     const runId = await executeRun(user, profileId);
-    const [n] = (await call(runNotifications, { user, params: { id: runId } })).json.data;
-    const wamid = n.providerMessageId as string;
-
-    const res = await postWebhook(
-      statusPayload([
-        { id: wamid, status: "delivered", timestamp: "1750030080" },
-        { id: wamid, status: "read", timestamp: "1750030090" },
-        { id: wamid, status: "sent", timestamp: "1750030095" },
-        { id: "wamid.unknown", status: "delivered" },
-      ]),
-    );
-    expect(res.status).toBe(200);
-    expect(res.json.data).toEqual({ received: 4, applied: 2, ignored: 2 });
-    const [row] = await getDb().select().from(notifications).where(eq(notifications.id, n.id));
-    expect(row!.status).toBe("READ");
-    expect(row!.deliveredAt).not.toBeNull();
+    const summaries = email().sent.filter(isSummary);
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0]!.idempotencyKey).toBe(`summary-${runId}`);
+    expect(summaries[0]!.subject).toMatch(/^LeadPilot run /);
+    expect(summaries[0]!.text).toContain(`/history/${runId}`);
+    const [run] = await getDb().select().from(agentRuns).where(eq(agentRuns.id, runId));
+    expect(run!.summaryNotification).toMatchObject({ status: "SENT" });
   });
+});
 
-  it("reconciles an UNCERTAIN send through biz_opaque_callback_data", async () => {
+describe("removed WhatsApp alerts", () => {
+  it("refuses new WhatsApp recipients", async () => {
     const user = await createUser("OPERATOR");
-    const { profileId } = await setup(user, 1);
-    whatsapp().queueOutcome({ kind: "uncertain", error: "timeout" });
-    const runId = await executeRun(user, profileId);
-    const [n] = (await call(runNotifications, { user, params: { id: runId } })).json.data;
-    const [row] = await getDb().select().from(notifications).where(eq(notifications.id, n.id));
-    expect(row!.status).toBe("UNCERTAIN");
-
-    await postWebhook(
-      statusPayload([
-        { id: "wamid.recovered", status: "sent", biz_opaque_callback_data: row!.idempotencyKey },
-      ]),
-    );
-    const [after] = await getDb().select().from(notifications).where(eq(notifications.id, n.id));
-    expect(after!.status).toBe("SENT");
-    expect(after!.providerMessageId).toBe("wamid.recovered");
-    const audit = await getDb().select().from(auditLogs).where(eq(auditLogs.entityId, n.id));
-    expect(audit.some((a) => a.action === "notification.reconciled")).toBe(true);
-  });
-
-  it("rejects an invalid signature", async () => {
-    const res = await postWebhook(statusPayload([]), "sha256=" + "0".repeat(64));
-    expect(res.status).toBe(401);
-  });
-
-  it("answers Meta's verification handshake only with the right token", async () => {
-    const ok = await verifyWebhook(
-      new (await import("next/server")).NextRequest(
-        "http://localhost:3000/api/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=test-verify-token&hub.challenge=12345",
-      ),
-      { params: Promise.resolve({}) },
-    );
-    expect(ok.status).toBe(200);
-    expect(await ok.text()).toBe("12345");
-
-    const bad = await call(verifyWebhook, {
-      path: "/api/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=wrong&hub.challenge=12345",
+    const res = await call(createRecipient, {
+      method: "POST",
+      user,
+      body: { channel: "WHATSAPP", label: "Phone", phoneE164: "+14155550123", optInConfirmed: true },
     });
-    expect(bad.status).toBe(403);
-    const xss = await call(verifyWebhook, {
-      path: "/api/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=test-verify-token&hub.challenge=%3Cscript%3E",
-    });
-    expect(xss.status).toBe(403);
+    expect(res.status).toBe(400);
   });
 });
