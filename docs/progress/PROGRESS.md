@@ -10,23 +10,24 @@ Last updated: 2026-11-14
 
 Plan: `C:\Users\ACER\.claude\plans\clever-noodling-finch.md`.
 
-| Phase                    | Scope                                                                     | Status                                                                                              |
-| ------------------------ | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Baseline                 | Pre-existing backend core committed                                       | ✅ Done (`703761f`)                                                                                 |
-| A. Foundation            | Seed, `.env.example`, page auth proxy, CSRF check                         | ✅ Merged to `main` (`ab4b7e1`); seed verified during B1                                            |
-| B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                     | ✅ Merged to `main` (`0bed021`); Turbopack build verified on main                                   |
-| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook      | ✅ Merged to `main` (`41e8d95`); Turbopack build verified on main                                   |
-| C1. UI (part 1)          | Design system, app shell, login, Dashboard, Run Agent                     | ✅ Merged to `main` (`71a0b50`); Turbopack build verified on main                                   |
-| C2. UI (part 2)          | Search History and run detail, Qualified Leads, All Jobs                  | ✅ Merged to `main` (`d742e0a`); Turbopack build verified on main                                   |
-| C3a. UI (part 3a)        | Search Profiles list, editor, version history                             | ✅ Merged to `main` (fast-forward, `e650286` + docs `a82ddab`)                                      |
-| C3b. UI (part 3b)        | Notifications, Integrations, Settings (incl. change password), Audit Logs | ✅ Merged to `main` (fast-forward `a82ddab` → `727c19b`, 2026-10-15); `d18e5f8` + docs `3730daf`    |
-| D. n8n                   | Run workflow calling the app's internal step API, lease-safe `/fail`      | ✅ Merged to `main` (same fast-forward); `9cf72ad`                                                  |
-| E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                                | ✅ Merged to `main` (same fast-forward); `62d69cc` + `7e34456`                                      |
-| F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                       | ✅ Merged to `main` (same fast-forward); `b806b52` + docs `727c19b`                                 |
-| G. Docs and final review | README, `docs/*.md`, full verification                                    | ✅ On `main` (`9b7b102` + PROGRESS `f492a9b`)                                                       |
-| H. Upwork sync           | Upwork sync via Claude + Upwork MCP, import API, e-mail alerts            | ✅ On `main` (`main` is at `fe3500c`, which contains `05b064a`); e2e 19/19 and build passed         |
-| Cloudflare Tunnel        | `docker-compose.cloudflare.yml`, `deploy/Caddyfile.cloudflare`            | ✅ Committed `ae68cdf` on `worktree-cloudflare-deploy` (2026-11-11); not merged; no real tunnel yet |
-| WhatsApp removal         | E-mail is the only alert channel                                          | 🟡 Committed in `worktree-cloudflare-deploy` (2026-11-14), not merged; all checks pass, e2e 19/19   |
+| Phase                    | Scope                                                                     | Status                                                                                           |
+| ------------------------ | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Baseline                 | Pre-existing backend core committed                                       | ✅ Done (`703761f`)                                                                              |
+| A. Foundation            | Seed, `.env.example`, page auth proxy, CSRF check                         | ✅ Merged to `main` (`ab4b7e1`); seed verified during B1                                         |
+| B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                     | ✅ Merged to `main` (`0bed021`); Turbopack build verified on main                                |
+| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook      | ✅ Merged to `main` (`41e8d95`); Turbopack build verified on main                                |
+| C1. UI (part 1)          | Design system, app shell, login, Dashboard, Run Agent                     | ✅ Merged to `main` (`71a0b50`); Turbopack build verified on main                                |
+| C2. UI (part 2)          | Search History and run detail, Qualified Leads, All Jobs                  | ✅ Merged to `main` (`d742e0a`); Turbopack build verified on main                                |
+| C3a. UI (part 3a)        | Search Profiles list, editor, version history                             | ✅ Merged to `main` (fast-forward, `e650286` + docs `a82ddab`)                                   |
+| C3b. UI (part 3b)        | Notifications, Integrations, Settings (incl. change password), Audit Logs | ✅ Merged to `main` (fast-forward `a82ddab` → `727c19b`, 2026-10-15); `d18e5f8` + docs `3730daf` |
+| D. n8n                   | Run workflow calling the app's internal step API, lease-safe `/fail`      | ✅ Merged to `main` (same fast-forward); `9cf72ad`                                               |
+| E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                                | ✅ Merged to `main` (same fast-forward); `62d69cc` + `7e34456`                                   |
+| F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                       | ✅ Merged to `main` (same fast-forward); `b806b52` + docs `727c19b`                              |
+| G. Docs and final review | README, `docs/*.md`, full verification                                    | ✅ On `main` (`9b7b102` + PROGRESS `f492a9b`)                                                    |
+| H. Upwork sync           | Upwork sync via Claude + Upwork MCP, import API, e-mail alerts            | ✅ On `main` (`main` is at `fe3500c`, which contains `05b064a`); e2e 19/19 and build passed      |
+| Cloudflare Tunnel        | `docker-compose.cloudflare.yml`, `deploy/Caddyfile.cloudflare`            | ✅ On `main` (`ae68cdf`, 2026-11-11); no real tunnel yet                                         |
+| WhatsApp removal         | E-mail is the only alert channel                                          | ✅ On `main` (`7ad2c19`, 2026-11-14); all checks pass, e2e 19/19                                 |
+| CI/CD                    | GitHub Actions checks + auto-deploy over Cloudflare Tunnel                | 🟡 Committed `a6f76ba` on `ci-cd` (2026-11-14), not pushed or merged; never run on GitHub        |
 
 ## Baseline (pre-existing work, committed 2026-10-11 as `703761f`)
 
@@ -931,8 +932,8 @@ Live run details (dev database):
 
 ## Cloudflare Tunnel deployment (`ae68cdf`, 2026-11-11, `worktree-cloudflare-deploy`)
 
-Based on `main` `fe3500c`. **Not merged to `main`.** A commit with the same message and author date (`8a3f980`) is on
-branch `ci-cd`. Full write-up in `docs/deployment.md`, section "Cloudflare Tunnel" (setup, Cloudflare Access with an
+Based on `main` `fe3500c`. Now on `main` (`main` and `origin/main` are at `7ad2c19`, which contains `ae68cdf`; checked
+2026-11-14). Full write-up in `docs/deployment.md`, section "Cloudflare Tunnel" (setup, Cloudflare Access with an
 import-API bypass, verification table "Cloudflare Tunnel (2026-11-11)").
 
 ### Implemented
@@ -967,11 +968,11 @@ import-API bypass, verification table "Cloudflare Tunnel (2026-11-11)").
 
 - Not verified: a real tunnel with a real token and domain, Cloudflare Access with the import bypass, and a full stack
   image build in this mode (the development PC lacked free memory for the image build).
-- Merge to `main` (developer).
+- ~~Merge to `main` (developer).~~ Done: on `main`.
 
-## WhatsApp removal: e-mail is the only alert channel (2026-11-14, uncommitted in `worktree-cloudflare-deploy`)
+## WhatsApp removal: e-mail is the only alert channel (`7ad2c19`, 2026-11-14)
 
-**Uncommitted working-tree changes** on top of `ae68cdf`.
+Committed as `7ad2c19` on top of `ae68cdf`; now on `main` and `origin/main`.
 
 ### Decision (developer, 2026-11-14)
 
@@ -1016,14 +1017,70 @@ C3 decision 8.
 ### Open items
 
 - ~~Commit the changes and record the e2e result.~~ Done 2026-11-14 (e2e 19/19).
-- Merge to `main` (developer).
+- ~~Merge to `main` (developer).~~ Done: `main` is at `7ad2c19`.
 - The `WHATSAPP` enum value, the phone column and the `WHATSAPP` column defaults stay in the schema by decision.
+
+## CI/CD: GitHub Actions with auto-deploy through Cloudflare Tunnel (`a6f76ba`, 2026-11-14, branch `ci-cd`)
+
+Based on `main` `7ad2c19`. **Not pushed and not merged.** Full write-up in `docs/deployment.md`, section "CI/CD"
+(one-time setup, cost table, rollback, troubleshooting, verification table "CI/CD (2026-11-14)").
+
+### Decisions (developer, 2026-11-14, as stated in the update request and the commit)
+
+1. Production is a Linux VPS running the existing Docker Compose stack behind Cloudflare Tunnel. Cloudflare
+   Workers/Pages was rejected: it cannot run Postgres or n8n, and argon2/nodemailer would need a rewrite.
+2. Auto-deploy on every push to `main`, only after every check passes, and only when the repository variable
+   `DEPLOY_ENABLED` is `true`.
+3. Deploy SSH goes through a separate, host-level `cloudflared` tunnel plus a Cloudflare Access service token; the
+   deploy key's `authorized_keys` entry forces `scripts/deploy.sh`.
+4. No application secrets in GitHub: it holds only deploy credentials (SSH key, known hosts, Access service token).
+
+### Implemented
+
+- `.github/workflows/ci.yml`: runs on pull requests, pushes and `workflow_dispatch`; jobs `quality` (format, lint,
+  types, unit tests), `integration` and `e2e` (Postgres service containers, throwaway secrets, mock providers; Playwright
+  traces uploaded on failure), `build` (production build and `docker compose config` validation), and `deploy`
+  (`needs` all four; `if` push to `refs/heads/main` and `vars.DEPLOY_ENABLED == 'true'`). Actions pinned to SHAs,
+  `cloudflared` download checksum-verified, `permissions: contents: read`, SSH material removed in an `always()` step.
+  Deploy inputs: variable `DEPLOY_SSH_HOST`; secrets `DEPLOY_SSH_KEY`, `SSH_KNOWN_HOSTS`, `CF_ACCESS_CLIENT_ID`,
+  `CF_ACCESS_CLIENT_SECRET` (names only).
+- `scripts/deploy.sh`: forced-command deploy on the server. Accepts only a 40-hex SHA that is on `origin/main`, takes a
+  lock, refuses when tracked files are edited, backs up the database, checks out the commit, rebuilds and restarts the
+  stack (migrations through the `migrate` service), waits until every service is healthy (timeout
+  `DEPLOY_HEALTH_TIMEOUT`, default 300 s), writes `.deployed-sha`, and prints diagnostics on failure. Expects the
+  server's `.env` to set `COMPOSE_FILE` and `COMPOSE_PROFILES`.
+- `.gitignore` and `.dockerignore`: `.deployed-sha`, `.deploy.lock`.
+- `eslint.config.mjs`: ignores `.claude/worktrees/**` (local lint was scanning every worktree).
+- Docs: `docs/deployment.md` (new "CI/CD" section), `docs/testing.md`, `docs/security.md`, `README.md`.
+
+### Verification (2026-11-14, local; reported by the implementing session, not re-run by the tracker)
+
+| Check                                                                                                    | Result                                                                     |
+| -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `actionlint` 1.7.7 on the workflow; `shellcheck` 0.10.0 on `scripts/deploy.sh`                           | ✅ clean                                                                   |
+| `deploy.sh` in a Debian 12 container with stubbed `docker`: every refusal and failure path, success path | ✅ refusals changed nothing; failures exit 1 with diagnostics              |
+| `docker compose config` for base, prod and cloudflare files                                              | ✅                                                                         |
+| CI-equivalent: `format:check`, `lint`, `typecheck`                                                       | ✅ clean                                                                   |
+| CI-equivalent: unit / integration / e2e                                                                  | ✅ 148/148, 74/74, 19/19 (fresh `postgres:16.6`, workflow's throwaway env) |
+| `npm run build`                                                                                          | ✅                                                                         |
+
+### Not verified
+
+- A run on GitHub's runners.
+- A real deploy over the SSH tunnel and Access service token (the developer has no server or domain yet).
+- `scripts/deploy.sh` against a real Docker stack on a Linux server.
+
+### Open items
+
+- Push `ci-cd` and open a PR; the first GitHub run is the first real test of the workflow (developer).
+- Provision the VPS, domain, tunnels and Access service token, then set `DEPLOY_ENABLED` (developer).
 
 ## Environment notes
 
 - Windows 11, Node 22.17.0, Next.js 16.4.0 (16.4.5 on the Phase H branch), PostgreSQL 16 via Docker (`127.0.0.1:55432`).
 - Docker Desktop: Engine 29.7.2, Compose v5.4.0 (Phase E verification). Image builds need several GB free on C:.
-- No git remote configured; nothing has been pushed.
+- Remote `origin` is configured on GitHub; `main` and `worktree-cloudflare-deploy` are
+  pushed. `ci-cd` is not pushed (2026-11-14).
 - Phase G: the Turbopack build passed in the worktree because it had its own `npm ci` `node_modules` (earlier worktrees
   used a junction outside the project root, which Turbopack rejects).
 - No OpenAI, SMTP or Upwork API credentials; those integrations run in mock mode. WhatsApp was removed on 2026-11-14. Phase H reaches Upwork only
