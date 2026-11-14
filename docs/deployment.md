@@ -111,7 +111,7 @@ nameservers point to Cloudflare). The Cloudflare features used here (DNS, Tunnel
 ```
 Browser ─HTTPS─► Cloudflare ─(outbound tunnel)─► cloudflared ─HTTP─► caddy:80 ─► web:3000 ─► postgres
                                                   └──────────── Docker network, nothing published ────────────┘
-Upwork sync agent (your PC, Claude Code) ─HTTPS─► https://APP_DOMAIN/api/import/*  (import token)
+Upwork sync agent (your PC or a Claude cloud routine) ─HTTPS─► https://APP_DOMAIN/api/import/*  (import token)
 ```
 
 `cloudflared` connects out to Cloudflare; Cloudflare sends visitors for `APP_DOMAIN` down that connection. Caddy stays
@@ -166,7 +166,10 @@ Postgres is no longer published on `127.0.0.1:55432`, so `npm run dev` cannot re
 
 On the computer that runs the agent (Claude Code with the Upwork connector), create an import token on the **live**
 site (Settings → Import tokens) and set in that computer's `.env`: `LEADPILOT_URL=https://APP_DOMAIN` and
-`LEADPILOT_IMPORT_TOKEN`. Tokens from a local development database do not exist on the live site.
+`LEADPILOT_IMPORT_TOKEN`. Tokens from a local development database do not exist on the live site. To run the sync
+without a PC, set the same two values in a Claude Code cloud routine instead
+([upwork-sync.md](upwork-sync.md#running-the-sync-in-the-cloud-planned-production-setup)). The import script refuses a
+plain `http://` address other than localhost, so the token only travels over HTTPS.
 
 ### Optional: Cloudflare Access
 

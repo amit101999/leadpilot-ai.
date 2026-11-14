@@ -28,6 +28,7 @@ Plan: `C:\Users\ACER\.claude\plans\clever-noodling-finch.md`.
 | Cloudflare Tunnel        | `docker-compose.cloudflare.yml`, `deploy/Caddyfile.cloudflare`            | ✅ On `main` (`ae68cdf`, 2026-11-11); no real tunnel yet                                         |
 | WhatsApp removal         | E-mail is the only alert channel                                          | ✅ On `main` (`7ad2c19`, 2026-11-14); all checks pass, e2e 19/19                                 |
 | CI/CD                    | GitHub Actions checks + auto-deploy over Cloudflare Tunnel                | 🟡 Committed `a6f76ba` on `ci-cd` (2026-11-14), not pushed or merged; never run on GitHub        |
+| Cloud routine sync       | Upwork sync as a Claude cloud routine calling the public import API       | 🟡 Uncommitted on `cloud-routine-sync` (2026-11-14, based on `ci-cd`); routine not created       |
 
 ## Baseline (pre-existing work, committed 2026-10-11 as `703761f`)
 
@@ -1075,12 +1076,59 @@ Based on `main` `7ad2c19`. **Not pushed and not merged.** Full write-up in `docs
 - Push `ci-cd` and open a PR; the first GitHub run is the first real test of the workflow (developer).
 - Provision the VPS, domain, tunnels and Access service token, then set `DEPLOY_ENABLED` (developer).
 
+## Cloud routine sync: Upwork sync from a Claude Code on the web routine (2026-11-14, branch `cloud-routine-sync`)
+
+Worktree `.claude/worktrees/cloud-routine-sync`, based on `ci-cd` (`9f9bc24`). Committed on `cloud-routine-sync`. Full write-up in
+`docs/upwork-sync.md`, section "Running the sync in the cloud (planned production setup)".
+
+### Decision (developer, 2026-11-14, as stated in the update request)
+
+1. In production the Upwork sync runs as a Claude Code on the web scheduled cloud routine (hourly,
+   `/upwork-sync --scheduled`, using the Upwork connector from the developer's claude.ai account). It calls
+   LeadPilot's public import API through Cloudflare Tunnel with a dedicated import token. Claude Code CLI is **not**
+   installed on the VPS.
+2. The long-term alternative stays the official Upwork API key (provider still blocked).
+
+### Implemented
+
+- `scripts/leadpilot-import.mjs`: `import "dotenv/config"` replaced by Node's built-in `process.loadEnvFile(".env")`,
+  called only when `.env` exists, so the script runs without `npm install` in a cloud sandbox. Variables already in
+  the environment win over `.env`.
+- `scripts/lib/leadpilot-url.mjs` (+ `leadpilot-url.d.mts`): `resolveLeadPilotUrl` validates `LEADPILOT_URL` before
+  the token is sent: `https://` required except for `localhost`, `127.0.0.1`, `[::1]`; embedded credentials and other
+  schemes refused; trailing slashes stripped. Default stays `http://localhost:3000`.
+- `tests/unit/leadpilot-url.test.ts`: new unit tests for the validator.
+- Docs: `docs/upwork-sync.md` (new cloud section), `docs/deployment.md`, `docs/security.md`.
+
+### Verification (2026-11-14; reported by the implementing session, not re-run by the tracker)
+
+| Check                                            | Result                                   |
+| ------------------------------------------------ | ---------------------------------------- |
+| Unit tests                                       | ✅ 15 files, 152/152 (148 before)        |
+| ESLint, `tsc`                                    | ✅ clean; Prettier applied               |
+| Manual: `LEADPILOT_URL=http://leads.example.com` | ✅ refused before any request            |
+| Manual: run in a folder with no `node_modules`   | ✅ runs                                  |
+| Manual: environment variable vs `.env`           | ✅ environment variable overrides `.env` |
+
+Integration, e2e and build were not reported as re-run for this change.
+
+### Not verified
+
+- Whether a cloud routine can use the claude.ai Upwork connector and reach the LeadPilot domain (no public deployment
+  yet).
+- The routine itself: not created.
+
+### Open items
+
+- Decide `UPWORK_SYNC_SCHEDULED_ALLOWED` (developer).
+- After the VPS and tunnel exist: create the routine, issue a dedicated import token, test a scheduled run end to end.
+
 ## Environment notes
 
 - Windows 11, Node 22.17.0, Next.js 16.4.0 (16.4.5 on the Phase H branch), PostgreSQL 16 via Docker (`127.0.0.1:55432`).
 - Docker Desktop: Engine 29.7.2, Compose v5.4.0 (Phase E verification). Image builds need several GB free on C:.
 - Remote `origin` is configured on GitHub; `main` and `worktree-cloudflare-deploy` are
-  pushed. `ci-cd` is not pushed (2026-11-14).
+  pushed. `ci-cd` and `cloud-routine-sync` are not pushed (2026-11-14).
 - Phase G: the Turbopack build passed in the worktree because it had its own `npm ci` `node_modules` (earlier worktrees
   used a junction outside the project root, which Turbopack rejects).
 - No OpenAI, SMTP or Upwork API credentials; those integrations run in mock mode. WhatsApp was removed on 2026-11-14. Phase H reaches Upwork only
