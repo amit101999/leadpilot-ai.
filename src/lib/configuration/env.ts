@@ -29,7 +29,8 @@ const envSchema = z.object({
   OPENAI_MODEL: optionalString,
   OPENAI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(30000),
 
-  EMAIL_PROVIDER: z.enum(["mock", "smtp"]).default("mock"),
+  /** smtp = any mail server; brevo = Brevo HTTPS API (for hosts that block SMTP ports, e.g. Render free). */
+  EMAIL_PROVIDER: z.enum(["mock", "smtp", "brevo"]).default("mock"),
   SMTP_HOST: optionalString,
   SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
   /** "true" = TLS from the first byte (usually port 465); "false" = STARTTLS when the server offers it. */
@@ -42,6 +43,8 @@ const envSchema = z.object({
   /** Sender, e.g. "LeadPilot <alerts@example.com>". */
   EMAIL_FROM: optionalString,
   SMTP_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(15000),
+  BREVO_API_KEY: optionalString,
+  BREVO_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(15000),
 
   /** Scheduled (unattended) Upwork syncs get no due profiles until this is "true"; manual syncs always work. */
   UPWORK_SYNC_SCHEDULED_ALLOWED: z

@@ -1,0 +1,52 @@
+# Render Blueprint for LeadPilot (free plan). Setup: docs/deployment.md, "Render + Neon (free hosting)".
+#
+# One web service built from the Dockerfile (final `runner` stage). The database is Neon (free, external),
+# e-mail goes through Brevo's HTTPS API (Render's free plan blocks outbound SMTP ports), runs execute
+# in-process (no n8n), and migrations run at startup (MIGRATE_ON_START; the free plan has no pre-deploy step).
+# Render deploys a commit on main only after its GitHub checks (.github/workflows/ci.yml) have passed.
+services:
+  - type: web
+    name: leadpilot
+    runtime: docker
+    plan: free
+    region: frankfurt
+    branch: main
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeployTrigger: checksPass
+    domains:
+      - leads.peepalx.com
+    envVars:
+      # Fixed settings
+      - key: APP_BASE_URL
+        value: https://leads.peepalx.com
+      - key: MIGRATE_ON_START
+        value: "true"
+      - key: RUN_EXECUTOR
+        value: inprocess
+      - key: DATABASE_POOL_MAX
+        value: "5"
+      - key: LOG_LEVEL
+        value: info
+      - key: AI_PROVIDER
+        value: openai
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: EMAIL_PROVIDER
+        value: brevo
+      - key: JOB_SOURCE_PROVIDER
+        value: mock
+      - key: UPWORK_SYNC_SCHEDULED_ALLOWED
+        value: "false"
+      # Generated once by Render (base64, 256 bits); signs sessions and import tokens. Never change it.
+      - key: AUTH_SECRET
+        generateValue: true
+      # Secrets: entered in the Render dashboard when the Blueprint is created (never committed).
+      - key: DATABASE_URL # Neon connection string (direct, not "-pooler"), ending in ?sslmode=require
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: EMAIL_FROM # a sender verified in Brevo, e.g. "LeadPilot <alerts@peepalx.com>"
+        sync: false

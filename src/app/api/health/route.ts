@@ -10,7 +10,8 @@ export const GET = publicRoute(async ({ db }) => {
     await Promise.race([
       db.execute(sql`select 1`),
       new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error("timeout")), 2000);
+        // 5 s: a serverless database (Neon) can take a few seconds to wake from idle.
+        timer = setTimeout(() => reject(new Error("timeout")), 5000);
       }),
     ]);
   } catch {

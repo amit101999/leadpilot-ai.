@@ -80,7 +80,7 @@ export default async function IntegrationsPage() {
       ),
     },
     email: {
-      title: "E-mail (SMTP)",
+      title: "E-mail (SMTP or Brevo)",
       setup: (
         <>
           Set{" "}
@@ -95,8 +95,11 @@ export default async function IntegrationsPage() {
               "EMAIL_FROM",
             ]}
           />
-          . Any SMTP mailbox works, e.g. a Gmail address with an app password. The test checks the login
-          without sending anything.
+          . Any SMTP mailbox works, e.g. a Gmail address with an app password. Where SMTP ports are blocked
+          (Render&apos;s free plan), use <code className="text-xs">EMAIL_PROVIDER=brevo</code> with{" "}
+          <Vars names={["BREVO_API_KEY"]} /> and a sender verified in Brevo as{" "}
+          <code className="text-xs">EMAIL_FROM</code>. The test checks the login or API key without sending
+          anything.
         </>
       ),
     },

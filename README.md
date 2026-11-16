@@ -40,7 +40,9 @@ npm run dev                     # http://localhost:3000
 Everything runs with mock providers by default (`AI_PROVIDER=mock`, `EMAIL_PROVIDER=mock`,
 `JOB_SOURCE_PROVIDER=mock`), so no external service is called.
 
-Full Docker stack and production: [docs/deployment.md](docs/deployment.md). CI/CD: GitHub Actions tests every push
+Production runs free on Render + Neon at `https://leads.peepalx.com`
+([docs/deployment.md#render--neon-free-hosting](docs/deployment.md#render--neon-free-hosting)). Full Docker stack and
+other hosting: [docs/deployment.md](docs/deployment.md). CI/CD: GitHub Actions tests every push
 and deploys `main` to the server through a Cloudflare Tunnel ([docs/deployment.md#cicd](docs/deployment.md#cicd)).
 
 ## Commands

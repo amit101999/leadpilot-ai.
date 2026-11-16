@@ -1,5 +1,8 @@
 # Deployment, Docker and backups
 
+**Current production: [Render + Neon (free hosting)](#render--neon-free-hosting)** at `https://leads.peepalx.com`.
+The Docker Compose setups below remain supported for a server of your own (VPS, PC, Cloudflare Tunnel).
+
 LeadPilot ships as a Docker Compose stack. One `docker-compose.yml` serves four uses:
 
 | Use               | Command                                                                                               | What runs                                                                            |
@@ -62,6 +65,76 @@ static assets only) and `migrator` (dependencies plus sources, for migrations an
 
 The production override removes the other ports with Compose's `!reset` tag, which needs Docker Compose v2.24 or
 newer (verified with v5.4.0).
+
+## Render + Neon (free hosting)
+
+Chosen on 2026-11-16 because it costs nothing and needs no credit card (Oracle Cloud's free server needs one).
+File: [`render.yaml`](../render.yaml) (Render Blueprint).
+
+```
+Browser ─HTTPS─► leads.peepalx.com (Cloudflare DNS, CNAME) ─► Render free web service (Docker, runner image)
+                                                                 ├─► Neon free Postgres (TLS)
+                                                                 ├─► OpenAI API (scoring)
+                                                                 └─► Brevo API (lead e-mails)
+Upwork sync (Claude Code on your PC) ─HTTPS─► https://leads.peepalx.com/api/import/*  (import token)
+GitHub push to main ─► CI (.github/workflows/ci.yml) ─ all checks green ─► Render deploys that commit
+```
+
+How the app differs from the Docker Compose stack, all through settings in `render.yaml`:
+
+| Compose stack                            | On Render                                                                                                                                       | Why                                                                               |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `migrate` service runs migrations        | `MIGRATE_ON_START=true`: the server applies them at startup ([`src/instrumentation.ts`](../src/instrumentation.ts)); a failure stops the server | The free plan has no pre-deploy command                                           |
+| n8n runs the stages (`RUN_EXECUTOR=n8n`) | `RUN_EXECUTOR=inprocess`                                                                                                                        | One free service; n8n is not deployed                                             |
+| SMTP e-mail                              | `EMAIL_PROVIDER=brevo` ([`brevo-email.ts`](../src/modules/notifications/brevo-email.ts))                                                        | Render's free plan blocks outbound SMTP ports 25, 465 and 587                     |
+| Postgres container                       | Neon (`DATABASE_URL`, TLS)                                                                                                                      | Render's free Postgres is deleted after 30 days; Neon's free plan does not expire |
+| Caddy                                    | Render's own HTTPS proxy                                                                                                                        |                                                                                   |
+
+### Free-plan limits (checked 2026-11-16)
+
+- **Sleep:** the service stops after 15 minutes without requests; the next visit waits about a minute while it starts
+  (and applies migrations). A run in progress when it falls asleep stops; open it and click **Resume**. Keep the run
+  page open while a run is working: its progress polling counts as traffic.
+- **750 free hours a month per workspace**: enough for this one service; do not add a second free service.
+- **512 MB memory, shared CPU.** Enough for 3–4 users.
+- **Neon free:** 0.5 GB storage per project and 100 compute-hours a month; the database sleeps after 5 minutes idle
+  and wakes in about a second (the health check waits up to 5 s). Delete old runs/jobs if storage gets close.
+- **No shell on Render free:** one-off commands (the seed) run from your PC against `DATABASE_URL` (below).
+- **No backups on Neon free beyond its short history window.** Export now and then (`pg_dump` with the Neon URL).
+
+### One-time setup
+
+1. **Neon:** create project `leadpilot` in **AWS Europe Central (Frankfurt)** (same region as the Render service).
+   Copy the **direct** connection string (not the `-pooler` host) ending in `?sslmode=require`.
+2. **Brevo:** create a free account, verify the sender address under **Senders**, create an API key under
+   **SMTP & API → API keys**.
+3. **Render:** sign in with GitHub → **New → Blueprint** → pick this repository → Render reads `render.yaml` and asks
+   for the four `sync: false` values: `DATABASE_URL`, `OPENAI_API_KEY`, `BREVO_API_KEY`, `EMAIL_FROM`. `AUTH_SECRET`
+   is generated by Render; never change it later (it would sign everyone out and invalidate import tokens).
+4. **Domain:** Render → service → **Settings → Custom Domains** shows the target for `leads.peepalx.com`. In
+   Cloudflare → `peepalx.com` → **DNS**, add `CNAME leads → <service>.onrender.com` with **Proxy status: DNS only**
+   (grey cloud) so Render can issue the certificate. Wait until Render shows the domain as verified.
+5. **First admin** (once, from the repository on your PC; the password never leaves your machine):
+
+   ```sh
+   DATABASE_URL='<Neon direct URL>' SEED_ADMIN_EMAIL='you@example.com' SEED_ADMIN_PASSWORD='<12+ characters>' npm run db:seed
+   ```
+
+   On Windows PowerShell set the three values with `$env:NAME='...'` first. The service must have started once
+   (so the tables exist).
+
+6. Open `https://leads.peepalx.com`, sign in, create an import token (Settings), and put
+   `LEADPILOT_URL=https://leads.peepalx.com` and the token in your PC's `.env` for the Upwork sync.
+
+Use `https://leads.peepalx.com` only: the `*.onrender.com` address also answers, but forms there fail the CSRF origin
+check because `APP_BASE_URL` is the custom domain.
+
+### Deploys
+
+Push to `main` → GitHub Actions runs every check → when they all pass, Render builds the Docker image and deploys it
+(`autoDeployTrigger: checksPass`). Render keeps the previous version running until the new one answers its health
+check (`/api/health`); a failed migration or a missing setting therefore leaves the old version live. Roll back with
+**Render → service → Events → Rollback**.
 
 ## Production setup
 

@@ -6,6 +6,7 @@ import { MockJobSourceProvider } from "@/modules/job-sources/mock-provider";
 import type { JobSourceProvider } from "@/modules/job-sources/types";
 import { UpworkJobSourceProvider } from "@/modules/job-sources/upwork-provider";
 import type { EmailProvider } from "@/modules/notifications/email-provider";
+import { BrevoEmailProvider } from "@/modules/notifications/brevo-email";
 import { MockEmailProvider } from "@/modules/notifications/mock-email";
 import { SmtpEmailProvider } from "@/modules/notifications/smtp-email";
 
@@ -40,20 +41,32 @@ export function getProviders(): Providers {
       config.AI_PROVIDER === "openai"
         ? new OpenAiEvaluator(config.OPENAI_API_KEY, config.OPENAI_MODEL, config.OPENAI_TIMEOUT_MS)
         : new MockAiEvaluator(),
-    email:
-      config.EMAIL_PROVIDER === "smtp"
-        ? new SmtpEmailProvider({
-            host: config.SMTP_HOST,
-            port: config.SMTP_PORT,
-            secure: config.SMTP_SECURE,
-            user: config.SMTP_USER,
-            password: config.SMTP_PASSWORD,
-            from: config.EMAIL_FROM,
-            timeoutMs: config.SMTP_TIMEOUT_MS,
-          })
-        : new MockEmailProvider(),
+    email: createEmailProvider(config),
   };
   return cached;
+}
+
+function createEmailProvider(config: ReturnType<typeof env>): EmailProvider {
+  switch (config.EMAIL_PROVIDER) {
+    case "smtp":
+      return new SmtpEmailProvider({
+        host: config.SMTP_HOST,
+        port: config.SMTP_PORT,
+        secure: config.SMTP_SECURE,
+        user: config.SMTP_USER,
+        password: config.SMTP_PASSWORD,
+        from: config.EMAIL_FROM,
+        timeoutMs: config.SMTP_TIMEOUT_MS,
+      });
+    case "brevo":
+      return new BrevoEmailProvider({
+        apiKey: config.BREVO_API_KEY,
+        from: config.EMAIL_FROM,
+        timeoutMs: config.BREVO_TIMEOUT_MS,
+      });
+    default:
+      return new MockEmailProvider();
+  }
 }
 
 /** Test hook. Pass undefined to restore environment-based providers. */
