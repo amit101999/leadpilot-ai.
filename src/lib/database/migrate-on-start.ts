@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 import { logger } from "@/lib/logging/logger";
+import { normalizeDatabaseUrl } from "./url";
 
 /** Applies pending SQL migrations from database/migrations (idempotent). Exits the process on failure. */
 export async function runMigrations(): Promise<void> {
@@ -11,7 +12,7 @@ export async function runMigrations(): Promise<void> {
     logger.fatal("MIGRATE_ON_START is set but DATABASE_URL is missing");
     process.exit(1);
   }
-  const sql = postgres(url, { max: 1, onnotice: () => undefined });
+  const sql = postgres(normalizeDatabaseUrl(url), { max: 1, onnotice: () => undefined });
   try {
     await migrate(drizzle(sql), { migrationsFolder: path.join(process.cwd(), "database", "migrations") });
     logger.info("Database migrations applied");

@@ -2,6 +2,7 @@ import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { env } from "@/lib/configuration/env";
 import * as schema from "./schema";
+import { normalizeDatabaseUrl } from "./url";
 
 export type Database = PostgresJsDatabase<typeof schema>;
 /** A database handle or an open transaction; repositories accept either. */
@@ -14,7 +15,7 @@ const holder: Holder = (globalHolder.__leadpilotDb ??= {});
 export function getDb(): Database {
   if (!holder.db) {
     const config = env();
-    holder.sql = postgres(config.DATABASE_URL, {
+    holder.sql = postgres(normalizeDatabaseUrl(config.DATABASE_URL), {
       max: config.DATABASE_POOL_MAX,
       idle_timeout: 30,
       connect_timeout: 10,
