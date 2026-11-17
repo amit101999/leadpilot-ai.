@@ -38,7 +38,7 @@ services:
       - key: JOB_SOURCE_PROVIDER
         value: import
       - key: UPWORK_SYNC_SCHEDULED_ALLOWED
-        value: "false"
+        value: "true" # decided 2026-11-17 after reviewing Upwork's terms; scheduled syncs (cloud routine) are allowed
       # Generated once by Render (base64, 256 bits); signs sessions and import tokens. Never change it.
       - key: AUTH_SECRET
         generateValue: true

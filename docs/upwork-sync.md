@@ -60,7 +60,7 @@ schtasks /Create /TN "LeadPilot Upwork sync" /SC HOURLY /TR "powershell -NoProfi
 
 The PC must be on and logged in, LeadPilot and Postgres must be running, and each sync uses some Claude usage.
 
-## Running the sync in the cloud (planned production setup)
+## Running the sync in the cloud (production setup)
 
 Instead of a PC with Claude Code, the same agent can run as a **scheduled cloud agent (routine) of Claude Code on the
 web**: Anthropic's cloud clones this repository every hour, runs `/upwork-sync --scheduled` with the Upwork connector of
@@ -70,19 +70,19 @@ installed on the LeadPilot server, and no PC has to stay on.
 ```
 Claude cloud routine (hourly) ─► clone repo ─► /upwork-sync --scheduled
    ├─ Upwork connector (your claude.ai account) ─► find_jobs
-   └─ node scripts/leadpilot-import.mjs ─HTTPS + Bearer import token─► https://APP_DOMAIN/api/import/*
-                                                                         (Cloudflare Tunnel → LeadPilot)
+   └─ node scripts/leadpilot-import.mjs ─HTTPS + Bearer import token─► https://leads.peepalx.com/api/import/*
+                                                                         (Render → LeadPilot)
 ```
 
 The import script needs no `npm install` (Node built-ins only, Node ≥ 22.12), reads `LEADPILOT_URL` and
 `LEADPILOT_IMPORT_TOKEN` from the environment, and refuses to send the token to a plain `http://` address other than
 `localhost`, `127.0.0.1` or `[::1]` (`scripts/lib/leadpilot-url.mjs`).
 
-Setup, once LeadPilot is deployed at a public HTTPS address ([deployment.md](deployment.md#cloudflare-tunnel)):
+Setup (LeadPilot runs on Render at `https://leads.peepalx.com`, see [deployment.md](deployment.md)):
 
 0. On claude.ai: connect GitHub (`/web-setup` in Claude Code, or claude.ai/connect-github) so the cloud can clone
    this repository, and add the Upwork connector under **Customize → Connectors**. Routines can only use claude.ai
-   connectors, not MCP servers configured locally in Claude Code. (On 2026-11-14 neither was connected.)
+   connectors, not MCP servers configured locally in Claude Code. (Both connected and available to routines on 2026-11-17.)
 1. On the live site, **Settings → Import tokens**: create a token used only by the routine (e.g. named
    `cloud-routine`), so it can be revoked on its own.
 2. In the cloud environment of Claude Code on the web: set `LEADPILOT_URL=https://APP_DOMAIN` and
@@ -94,15 +94,16 @@ Setup, once LeadPilot is deployed at a public HTTPS address ([deployment.md](dep
    tools limited to Upwork `list_accounts` and `find_jobs`, `Bash(node scripts/leadpilot-import.mjs:*)` and file
    access under `.upwork-sync/` (the same list as `scripts/upwork-sync.ps1`).
 5. Set `UPWORK_SYNC_SCHEDULED_ALLOWED=true` on the server only after reading Upwork's terms (see
-   [Scheduling](#scheduling)); until then every scheduled run answers "Nothing due".
+   [Scheduling](#scheduling)); until then every scheduled run answers "Nothing due". Decided 2026-11-17: on
+   (`render.yaml`).
 
 Differences from the PC setup: there is no lock file, so two runs could overlap if one takes over an hour; LeadPilot
 already deduplicates jobs and queues imports while a run is active (`QUEUED`), so an overlap wastes Claude usage but does
 not create duplicates. The `.upwork-sync/` files live only in the temporary cloud copy. If Cloudflare Access protects the
 site, the `api/import` bypass in [deployment.md](deployment.md#optional-cloudflare-access) is required.
 
-**Status: not verified.** Whether cloud routines can use the claude.ai Upwork connector and reach the LeadPilot domain
-has not been tested (no public deployment exists yet). The PC setup above remains the working fallback.
+**Status (2026-11-17):** GitHub and the Upwork connector are available to routines; an end-to-end cloud run has not
+been verified yet. The PC setup above remains the fallback.
 
 ## What is imported
 
