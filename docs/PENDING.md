@@ -11,24 +11,24 @@ nice to have.
 
 ## Where things stand today
 
-| Area                                            | Status                                                                                                                                                                                                                     |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Code (app, pipeline, import API, e-mail alerts) | ✅ Built, tested (163 unit, 74 integration, 19 browser tests), on GitHub `main`                                                                                                                                            |
-| GitHub CI                                       | ✅ Runs on every push; all checks green on the last verified run                                                                                                                                                           |
-| Render (hosting)                                | ✅ Service `leadpilot` live at `https://leadpilot-hcrz.onrender.com`, health OK (re-checked 2026-11-17: HTTP 200 after a ~16 s wake-up), migrations applied                                                                |
-| Neon (database)                                 | ✅ Project `leadpilot` (Frankfurt) connected; 19 tables created                                                                                                                                                            |
-| Domain `leads.peepalx.com`                      | ❌ Does not resolve (NXDOMAIN, 2026-11-17). `peepalx.com` uses **GoDaddy** nameservers (`ns27`/`ns28.domaincontrol.com`), not Cloudflare, so records in Cloudflare are ignored. The CNAME must be added **in GoDaddy DNS** |
-| First login                                     | ❌ No user exists yet, so nobody can sign in                                                                                                                                                                               |
-| Brevo (e-mail)                                  | ⚠️ Key and sender set in Render, but no e-mail sent yet; domain authentication missing                                                                                                                                     |
-| OpenAI (AI scoring)                             | ⚠️ Key set in Render, never tested live                                                                                                                                                                                    |
-| Upwork jobs → LeadPilot                         | ⚠️ Works only from your PC through Claude Code; not yet pointed at the live site                                                                                                                                           |
+| Area                                            | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Code (app, pipeline, import API, e-mail alerts) | ✅ Built, tested (163 unit, 74 integration, 19 browser tests), on GitHub `main`                                                                                                                                                                                                                                                                                                                                                                              |
+| GitHub CI                                       | ✅ Runs on every push; all checks green on the last verified run                                                                                                                                                                                                                                                                                                                                                                                             |
+| Render (hosting)                                | ✅ Service `leadpilot` live at `https://leadpilot-hcrz.onrender.com`, health OK (re-checked 2026-11-17: HTTP 200 after a ~16 s wake-up), migrations applied                                                                                                                                                                                                                                                                                                  |
+| Neon (database)                                 | ✅ Project `leadpilot` (Frankfurt) connected; 19 tables created                                                                                                                                                                                                                                                                                                                                                                                              |
+| Domain `leads.peepalx.com`                      | ✅ CNAME `leads` → `leadpilot-hcrz.onrender.com` added in **GoDaddy** (the domain uses GoDaddy nameservers, not Cloudflare); Render shows it **Verified**; `https://leads.peepalx.com` answers 200 with a valid certificate (2026-11-17). Render still reports **Certificate Error**: the certificate served is `peepalx.com`/`*.peepalx.com` from Google Trust Services (issued 2026-11-02), not one Render issued, see [Domain DNS 3](#domain-dns-godaddy) |
+| First login                                     | ❌ No user exists yet, so nobody can sign in                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Brevo (e-mail)                                  | ⚠️ Key and sender set in Render, but no e-mail sent yet; domain authentication missing                                                                                                                                                                                                                                                                                                                                                                       |
+| OpenAI (AI scoring)                             | ⚠️ Key set in Render, never tested live                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Upwork jobs → LeadPilot                         | ⚠️ Works only from your PC through Claude Code; not yet pointed at the live site                                                                                                                                                                                                                                                                                                                                                                             |
 
 ---
 
 ## Minimum path to a working system (do these in order)
 
-1. **Add the DNS record in GoDaddy** (P0, You, 2 min): see [Domain DNS 1](#domain-dns-godaddy).
-2. **Wait for Render to verify `leads.peepalx.com` and issue HTTPS** (P0, automatic, 5–15 min).
+1. ~~**Add the DNS record in GoDaddy**~~ Done 2026-11-17.
+2. ~~**Wait for Render to verify `leads.peepalx.com`**~~ Verified 2026-11-17; HTTPS works (Render certificate status still red, see [Domain DNS 3](#domain-dns-godaddy)).
 3. **Create the first user** (P0, You, 2 min): see [Login and users 1](#login-and-users).
 4. **Sign in at `https://leads.peepalx.com`** and click **Test connection** on **Integrations** for AI scoring and e-mail
    (P0, You, 2 min).
@@ -71,18 +71,23 @@ automatic.
 **every DNS record must be added in GoDaddy**. Keep it that way: switching nameservers to Cloudflare would replace
 all existing records (Zoho mail, website) and could break your e-mail unless every record is copied first.
 
-1. **P0 · You · 2 min: add the CNAME in GoDaddy.** GoDaddy → **My Products → `peepalx.com` → DNS → Add New Record**:
+1. ~~**P0 · You · 2 min: add the CNAME in GoDaddy.**~~ **Done 2026-11-17.** GoDaddy → **My Products → `peepalx.com` → DNS → Add New Record**:
    Type **CNAME**, Name **`leads`**, Value **`leadpilot-hcrz.onrender.com`**, TTL default (1 hour) → **Save**. Do not
    change any other record. Check: `nslookup leads.peepalx.com` shows `leadpilot-hcrz.onrender.com` (usually within
    minutes, at most the TTL).
 2. **P1 · You (I can guide) · 10 min: e-mail authentication records for Brevo**, also in GoDaddy. See
    [E-mail 2](#e-mail-and-notifications-brevo).
-3. **P2 · You decide: clean up Cloudflare.** The Cloudflare zone for `peepalx.com` and the tunnel `leadpilot`
-   (Zero Trust → Networks → Tunnels) are unused. Leaving them costs nothing; deleting them avoids confusion.
+3. **P1 · You · 5 min: Render certificate.** Render shows _Certificate Error_ although the site serves a valid
+   certificate for `peepalx.com` and `*.peepalx.com` (Google Trust Services, issued 2026-11-02, before the Render
+   service existed). It most likely comes from the unused Cloudflare zone for `peepalx.com` (Render routes traffic
+   through Cloudflare). If Render still shows the error after an hour: delete the `peepalx.com` site in Cloudflare
+   (DNS is at GoDaddy, so nothing uses it), then click **Verify** again in Render → `leadpilot` → Settings → Custom
+   Domains, so Render issues and renews its own certificate.
+4. **P2 · You decide: delete the unused tunnel `leadpilot`** (Zero Trust → Networks → Tunnels). Costs nothing to keep.
 
 ## Render
 
-1. **P0 · automatic · 5–15 min: custom domain and HTTPS.** After the GoDaddy CNAME is saved, Render verifies
+1. ~~**P0 · automatic: custom domain and HTTPS.**~~ Verified 2026-11-17 (certificate status: see [Domain DNS 3](#domain-dns-godaddy)). After the GoDaddy CNAME is saved, Render verifies
    `leads.peepalx.com` and issues the certificate (Render → `leadpilot` → Settings → Custom Domains). If it stays
    "unverified" for more than an hour, tell me.
 2. **P1 · You · 2 min: replace `BREVO_API_KEY`.** The key you pasted in chat is exposed: delete it in Brevo, create a
