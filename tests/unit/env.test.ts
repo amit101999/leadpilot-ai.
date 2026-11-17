@@ -50,3 +50,29 @@ describe("mock providers in production", () => {
     expect(load({ NODE_ENV: "test" }).EMAIL_PROVIDER).toBe("mock");
   });
 });
+
+describe("admin login settings", () => {
+  it("is off by default", () => {
+    const config = load({});
+    expect(config.ADMIN_USERNAME).toBeUndefined();
+    expect(config.ADMIN_PASSWORD).toBeUndefined();
+  });
+
+  it("accepts a username and password together and lower-cases the username", () => {
+    const config = load({ ADMIN_USERNAME: " Test.Admin ", ADMIN_PASSWORD: "eight-ch" });
+    expect(config.ADMIN_USERNAME).toBe("test.admin");
+    expect(config.ADMIN_PASSWORD).toBe("eight-ch");
+  });
+
+  it("requires both settings", () => {
+    expect(() => load({ ADMIN_USERNAME: "test.admin" })).toThrow(/ADMIN_PASSWORD: .*set together/);
+    expect(() => load({ ADMIN_PASSWORD: "long-enough-password" })).toThrow(/ADMIN_USERNAME: .*set together/);
+  });
+
+  it("rejects a short password and a username with unsafe characters", () => {
+    expect(() => load({ ADMIN_USERNAME: "test.admin", ADMIN_PASSWORD: "short" })).toThrow(/ADMIN_PASSWORD/);
+    expect(() => load({ ADMIN_USERNAME: "a@b.com", ADMIN_PASSWORD: "long-enough" })).toThrow(
+      /ADMIN_USERNAME/,
+    );
+  });
+});

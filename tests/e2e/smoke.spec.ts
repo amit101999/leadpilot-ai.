@@ -14,7 +14,7 @@ test.describe("signed out", () => {
     await page.getByLabel("Password").fill("definitely-wrong");
     await page.getByRole("button", { name: "Sign in" }).click();
     // Next.js also renders an (empty) role="alert" route announcer, so match by text.
-    await expect(page.getByText("Invalid email or password.")).toBeVisible();
+    await expect(page.getByText("Invalid email, username or password.")).toBeVisible();
     expect(page.url()).not.toContain("password");
   });
 

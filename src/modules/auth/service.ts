@@ -3,13 +3,16 @@ import { and, eq, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { hashPassword, MIN_PASSWORD_LENGTH, verifyAgainstDummy, verifyPassword } from "@/lib/auth/password";
 import { createSession, deleteExpiredSessions, deleteSession } from "@/lib/auth/session";
+import { env } from "@/lib/configuration/env";
 import type { Database } from "@/lib/database/client";
 import { sessions, users } from "@/lib/database/schema";
 import { AppError } from "@/lib/http/errors";
 import { enforceRateLimit, RATE_LIMITS } from "@/lib/security/rate-limit";
 import { recordAudit, userActor } from "@/modules/audit/service";
+import { ensureEnvAdmin, isEnvAdminEmail, passwordMatches } from "./env-admin";
 
 export const loginSchema = z.object({
+  // An e-mail address, or the ADMIN_USERNAME (lower-cased here); the field name stays for API compatibility.
   email: z.string().trim().toLowerCase().max(254),
   password: z.string().min(1).max(256),
 });
@@ -31,22 +34,8 @@ export async function login(
   await enforceRateLimit(db, RATE_LIMITS.login, `ip:${meta.ipAddress}`);
   await enforceRateLimit(db, RATE_LIMITS.login, `email:${hashForBucket(input.email)}`);
 
-  const [user] = await db
-    .select({
-      id: users.id,
-      email: users.email,
-      role: users.role,
-      status: users.status,
-      passwordHash: users.passwordHash,
-    })
-    .from(users)
-    .where(sql`lower(${users.email}) = ${input.email}`)
-    .limit(1);
-
-  const valid = user
-    ? await verifyPassword(user.passwordHash, input.password)
-    : await verifyAgainstDummy(input.password);
-  if (!user || !valid || user.status !== "ACTIVE") {
+  const user = await findLoginUser(db, input);
+  if (!user || user.status !== "ACTIVE") {
     throw new AppError("UNAUTHENTICATED", INVALID_CREDENTIALS);
   }
 
@@ -61,6 +50,41 @@ export async function login(
     requestId: meta.requestId,
   });
   return { ...session, user: { id: user.id, email: user.email, role: user.role } };
+}
+
+/**
+ * Resolves the identifier and password to a user, or null. The identifier is either the ADMIN_USERNAME (checked
+ * against ADMIN_PASSWORD, see env-admin.ts) or an e-mail address (checked against the stored argon2 hash). Rows
+ * managed by the server settings can only sign in through the username, so an old password never outlives a change
+ * of ADMIN_PASSWORD. Unknown accounts still run one argon2 verification so timing does not reveal them.
+ */
+async function findLoginUser(db: Database, input: LoginInput) {
+  const config = env();
+  if (config.ADMIN_USERNAME && config.ADMIN_PASSWORD && input.email === config.ADMIN_USERNAME) {
+    if (!passwordMatches(config.ADMIN_PASSWORD, input.password)) {
+      await verifyAgainstDummy(input.password);
+      return null;
+    }
+    return ensureEnvAdmin(db, config.ADMIN_USERNAME);
+  }
+
+  const [user] = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      role: users.role,
+      status: users.status,
+      passwordHash: users.passwordHash,
+    })
+    .from(users)
+    .where(sql`lower(${users.email}) = ${input.email}`)
+    .limit(1);
+  if (!user || isEnvAdminEmail(user.email)) {
+    await verifyAgainstDummy(input.password);
+    return null;
+  }
+  if (!(await verifyPassword(user.passwordHash, input.password))) return null;
+  return { id: user.id, email: user.email, role: user.role, status: user.status };
 }
 
 export const changePasswordSchema = z
@@ -90,10 +114,16 @@ export async function changePassword(
 ): Promise<{ otherSessionsEnded: number }> {
   await enforceRateLimit(db, RATE_LIMITS.passwordChange, `user:${user.id}`);
   const [row] = await db
-    .select({ passwordHash: users.passwordHash })
+    .select({ email: users.email, passwordHash: users.passwordHash })
     .from(users)
     .where(eq(users.id, user.id))
     .limit(1);
+  if (row && isEnvAdminEmail(row.email)) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "This account's password is set in the server settings (ADMIN_PASSWORD); change it there",
+    );
+  }
   if (!row || !(await verifyPassword(row.passwordHash, input.currentPassword))) {
     throw new AppError("VALIDATION_ERROR", "The current password is not correct", [
       { path: "currentPassword", message: "The current password is not correct" },

@@ -12,6 +12,18 @@ const envSchema = z.object({
   AUTH_SECRET: z.string().min(32, "AUTH_SECRET must be at least 32 characters"),
   APP_BASE_URL: z.url().default("http://localhost:3000"),
   SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(72),
+  /**
+   * Optional single admin login defined by the server settings (no seed, no user management): sign in with this
+   * username and password. Both or neither. The app keeps one matching ADMIN user row in sync on login.
+   */
+  ADMIN_USERNAME: optionalString.pipe(
+    z
+      .string()
+      .regex(/^[A-Za-z0-9._-]{3,64}$/, "use 3-64 letters, digits, '.', '_' or '-'")
+      .transform((v) => v.toLowerCase())
+      .optional(),
+  ),
+  ADMIN_PASSWORD: optionalString.pipe(z.string().min(8, "must be at least 8 characters").max(256).optional()),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
 
   RUN_EXECUTOR: z.enum(["n8n", "inprocess"]).default("inprocess"),
@@ -76,6 +88,13 @@ const envSchema = z.object({
  * are never sent. The app then fails its health check, so a deploy stops with this message in the logs.
  */
 const envSchemaWithGuards = envSchema.superRefine((config, ctx) => {
+  if (Boolean(config.ADMIN_USERNAME) !== Boolean(config.ADMIN_PASSWORD)) {
+    ctx.addIssue({
+      code: "custom",
+      path: [config.ADMIN_USERNAME ? "ADMIN_PASSWORD" : "ADMIN_USERNAME"],
+      message: "ADMIN_USERNAME and ADMIN_PASSWORD must be set together",
+    });
+  }
   if (config.NODE_ENV !== "production" || config.ALLOW_MOCK_PROVIDERS) return;
   for (const name of ["AI_PROVIDER", "EMAIL_PROVIDER"] as const) {
     if (config[name] === "mock") {

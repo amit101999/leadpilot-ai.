@@ -18,7 +18,7 @@ nice to have.
 | Render (hosting)                                | ✅ Service `leadpilot` live at `https://leadpilot-hcrz.onrender.com`, health OK (re-checked 2026-11-17: HTTP 200 after a ~16 s wake-up), migrations applied                                                                                                                                                                                                                                                                                                  |
 | Neon (database)                                 | ✅ Project `leadpilot` (Frankfurt) connected; 19 tables created                                                                                                                                                                                                                                                                                                                                                                                              |
 | Domain `leads.peepalx.com`                      | ✅ CNAME `leads` → `leadpilot-hcrz.onrender.com` added in **GoDaddy** (the domain uses GoDaddy nameservers, not Cloudflare); Render shows it **Verified**; `https://leads.peepalx.com` answers 200 with a valid certificate (2026-11-17). Render still reports **Certificate Error**: the certificate served is `peepalx.com`/`*.peepalx.com` from Google Trust Services (issued 2026-11-02), not one Render issued, see [Domain DNS 3](#domain-dns-godaddy) |
-| First login                                     | ❌ No user exists yet, so nobody can sign in                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| First login                                     | ⏳ Code ready (branch `worktree-pending-fixes`): sign in with **username + password** from Render settings `ADMIN_USERNAME` / `ADMIN_PASSWORD`, no seed. Needs: merge to `main`, then set both values in Render                                                                                                                                                                                                                                              |
 | Brevo (e-mail)                                  | ⚠️ Key and sender set in Render, but no e-mail sent yet; domain authentication missing                                                                                                                                                                                                                                                                                                                                                                       |
 | OpenAI (AI scoring)                             | ⚠️ Key set in Render, never tested live                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Upwork jobs → LeadPilot                         | ⚠️ Works only from your PC through Claude Code; not yet pointed at the live site                                                                                                                                                                                                                                                                                                                                                                             |
@@ -29,7 +29,7 @@ nice to have.
 
 1. ~~**Add the DNS record in GoDaddy**~~ Done 2026-11-17.
 2. ~~**Wait for Render to verify `leads.peepalx.com`**~~ Verified 2026-11-17; HTTPS works (Render certificate status still red, see [Domain DNS 3](#domain-dns-godaddy)).
-3. **Create the first user** (P0, You, 2 min): see [Login and users 1](#login-and-users).
+3. **Set up the login** (P0, You, 3 min): merge the login change, then set `ADMIN_USERNAME` and `ADMIN_PASSWORD` in Render, see [Login and users 1](#login-and-users).
 4. **Sign in at `https://leads.peepalx.com`** and click **Test connection** on **Integrations** for AI scoring and e-mail
    (P0, You, 2 min).
 5. **Add yourself as an e-mail recipient** and run a test (P0, You, 5 min): see [E-mail 3](#e-mail-and-notifications-brevo).
@@ -44,7 +44,13 @@ automatic.
 
 ## Login and users
 
-1. **P0 · You · 2 min: create the first user.** The app has **no sign-up page**, so even a "simple login" needs one
+1. **P0 · You · 3 min: admin login from the Render settings (chosen 2026-11-17).** No seed needed: in Render →
+   `leadpilot` → **Environment**, add `ADMIN_USERNAME` (your username) and `ADMIN_PASSWORD` (8+ characters), save
+   (Render redeploys), then sign in at `https://leads.peepalx.com/login` with that username. The app creates one
+   ADMIN user record for it on first login. Change the password in Render, not in the app. Needs the login change on
+   `main` first (branch `worktree-pending-fixes`).
+
+   _Alternative (a real e-mail account, e.g. for more users later):_ the app has **no sign-up page**, so even a "simple login" needs one
    user in the database. The seed command creates it (role ADMIN, which is just the account that can do everything)
    plus a starter search profile. Run it in **your own PowerShell** from the project folder, so the password never
    passes through chat:

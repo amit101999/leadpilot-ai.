@@ -10,7 +10,8 @@ import { Field, Input } from "@/components/ui/field";
 import { ApiError, apiFetch } from "@/lib/http/client";
 
 const schema = z.object({
-  email: z.email("Enter a valid email address"),
+  // An e-mail address, or the admin username set in the server settings (ADMIN_USERNAME).
+  email: z.string().trim().min(1, "Enter your email or username").max(254),
   password: z.string().min(1, "Enter your password"),
 });
 type Values = z.infer<typeof schema>;
@@ -34,7 +35,7 @@ export function LoginForm({ next }: { next: string }) {
       if (error instanceof ApiError && error.code === "RATE_LIMITED") {
         setFormError("Too many sign-in attempts. Wait 15 minutes and try again.");
       } else if (error instanceof ApiError && error.status === 401) {
-        setFormError("Invalid email or password.");
+        setFormError("Invalid email, username or password.");
       } else {
         setFormError(error instanceof ApiError ? error.message : "Sign-in failed. Try again.");
       }
@@ -43,13 +44,15 @@ export function LoginForm({ next }: { next: string }) {
 
   return (
     // method="post": if the form is submitted before React hydrates, the browser must not
-    // fall back to a GET that would put the email and password in the URL (history, logs).
+    // fall back to a GET that would put the sign-in name and password in the URL (history, logs).
     <form method="post" onSubmit={handleSubmit(onSubmit)} noValidate className="mt-5 flex flex-col gap-4">
-      <Field id="email" label="Email" error={errors.email?.message}>
+      <Field id="email" label="Email or username" error={errors.email?.message}>
         <Input
           id="email"
-          type="email"
+          type="text"
           autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
           autoFocus
           aria-invalid={Boolean(errors.email)}
           aria-describedby={errors.email ? "email-error" : undefined}

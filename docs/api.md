@@ -44,13 +44,13 @@ parses and validates input with zod, calls a module in `src/modules`, and return
 
 ### Authentication and health
 
-| Method | Path                 | Access | Purpose                                                                                                       |
-| ------ | -------------------- | ------ | ------------------------------------------------------------------------------------------------------------- |
-| POST   | `/api/auth/login`    | public | `{ email, password }` → sets the session cookie. Same 401 for unknown e-mail and wrong password. Rate limited |
-| POST   | `/api/auth/logout`   | public | Deletes the session                                                                                           |
-| GET    | `/api/auth/me`       | VIEWER | The signed-in user                                                                                            |
-| POST   | `/api/auth/password` | VIEWER | Change own password; ends the user's other sessions. Rate limited                                             |
-| GET    | `/api/health`        | public | `{ status: "ok" }` and nothing else (used by Docker health checks)                                            |
+| Method | Path                 | Access | Purpose                                                                                                                                                                                                           |
+| ------ | -------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/api/auth/login`    | public | `{ email, password }` → sets the session cookie. `email` may also be the `ADMIN_USERNAME` (server-settings admin, checked against `ADMIN_PASSWORD`). Same 401 for unknown e-mail and wrong password. Rate limited |
+| POST   | `/api/auth/logout`   | public | Deletes the session                                                                                                                                                                                               |
+| GET    | `/api/auth/me`       | VIEWER | The signed-in user                                                                                                                                                                                                |
+| POST   | `/api/auth/password` | VIEWER | Change own password; ends the user's other sessions. Rate limited                                                                                                                                                 |
+| GET    | `/api/health`        | public | `{ status: "ok" }` and nothing else (used by Docker health checks)                                                                                                                                                |
 
 ### Search profiles
 
