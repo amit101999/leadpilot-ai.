@@ -4,7 +4,7 @@ Curated record of what has been built, decided and verified. Maintained by the
 `project-tracker` subagent (`.claude/agents/project-tracker.md`). The raw,
 automatic history is in `activity-log.md` (local, gitignored).
 
-Last updated: 2026-11-14
+Last updated: 2026-11-17
 
 ## Phase status
 
@@ -28,6 +28,7 @@ Plan: `C:\Users\ACER\.claude\plans\clever-noodling-finch.md`.
 | Cloudflare Tunnel        | `docker-compose.cloudflare.yml`, `deploy/Caddyfile.cloudflare`            | ✅ On `main` (`ae68cdf`, 2026-11-11); no real tunnel yet                                                 |
 | WhatsApp removal         | E-mail is the only alert channel                                          | ✅ On `main` (`7ad2c19`, 2026-11-14); all checks pass, e2e 19/19                                         |
 | CI/CD                    | GitHub Actions checks + auto-deploy over Cloudflare Tunnel                | 🟡 `a6f76ba` + review fixes `b3191c0` on `ci-cd` (2026-11-14), not pushed or merged; never run on GitHub |
+| Production data          | First search profile created in production (no code change)               | ✅ 2026-11-17; hourly sync for it not yet verified                                                       |
 
 ## Baseline (pre-existing work, committed 2026-10-11 as `703761f`)
 
@@ -1183,6 +1184,23 @@ Integration, e2e and build were not reported as re-run for this change.
 - Connect Upwork at claude.ai/customize/connectors and GitHub (`/web-setup` or claude.ai/connect-github), then run
   the one-off connector test (developer).
 - After the VPS and tunnel exist: create the routine, issue a dedicated import token, test a scheduled run end to end.
+
+## Production data: first search profile (2026-11-17, no code change)
+
+Created in production (`https://leads.peepalx.com`) from the logged-in admin's browser session with
+`POST /api/profiles`, then made default with `POST /api/profiles/<id>/default`. It is the first profile in production.
+The payload was validated locally against `createProfileSchema` before sending.
+
+- Profile `1e6f314d-5799-48c3-961b-2bad09dc9ace`, "Zoho – All Products & Development", version 1, default.
+- 16 Upwork search keywords (Zoho products, Deluge, ERP, manufacturing, developer); keyword coverage rule off.
+- 9 required Zoho skills in ANY mode (a job must clearly mention Zoho); optional skills include Deluge, automation,
+  ERP, API integrations, full stack, JS, Node, React.
+- Job type BOTH with no fixed or hourly minimum (budget check skipped); `maxJobsToEvaluate` 60.
+- Upwork sync enabled, every 1 hour, 08:00–22:00 UTC.
+- Client, AI scoring (min score 75) and notification settings are app defaults; e-mail alerts off because production
+  has no e-mail recipient yet.
+
+Not verified: an actual hourly sync run for this profile. Open: add an e-mail recipient, then enable alerts (developer).
 
 ## Environment notes
 
