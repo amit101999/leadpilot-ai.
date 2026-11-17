@@ -8,6 +8,9 @@ import {
   upworkMcpJobSchema,
 } from "@/modules/job-sources/upwork-import/normalize";
 import { localClock, syncDue, withinActiveHours } from "@/modules/imports/schedule";
+import detailsFixed from "../fixtures/upwork/details-fixed.json";
+import detailsHourly from "../fixtures/upwork/details-hourly.json";
+import searchHourly from "../fixtures/upwork/search-hourly.json";
 import { DEFAULT_SEARCH_CONFIG, type SearchConfig } from "@/modules/profiles/config-schema";
 
 /** Shape recorded from a real Upwork MCP `find_jobs` search result (2026-11-04). */
@@ -55,11 +58,15 @@ describe("Upwork MCP job mapping", () => {
       category: null,
     });
     expect(job.postedAt?.toISOString()).toBe("2026-11-02T23:31:51.448Z");
-    expect(job.sourceMetadata).toMatchObject({
-      detailsFetched: false,
+    expect(job.sourceMetadata).toEqual({ origin: "upwork-mcp", detailsFetched: false });
+    expect(job.posting).toMatchObject({
+      experienceLevel: "Intermediate",
       proposalsTier: "5 to 10",
-      client: { totalPostedJobs: 197, totalReviews: 88 },
+      detailsFetchedAt: null,
+      connectsCost: null,
     });
+    // Search data alone never identifies the client.
+    expect(job.client).toBeNull();
   });
 
   it("prefers job details for hires, category, currency and the client record", () => {
@@ -81,7 +88,7 @@ describe("Upwork MCP job mapping", () => {
             activityStat: { jobActivity: { totalHired: 1, invitesSent: 0 } },
           },
         },
-        client_feedback: { reviews: [{ comment: "free text that must be dropped" }] },
+        attachments: [{ link: "https://bucket.s3.amazonaws.com/x?X-Amz-Security-Token=must-be-dropped" }],
       },
     });
     expect(job).toMatchObject({
@@ -90,12 +97,112 @@ describe("Upwork MCP job mapping", () => {
       currency: "USD",
       description: "Full description from details.",
     });
-    expect(job.sourceMetadata).toMatchObject({
-      detailsFetched: true,
-      client: { hireRatePercent: 70, openJobs: 5 },
-      job: { totalHired: 1 },
+    expect(job.sourceMetadata).toEqual({ origin: "upwork-mcp", detailsFetched: true });
+    expect(job.posting).toMatchObject({ hiresMade: 1, invitesSent: 0 });
+    expect(job.posting.detailsFetchedAt).toBeInstanceOf(Date);
+    // Details without a client company id cannot be linked to a client.
+    expect(job.client).toBeNull();
+    expect(JSON.stringify(job)).not.toContain("must-be-dropped");
+  });
+
+  it("maps a recorded hourly job with its full client record", () => {
+    const now = new Date("2026-11-17T16:00:00Z");
+    const job = normalizeUpworkMcpJob(
+      upworkMcpJobSchema.parse({ ...searchHourly, details: detailsHourly }),
+      now,
+    );
+    expect(job).toMatchObject({
+      budgetType: "HOURLY",
+      hourlyMin: "10.00",
+      hourlyMax: "20.00",
+      clientRating: "4.99",
+      clientHires: 33,
+      clientTotalSpent: "34285.90",
+      clientCountry: "United States",
+      jobUrl: "https://www.upwork.com/jobs/~022122661073608733679",
     });
-    expect(JSON.stringify(job)).not.toContain("must be dropped");
+    expect(job.posting).toEqual({
+      subcategory: "Scripts & Utilities",
+      experienceLevel: "Expert",
+      duration: "1 to 3 months",
+      workload: "Part time",
+      personsToHire: 1,
+      proposalsTier: "50+",
+      connectsCost: 26,
+      featured: true,
+      invitesSent: 39,
+      interviewing: 25,
+      offersMade: 0,
+      hiresMade: 0,
+      workflowStatus: "ACTIVE",
+      preferredQualifications: detailsHourly.preferred_qualifications,
+      detailsFetchedAt: now,
+    });
+    expect(job.client).toMatchObject({
+      sourceClientId: "1001859645",
+      country: "United States",
+      state: "PA",
+      timezone: "America/New_York",
+      paymentVerified: true,
+      rating: "4.99",
+      reviewsCount: 16,
+      totalSpent: "34285.90",
+      totalHires: 33,
+      jobsWithHires: 27,
+      activeContracts: 7,
+      hoursTotal: "3606.17",
+      jobsPosted: 35,
+      openJobs: 1,
+      hireRatePercent: 77,
+    });
+    const client = job.client!;
+    expect(client.recentReviews).toHaveLength(2);
+    expect(client.recentReviews[0]).toMatchObject({ score: 5, endedAt: "2026-08-15T18:51:58.759Z" });
+    expect(client.recentReviews[0]!.comment).not.toContain("untrusted_participant_content");
+    expect(client.workHistory.open).toHaveLength(2);
+    expect(client.workHistory.closed[0]).toMatchObject({
+      type: "FIXED",
+      status: "CLOSED",
+      feedbackToClient: 5,
+    });
+    // Signed attachment links (temporary S3 credentials) never reach the stored record.
+    expect(JSON.stringify(job)).not.toContain("X-Amz");
+  });
+
+  it("maps a recorded fixed-price job with details but no search client block", () => {
+    const job = normalize({
+      id: "2121777721694126333",
+      title: "SuiteDash",
+      job_type: "fixed",
+      details: detailsFixed,
+    });
+    expect(job).toMatchObject({
+      budgetType: "FIXED",
+      budgetAmount: "250.00",
+      currency: "USD",
+      clientRating: "4.59",
+    });
+    expect(job.posting).toMatchObject({ subcategory: "Web Development", experienceLevel: "Intermediate" });
+    expect(job.client).toMatchObject({ sourceClientId: "4793565", state: "FL", hireRatePercent: 33 });
+    // Payment verification comes only from the search row: unknown here, never assumed.
+    expect(job.client!.paymentVerified).toBeNull();
+  });
+
+  it("clips third-party text and caps lists instead of rejecting the job", () => {
+    const review = { title: "t", comment: "c".repeat(5_000), score: 5 };
+    const job = normalize({
+      ...searchItem,
+      details: {
+        data: { marketplaceJobPosting: { clientCompanyPublic: { id: "77" } } },
+        client_feedback: { reviews: Array(9).fill(review) },
+        client_work_history: { closed: Array(9).fill({ title: "x".repeat(900) }) },
+      },
+    });
+    const client = job.client!;
+    expect(client.recentReviews).toHaveLength(5);
+    expect(client.recentReviews[0]!.comment).toHaveLength(2_000);
+    expect(client.workHistory.closed).toHaveLength(5);
+    expect(client.workHistory.closed[0]!.title).toHaveLength(300);
   });
 
   it("never assumes payment verification or a rating that is not there", () => {
@@ -125,6 +232,11 @@ describe("Upwork MCP job mapping", () => {
       hourlyMin: "15.00",
       hourlyMax: "30.00",
     });
+    // Upwork's search results separate the range with an en dash.
+    expect(normalize({ ...searchItem, job_type: "hourly", budget: "7.00–27.00/hr" })).toMatchObject({
+      hourlyMin: "7.00",
+      hourlyMax: "27.00",
+    });
   });
 
   it("rejects unexpected ids and oversized fields instead of storing them", () => {
@@ -152,7 +264,20 @@ describe("Upwork MCP job mapping", () => {
     const job = normalize(searchItem);
     const revived = parseStagedJob(JSON.parse(JSON.stringify(job)));
     expect(revived).toEqual(job);
+    const rich = normalize({ ...searchHourly, details: detailsHourly });
+    expect(parseStagedJob(JSON.parse(JSON.stringify(rich)))).toEqual(rich);
     expect(parseStagedJob({ title: "broken" })).toBeNull();
+  });
+
+  it("still loads payloads queued before posting and client data existed", () => {
+    const {
+      posting: _posting,
+      client: _client,
+      ...older
+    } = JSON.parse(JSON.stringify(normalize(searchItem)));
+    const revived = parseStagedJob(older);
+    expect(revived?.posting.detailsFetchedAt).toBeNull();
+    expect(revived?.client).toBeNull();
   });
 });
 

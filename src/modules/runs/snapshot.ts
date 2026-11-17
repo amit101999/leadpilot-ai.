@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PROMPT_VERSION } from "@/modules/ai/prompts/v1";
+import { PROMPT_VERSION } from "@/modules/ai/prompts/v2";
 import { profileConfigSchema, type ProfileConfig } from "@/modules/profiles/config-schema";
 import type { ProfileRow, ProfileVersionRow } from "@/modules/profiles/service";
 import type { Providers } from "@/modules/providers";

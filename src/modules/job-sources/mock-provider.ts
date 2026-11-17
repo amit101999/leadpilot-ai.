@@ -8,7 +8,7 @@ import type {
   SourceCapabilities,
   SourceConnectionResult,
 } from "./types";
-import { SourceNotAuthorizedError } from "./types";
+import { EMPTY_POSTING, SourceNotAuthorizedError } from "./types";
 
 const PAGE_SIZE = 8;
 
@@ -91,6 +91,8 @@ export class MockJobSourceProvider implements JobSourceProvider {
       skills: (r.tags ?? []).filter((t) => typeof t === "string").slice(0, 50),
       category: r.category ?? null,
       postedAt: r.posted ? new Date(r.posted) : null,
+      posting: EMPTY_POSTING,
+      client: null,
       sourceMetadata: r.mockAi ? { mockAi: r.mockAi, mock: true } : { mock: true },
     };
   }

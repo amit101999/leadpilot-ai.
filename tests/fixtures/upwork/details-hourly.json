@@ -1,0 +1,124 @@
+{
+  "applied": false,
+  "attachments": [
+    {
+      "fileName": "LeadFlowChart.png",
+      "fileSize": 996984,
+      "id": "55d052fc-8edf-42ae-ba1d-b1d2242dc489",
+      "link": "https://example-bucket.s3.us-west-2.amazonaws.com/opening-attachments/redacted?X-Amz-Security-Token=REDACTED&X-Amz-Signature=REDACTED"
+    }
+  ],
+  "can_apply": false,
+  "client_feedback": {
+    "more_available": true,
+    "reviews": [
+      {
+        "comment": "<untrusted_participant_content>\nIt was an amazing working experience and I enjoyed working with [name]. I'd love to work with him again.\n</untrusted_participant_content>",
+        "ended": "2026-08-15T18:51:58.759Z",
+        "score": 5,
+        "title": "Build CEO KPI Dashboard on Plecto or simialiar Softwares"
+      },
+      {
+        "comment": "<untrusted_participant_content>\nNice client but AnswerForce didn't have the option to integrate Bing tracking as they only have the GA4 method to track the calls.\n</untrusted_participant_content>",
+        "ended": "2024-10-24T12:45:35.326Z",
+        "score": 4,
+        "title": "PPC Conversion Tracking"
+      }
+    ],
+    "shown": 2
+  },
+  "client_record": {
+    "contracts_active": 7,
+    "contracts_total": 33,
+    "feedback_count": 16,
+    "feedback_score": 4.99,
+    "hire_rate_percent": 77,
+    "hours_total": 3606.17,
+    "jobs_posted": 35,
+    "jobs_with_hires": 27,
+    "open_jobs": 1,
+    "spend_total": "$34,285.90"
+  },
+  "client_work_history": {
+    "closed": [
+      {
+        "ended": "2026-08-15T18:51:58.759Z",
+        "feedback_score": 5,
+        "feedback_to_client_score": 5,
+        "started": "2026-06-28T13:37:09.918Z",
+        "status": "CLOSED",
+        "title": "Build CEO KPI Dashboard on Plecto or simialiar Softwares",
+        "type": "FIXED"
+      },
+      {
+        "ended": "2024-09-12T18:55:24.575Z",
+        "feedback_to_client_score": 5,
+        "started": "2024-09-12T18:51:25.681Z",
+        "title": "MLS Listing",
+        "type": "FIXED"
+      }
+    ],
+    "more_available": true,
+    "open": [
+      { "started": "2026-09-30T15:03:16.357Z", "title": "Upkeep Reports CRM", "type": "FIXED" },
+      {
+        "started": "2023-04-13T17:46:05.000Z",
+        "status": "ACTIVE",
+        "title": "Podio Integration with Email ",
+        "type": "FIXED"
+      }
+    ],
+    "shown": 4
+  },
+  "connects_balance": 0,
+  "connects_cost": 26,
+  "data": {
+    "marketplaceJobPosting": {
+      "activityStat": {
+        "jobActivity": {
+          "invitesSent": 39,
+          "totalHired": 0,
+          "totalInvitedToInterview": 25,
+          "totalOffered": 0
+        }
+      },
+      "classification": {
+        "category": { "id": "531770282580668418", "preferredLabel": "Web, Mobile & Software Dev" },
+        "subCategory": { "id": "531770282589057028", "preferredLabel": "Scripts & Utilities" }
+      },
+      "clientCompanyPublic": {
+        "country": { "name": "United States" },
+        "id": "1001859645",
+        "state": "PA",
+        "timezone": "America/New_York"
+      },
+      "content": {
+        "description": "<untrusted_participant_content>\nWe need a freelancer to help build and customize a CRM solution inside Zoho CRM. The work includes setting up modules, workflows, automation, and integrations to support our business processes.\n</untrusted_participant_content>",
+        "title": "Zoho CRM Customization Specialist"
+      },
+      "contractTerms": {
+        "contractType": "HOURLY",
+        "experienceLevel": "EXPERT",
+        "hourlyContractTerms": {
+          "engagementType": "PART_TIME",
+          "hourlyBudgetMax": 20,
+          "hourlyBudgetMin": 10,
+          "hourlyBudgetType": "MANUAL"
+        },
+        "personsToHire": 1
+      },
+      "id": "2122661073608733679",
+      "url": "https://www.upwork.com/jobs/~022122661073608733679?utm_campaign=LLM_claude_MCP_jobpost&utm_source=claude",
+      "workFlowState": { "status": "ACTIVE" }
+    }
+  },
+  "plan": "Freelancer Basic",
+  "preferred_qualifications": {
+    "english_proficiency": "Any",
+    "has_portfolio": false,
+    "min_hours_worked": 0,
+    "min_job_success_score": 0,
+    "rising_talent": false
+  },
+  "status": "ok"
+}

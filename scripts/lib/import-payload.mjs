@@ -1,19 +1,29 @@
 /**
  * Shapes the agent's raw Upwork MCP results into small import requests for LeadPilot.
  *
- * LeadPilot's import contract (src/modules/job-sources/upwork-import/normalize.ts) reads only a few
- * fields; raw `find_jobs get` responses also carry review comments, work history and other bulk.
- * Keeping only the read fields here keeps each request well under the server's 256 KB body limit.
+ * LeadPilot's import contract (src/modules/job-sources/upwork-import/normalize.ts) reads only the
+ * fields listed here. Everything else in a raw `find_jobs get` response is dropped, notably
+ * `attachments`, whose links carry temporary signed S3 credentials and must never be stored.
+ * Lists and free text are capped so each request stays well under the server's 256 KB body limit.
  */
 
 /** Same cap the server applies to descriptions. */
 const MAX_DESCRIPTION = 20_000;
+/** Same caps the server applies to client reviews and history lists. */
+const MAX_COMMENT = 2_000;
+const MAX_LIST = 5;
 /** Below the server's 256 KB request limit, leaving room for the JSON envelope. */
 export const MAX_REQUEST_BYTES = 200_000;
 export const MAX_JOBS_PER_REQUEST = 100;
 
-/** Copies only the listed keys (nested objects described by a sub-shape), dropping everything else. */
+/**
+ * Copies only the listed keys, dropping everything else. A nested object is described by a sub-shape;
+ * a list of objects by `[subShape]` (applied to each item, at most MAX_LIST items).
+ */
 function pick(value, shape) {
+  if (Array.isArray(shape)) {
+    return Array.isArray(value) ? value.slice(0, MAX_LIST).map((item) => pick(item, shape[0])) : undefined;
+  }
   if (value === null || typeof value !== "object" || Array.isArray(value)) return value;
   const out = {};
   for (const [key, sub] of Object.entries(shape)) {
@@ -23,7 +33,7 @@ function pick(value, shape) {
   return out;
 }
 
-const truncate = (text) => (typeof text === "string" ? text.slice(0, MAX_DESCRIPTION) : text);
+const truncate = (text, max = MAX_DESCRIPTION) => (typeof text === "string" ? text.slice(0, max) : text);
 
 const SEARCH_ITEM = {
   id: true,
@@ -36,8 +46,11 @@ const SEARCH_ITEM = {
   skills: true,
   experience_level: true,
   duration: true,
+  engagement: true,
+  featured: true,
   proposals_tier: true,
   freelancers_to_hire: true,
+  job_activity: { invites_sent: true, invited_to_interview: true, total_offered: true, total_hired: true },
   created_date: true,
   published_date: true,
   client: {
@@ -52,7 +65,9 @@ const SEARCH_ITEM = {
 
 const DETAILS = {
   client_record: {
+    contracts_active: true,
     contracts_total: true,
+    hours_total: true,
     jobs_with_hires: true,
     hire_rate_percent: true,
     jobs_posted: true,
@@ -64,16 +79,36 @@ const DETAILS = {
   data: {
     marketplaceJobPosting: {
       content: { title: true, description: true },
-      classification: { category: { preferredLabel: true } },
+      classification: { category: { preferredLabel: true }, subCategory: { preferredLabel: true } },
       contractTerms: {
         contractType: true,
+        experienceLevel: true,
+        personsToHire: true,
         fixedPriceContractTerms: { amount: { currency: true, rawValue: true } },
+        hourlyContractTerms: { engagementType: true, hourlyBudgetMin: true, hourlyBudgetMax: true },
       },
-      activityStat: { jobActivity: { totalHired: true, invitesSent: true } },
+      activityStat: {
+        jobActivity: {
+          totalHired: true,
+          invitesSent: true,
+          totalInvitedToInterview: true,
+          totalOffered: true,
+        },
+      },
       workFlowState: { status: true },
-      clientCompanyPublic: { country: { name: true } },
+      clientCompanyPublic: { id: true, country: { name: true }, state: true, timezone: true },
     },
   },
+  client_feedback: { reviews: [{ title: true, comment: true, score: true, ended: true }] },
+  client_work_history: {
+    open: [
+      { title: true, type: true, status: true, started: true, ended: true, feedback_to_client_score: true },
+    ],
+    closed: [
+      { title: true, type: true, status: true, started: true, ended: true, feedback_to_client_score: true },
+    ],
+  },
+  client_open_jobs: [{ id: true, title: true, job_type: true, url: true }],
   preferred_qualifications: true,
   connects_cost: true,
 };
@@ -86,6 +121,8 @@ export function slimJob(job, details) {
     const d = pick(details, DETAILS);
     const content = d.data?.marketplaceJobPosting?.content;
     if (content) content.description = truncate(content.description);
+    for (const review of d.client_feedback?.reviews ?? [])
+      review.comment = truncate(review.comment, MAX_COMMENT);
     slim.details = d;
   }
   return slim;

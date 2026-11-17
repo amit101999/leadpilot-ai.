@@ -1,4 +1,4 @@
-import type { NormalizedJob } from "@/modules/job-sources/types";
+import { EMPTY_POSTING, type NormalizedJob } from "@/modules/job-sources/types";
 import type { AiOutput } from "@/modules/ai/output-schema";
 
 /** A job that satisfies every hard filter of the default profile. */
@@ -24,6 +24,8 @@ export function makeJob(overrides: Partial<NormalizedJob> = {}): NormalizedJob {
     skills: ["React", "Node.js", "Zoho CRM"],
     category: "Web Development",
     postedAt: new Date("2026-10-01T10:00:00Z"),
+    posting: EMPTY_POSTING,
+    client: null,
     sourceMetadata: {},
     ...overrides,
   };

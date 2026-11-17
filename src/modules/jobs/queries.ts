@@ -3,6 +3,7 @@ import { ownerFilter, type Actor } from "@/lib/auth/authorization";
 import type { Database } from "@/lib/database/client";
 import { notFound } from "@/lib/http/errors";
 import type { JobProcessingStatus, NotificationStatus, QualificationDecision } from "@/types/domain";
+import { getClient, rowToClient } from "@/modules/clients/repository";
 
 /**
  * Read models for the All Jobs and Qualified Leads pages. Raw SQL is used for
@@ -252,6 +253,7 @@ export async function getJobDetail(db: Database, actor: Actor, jobId: string) {
     select * from jobs j
     where j.id = ${jobId} and exists (select 1 from run_jobs rj where rj.job_id = j.id and rj.run_id in (${visibleRuns}))`);
   if (!job) throw notFound("Job");
+  const clientRow = job.client_id ? await getClient(db, job.client_id as string) : null;
 
   const runJobRows = await db.execute(sql`
     select rj.*, r.created_at as run_created_at, r.status as run_status, p.name as profile_name, p.id as profile_id
@@ -279,6 +281,7 @@ export async function getJobDetail(db: Database, actor: Actor, jobId: string) {
 
   return {
     job: camelize(job),
+    client: clientRow ? rowToClient(clientRow) : null,
     runs: runJobRows.map(camelize),
     qualifications: qualificationRows.map(camelize),
     notifications: notificationRows.map(camelize),

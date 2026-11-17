@@ -1,0 +1,68 @@
+{
+  "applied": false,
+  "client_feedback": {
+    "reviews": [
+      {
+        "comment": "<untrusted_participant_content>\nGreat client! Just the kind you want to work for.\n</untrusted_participant_content>",
+        "ended": "2025-07-24T16:45:37.716Z",
+        "score": 5,
+        "title": "Create spreadsheets from pdfs"
+      }
+    ],
+    "shown": 1
+  },
+  "client_record": {
+    "contracts_active": 4,
+    "contracts_total": 46,
+    "feedback_count": 27,
+    "feedback_score": 4.59,
+    "hire_rate_percent": 33,
+    "hours_total": 2579.5,
+    "jobs_posted": 81,
+    "jobs_with_hires": 27,
+    "open_jobs": 1,
+    "spend_total": "$13,341.52"
+  },
+  "connects_cost": 14,
+  "data": {
+    "marketplaceJobPosting": {
+      "activityStat": {
+        "jobActivity": { "invitesSent": 5, "totalHired": 0, "totalInvitedToInterview": 4, "totalOffered": 0 }
+      },
+      "classification": {
+        "category": { "id": "531770282580668418", "preferredLabel": "Web, Mobile & Software Dev" },
+        "subCategory": { "id": "531770282584862733", "preferredLabel": "Web Development" }
+      },
+      "clientCompanyPublic": {
+        "country": { "name": "United States" },
+        "id": "4793565",
+        "state": "FL",
+        "timezone": "America/Sao_Paulo"
+      },
+      "content": {
+        "description": "<untrusted_participant_content>\nWe are seeking a tech-savvy freelancer to configure an existing SuiteDash CRM and client portal.\n</untrusted_participant_content>",
+        "title": "SuiteDash CRM & Client Portal Configuration"
+      },
+      "contractTerms": {
+        "contractType": "FIXED",
+        "experienceLevel": "INTERMEDIATE",
+        "fixedPriceContractTerms": {
+          "amount": { "currency": "USD", "displayValue": "250.0", "rawValue": "250.0" }
+        },
+        "personsToHire": 1
+      },
+      "id": "2121777721694126333",
+      "workFlowState": { "status": "ACTIVE" }
+    }
+  },
+  "preferred_qualifications": {
+    "contractor_type": "All freelancers",
+    "english_proficiency": "Any",
+    "has_portfolio": false,
+    "min_earnings": "Any",
+    "min_hours_worked": 0,
+    "min_job_success_score": 0,
+    "rising_talent": false
+  },
+  "status": "ok"
+}

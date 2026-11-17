@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import type { AiConnection, AiEvaluator, EvaluationInput } from "./evaluator";
 import { AiProviderError } from "./evaluator";
 import { aiOutputJsonSchema } from "./output-schema";
-import { buildUserMessage, SYSTEM_INSTRUCTIONS } from "./prompts/v1";
+import { buildUserMessage, SYSTEM_INSTRUCTIONS } from "./prompts/v2";
 
 /**
  * OpenAI Responses API with strict JSON-schema structured output. Retries are

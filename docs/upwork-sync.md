@@ -109,20 +109,38 @@ been verified yet. The PC setup above remains the fallback.
 
 Each job from Upwork search: id, title, description (full text when details were fetched), link (tracking parameters
 removed; only `https://www.upwork.com` links are kept), fixed/hourly, budget or hourly range, skills, posting time,
-experience level, duration, proposals tier and the client block (country, rating, reviews, jobs posted, total spend,
-payment verification). Job details add the category, currency and the client's hiring record (hires, hire rate, open
-jobs) plus hires/invites on the job and the Connects needed to apply. Review comments and work history are dropped.
+experience level, duration, workload (full/part time), featured flag, proposals tier, the posting's hiring activity
+(invites, interviews, offers, hires) and the client block (country, rating, reviews, jobs posted, total spend, payment
+verification).
+
+The job-detail call (`find_jobs get`) adds:
+
+- **Job** (columns on `jobs`): category and subcategory, contract experience level, freelancers to hire, hourly rate
+  range or fixed budget and currency, the hiring funnel, posting status, Connects needed to apply and the client's
+  preferred qualifications. `details_fetched_at` records when.
+- **Client** (one row per Upwork client in `clients`, keyed by Upwork's client company id, linked from `jobs.client_id`):
+  country, state, time zone, rating and review count, total spend, hires, jobs with hires, active contracts, hours
+  paid, jobs posted, open jobs, hire rate, plus up to 5 recent reviews (comments capped at 2,000 characters), up to 5
+  open and 5 closed contracts from the work history and up to 5 other open jobs. Every later detail call for any job of
+  that client refreshes the row.
+
+The reviews, contract titles and other job titles are text written by third parties: they are shown on the job page as
+plain text and are **never sent to the AI model**, which only receives the client's numbers. Anything else in the
+detail response is dropped; in particular `attachments`, whose links carry temporary signed S3 credentials, is never
+sent to LeadPilot or stored.
 
 Rules applied while mapping: payment verification is `true` only when Upwork says `VERIFIED`, missing values stay
-unknown; a 0 rating with no reviews is unknown; budgets without a stated currency are treated as USD (Upwork
-marketplace budgets); `<untrusted_participant_content>` wrappers are removed and job text is only ever data.
+unknown; a 0 rating with no reviews is unknown; the detail call's client figures win over the search row's (they are
+read live); hourly ranges are read from the contract terms, or from the search budget text ("10.00–20.00/hr", either
+dash); budgets without a stated currency are treated as USD (Upwork marketplace budgets);
+`<untrusted_participant_content>` wrappers are removed and job text is only ever data.
 
 ## Duplicates, re-imports and queueing
 
 - Jobs are keyed by `(upwork, Upwork job id)`, the same key a future official API adapter will use. A re-import updates
   the stored job (e.g. a raised budget) but keeps job details fetched earlier (full description, hires, category,
-  client record), whether they are stored or still queued, and a job is still alerted at most once per recipient and
-  channel.
+  posting details, client link), whether they are stored or still queued, and a job is still alerted at most once per
+  recipient and channel.
 - A job waits at most once per profile in `staged_jobs` (PENDING); a re-import while it waits refreshes it.
 - If a run for the profile is active when jobs arrive, they stay PENDING and the commit answers `QUEUED`. When any run
   of the profile ends, LeadPilot starts one follow-up import run for them, as the most recent importing user who can
@@ -141,11 +159,17 @@ values never reject at this point, and rules that need the full description or t
 skills, include keywords, keyword coverage, required combinations, client hires, category) are left to the run, after
 the detail call. Every rule is applied in full during the run.
 
+`detailsWanted` lists every job that passed screening, except jobs whose details were fetched in the last 24 hours (so
+client figures stay current without re-opening the same jobs every hour), up to `limits.maxDetailCalls` (40) per sync.
+The agent stops early when Upwork's job-browse cooldown starts; jobs without details are still imported with search
+data and get their details on a later sync.
+
 ## Request size
 
-`scripts/leadpilot-import.mjs` sends only the fields LeadPilot reads (`scripts/lib/import-payload.mjs`): job details are
-trimmed to the client record, contract terms, activity, category and description; descriptions are capped at 20,000
-characters; requests are split at 200 KB and 100 jobs, below the API's 256 KB body limit.
+`scripts/leadpilot-import.mjs` sends only the fields LeadPilot reads (`scripts/lib/import-payload.mjs`, an allowlist):
+descriptions are capped at 20,000 characters, review comments at 2,000 and each client list at 5 entries; requests are
+split at 200 KB and 100 jobs, below the API's 256 KB body limit. The server applies the same caps again
+(`src/modules/job-sources/upwork-import/normalize.ts`).
 
 ## Security
 

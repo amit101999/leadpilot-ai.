@@ -2,23 +2,51 @@ import { createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { DbExecutor } from "@/lib/database/client";
 import { jobs } from "@/lib/database/schema";
-import type { NormalizedJob } from "@/modules/job-sources/types";
+import { rowToClient, upsertClient, type ClientRow } from "@/modules/clients/repository";
+import type { NormalizedJob, PreferredQualifications } from "@/modules/job-sources/types";
 
 export type JobRow = typeof jobs.$inferSelect;
 
-export function contentHash(job: NormalizedJob): string {
-  const { sourceMetadata: _meta, ...content } = job;
+/** Hash of the posting's content; volatile activity counts and the client record are left out. */
+function contentHash(job: NormalizedJob): string {
+  const { sourceMetadata: _meta, posting: _posting, client: _client, ...content } = job;
   return createHash("sha256").update(JSON.stringify(content)).digest("hex");
 }
 
 /**
- * Inserts or refreshes a job by its stable (source, source_job_id) identity.
- * first_seen_at is preserved; last_seen_at and content are refreshed.
+ * Columns only a job-detail call (or a richer search row) supplies. A later import that lacks them
+ * keeps the stored values instead of erasing them.
+ */
+const KEEP_WHEN_MISSING = new Set([
+  "clientId",
+  "subcategory",
+  "experienceLevel",
+  "duration",
+  "workload",
+  "personsToHire",
+  "proposalsTier",
+  "connectsCost",
+  "featured",
+  "invitesSent",
+  "interviewing",
+  "offersMade",
+  "hiresMade",
+  "workflowStatus",
+  "preferredQualifications",
+  "detailsFetchedAt",
+]);
+
+/**
+ * Inserts or refreshes a job by its stable (source, source_job_id) identity, together with its
+ * client when the source identified one. first_seen_at is preserved; last_seen_at and content are
+ * refreshed.
  */
 export async function upsertJob(
   db: DbExecutor,
   job: NormalizedJob,
 ): Promise<{ id: string; firstSeenAt: Date }> {
+  const clientId = job.client ? await upsertClient(db, job.source, job.client) : null;
+  const { posting } = job;
   const values = {
     source: job.source,
     sourceJobId: job.sourceJobId,
@@ -39,6 +67,22 @@ export async function upsertJob(
     skills: job.skills,
     category: job.category,
     postedAt: job.postedAt,
+    clientId,
+    subcategory: posting.subcategory,
+    experienceLevel: posting.experienceLevel,
+    duration: posting.duration,
+    workload: posting.workload,
+    personsToHire: posting.personsToHire,
+    proposalsTier: posting.proposalsTier,
+    connectsCost: posting.connectsCost,
+    featured: posting.featured,
+    invitesSent: posting.invitesSent,
+    interviewing: posting.interviewing,
+    offersMade: posting.offersMade,
+    hiresMade: posting.hiresMade,
+    workflowStatus: posting.workflowStatus,
+    preferredQualifications: posting.preferredQualifications,
+    detailsFetchedAt: posting.detailsFetchedAt,
     sourceMetadata: job.sourceMetadata,
     contentHash: contentHash(job),
   };
@@ -46,8 +90,11 @@ export async function upsertJob(
     Object.keys(values)
       .filter((key) => key !== "source" && key !== "sourceJobId")
       .map((key) => {
-        const column = jobs[key as keyof typeof values];
-        return [key, sql.raw(`excluded."${column.name}"`)];
+        const column = jobs[key as keyof typeof values].name;
+        const value = KEEP_WHEN_MISSING.has(key)
+          ? `coalesce(excluded."${column}", "jobs"."${column}")`
+          : `excluded."${column}"`;
+        return [key, sql.raw(value)];
       }),
   );
   const [row] = await db
@@ -62,7 +109,8 @@ export async function upsertJob(
   return row;
 }
 
-export function rowToNormalized(row: JobRow): NormalizedJob {
+/** A stored job (and its client row, when linked) as the provider-neutral record. */
+export function rowToNormalized(row: JobRow, client: ClientRow | null = null): NormalizedJob {
   return {
     source: row.source,
     sourceJobId: row.sourceJobId,
@@ -83,6 +131,24 @@ export function rowToNormalized(row: JobRow): NormalizedJob {
     skills: Array.isArray(row.skills) ? (row.skills as string[]) : [],
     category: row.category,
     postedAt: row.postedAt,
+    posting: {
+      subcategory: row.subcategory,
+      experienceLevel: row.experienceLevel,
+      duration: row.duration,
+      workload: row.workload,
+      personsToHire: row.personsToHire,
+      proposalsTier: row.proposalsTier,
+      connectsCost: row.connectsCost,
+      featured: row.featured,
+      invitesSent: row.invitesSent,
+      interviewing: row.interviewing,
+      offersMade: row.offersMade,
+      hiresMade: row.hiresMade,
+      workflowStatus: row.workflowStatus,
+      preferredQualifications: (row.preferredQualifications as PreferredQualifications | null) ?? null,
+      detailsFetchedAt: row.detailsFetchedAt,
+    },
+    client: client ? rowToClient(client) : null,
     sourceMetadata: (row.sourceMetadata ?? {}) as Record<string, unknown>,
   };
 }

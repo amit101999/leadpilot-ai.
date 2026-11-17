@@ -4,6 +4,7 @@ import { jobs, qualifications, runJobs } from "@/lib/database/schema";
 import { sanitizeErrorMessage } from "@/lib/security/sanitize";
 import { AiProviderError, hashEvaluationInput, toEvaluationProfile } from "@/modules/ai/evaluator";
 import { validateAiOutput, type AiOutput } from "@/modules/ai/output-schema";
+import { getClient } from "@/modules/clients/repository";
 import { rowToNormalized, type JobRow } from "@/modules/jobs/repository";
 import { decideEligibility } from "@/modules/qualification/eligibility";
 import type { HardCheckResult } from "@/modules/qualification/hard-filters";
@@ -63,7 +64,8 @@ async function evaluateOne(ctx: RunContext, runJob: RunJobRow, jobRow: JobRow): 
   const { db, run, snapshot, providers } = ctx;
   const config = snapshot.configuration;
   const evaluator = providers.ai;
-  const input = { job: rowToNormalized(jobRow), profile: toEvaluationProfile(config) };
+  const client = jobRow.clientId ? await getClient(db, jobRow.clientId) : null;
+  const input = { job: rowToNormalized(jobRow, client), profile: toEvaluationProfile(config) };
   const maxAttempts = 1 + config.ai.maxRetries;
 
   let output: AiOutput | null = null;

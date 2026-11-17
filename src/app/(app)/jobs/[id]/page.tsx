@@ -2,9 +2,10 @@ import { ExternalLink } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { ReactNode } from "react";
 import { Badge, StatusBadge, type BadgeTone } from "@/components/ui/badge";
 import { CopyButton } from "@/components/ui/copy-button";
+import { ClientCard } from "@/components/jobs/client-card";
+import { Facts, known } from "@/components/ui/facts";
 import { EmptyState, Panel } from "@/components/ui/panel";
 import { Time } from "@/components/ui/time";
 import { requireUser } from "@/lib/auth/current-user";
@@ -40,27 +41,29 @@ interface Job {
   postedAt: Date | null;
   firstSeenAt: Date;
   lastSeenAt: Date;
+  subcategory: string | null;
+  experienceLevel: string | null;
+  duration: string | null;
+  workload: string | null;
+  personsToHire: number | null;
+  proposalsTier: string | null;
+  connectsCost: number | null;
+  featured: boolean | null;
+  invitesSent: number | null;
+  interviewing: number | null;
+  offersMade: number | null;
+  hiresMade: number | null;
+  workflowStatus: string | null;
+  preferredQualifications: Record<string, string | number | boolean | null> | null;
+  detailsFetchedAt: Date | null;
   sourceMetadata?: Record<string, unknown> | null;
 }
 
-/** Extra data stored by the Upwork import (src/modules/job-sources/upwork-import/normalize.ts). */
-interface UpworkImportMetadata {
-  origin?: string;
-  detailsFetched?: boolean;
-  experienceLevel?: string | null;
-  duration?: string | null;
-  proposalsTier?: string | null;
-  client?: {
-    totalPostedJobs?: number | null;
-    totalReviews?: number | null;
-    hireRatePercent?: number | null;
-    openJobs?: number | null;
-  };
-  job?: { totalHired?: number | null; invitesSent?: number | null; connectsCost?: number | null };
-}
-
-const known = (value: string | number | null | undefined, suffix = "") =>
-  value === null || value === undefined ? "Unknown" : `${value}${suffix}`;
+/** "min_job_success_score" -> "Min job success score". */
+const qualificationLabel = (key: string) => {
+  const words = key.replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+};
 interface CheckResult {
   rule: string;
   outcome: string;
@@ -147,19 +150,6 @@ const OUTCOME_LABEL: Record<string, string> = {
 };
 const SEVERITY_TONE: Record<string, BadgeTone> = { LOW: "neutral", MEDIUM: "warning", HIGH: "danger" };
 
-function Facts({ rows }: { rows: Array<[string, ReactNode]> }) {
-  return (
-    <dl className="grid gap-x-8 gap-y-2.5 px-4 py-4 text-sm sm:grid-cols-[200px_1fr]">
-      {rows.map(([label, value]) => (
-        <div key={label} className="contents">
-          <dt className="text-muted">{label}</dt>
-          <dd>{value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { actor } = await requireUser();
   const parsed = uuidParam.safeParse((await params).id);
@@ -181,7 +171,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   const latestRun = runs[0];
   const latest = qualifications[0];
 
-  const upwork = (job.sourceMetadata ?? null) as UpworkImportMetadata | null;
+  const fromUpworkSync = (job.sourceMetadata as { origin?: string } | null)?.origin === "upwork-mcp";
+  const preferred = Object.entries(job.preferredQualifications ?? {});
   const budget =
     job.budgetType === "HOURLY"
       ? `${formatMoney(job.hourlyMin, job.currency)}–${formatMoney(job.hourlyMax, job.currency)} per hour`
@@ -274,30 +265,52 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         </Panel>
       </div>
 
-      {upwork?.origin === "upwork-mcp" && (
-        <Panel
-          id="upwork-details"
-          title="Upwork details"
-          description={
-            upwork.detailsFetched
-              ? "Imported by the Upwork sync, including the client's full hiring record."
-              : "Imported by the Upwork sync from search results; the client's full hiring record was not fetched."
-          }
-        >
-          <Facts
-            rows={[
-              ["Experience level", known(upwork.experienceLevel)],
-              ["Expected duration", known(upwork.duration)],
-              ["Proposals so far", known(upwork.proposalsTier)],
-              ["Client jobs posted", known(upwork.client?.totalPostedJobs)],
-              ["Client reviews", known(upwork.client?.totalReviews)],
-              ["Client hire rate", known(upwork.client?.hireRatePercent, "%")],
-              ["Client open jobs", known(upwork.client?.openJobs)],
-              ["Hired on this job", known(upwork.job?.totalHired)],
-              ["Connects to apply", known(upwork.job?.connectsCost)],
-            ]}
-          />
-        </Panel>
+      {fromUpworkSync && (
+        <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+          <Panel
+            id="posting"
+            title="Posting details"
+            description={
+              job.detailsFetchedAt
+                ? "Imported by the Upwork sync with the posting's full details."
+                : "Imported by the Upwork sync from search results only."
+            }
+          >
+            <Facts
+              rows={[
+                ["Subcategory", known(job.subcategory)],
+                ["Experience level", known(job.experienceLevel)],
+                ["Expected duration", known(job.duration)],
+                ["Workload", known(job.workload)],
+                ["Freelancers to hire", known(job.personsToHire)],
+                ["Proposals so far", known(job.proposalsTier)],
+                ["Invites sent", known(job.invitesSent)],
+                ["Interviewing", known(job.interviewing)],
+                ["Offers made", known(job.offersMade)],
+                ["Hired on this job", known(job.hiresMade)],
+                ["Posting status", known(job.workflowStatus)],
+                ["Connects to apply", known(job.connectsCost)],
+                ["Featured", job.featured === null ? "Unknown" : job.featured ? "Yes" : "No"],
+                [
+                  "Preferred qualifications",
+                  preferred.length ? (
+                    <ul className="flex flex-col gap-0.5">
+                      {preferred.map(([key, value]) => (
+                        <li key={key}>
+                          {qualificationLabel(key)}: {String(value)}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    "None stated"
+                  ),
+                ],
+                ["Details fetched", <Time key="details" value={job.detailsFetchedAt} fallback="Not yet" />],
+              ]}
+            />
+          </Panel>
+          <ClientCard client={detail.client} />
+        </div>
       )}
 
       <Panel

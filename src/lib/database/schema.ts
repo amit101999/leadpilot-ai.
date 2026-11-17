@@ -290,6 +290,46 @@ export const runStages = pgTable(
   (t) => [uniqueIndex("run_stages_run_stage_uq").on(t.runId, t.stage)],
 );
 
+/**
+ * One row per client of a job source, keyed by the source's stable client id. Refreshed whenever a
+ * job-detail call returns the client. The jsonb lists hold third-party text (reviews, contract titles):
+ * shown in the UI as plain text, never sent to the AI model.
+ */
+export const clients = pgTable(
+  "clients",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    source: text("source").notNull(),
+    sourceClientId: text("source_client_id").notNull(),
+    country: text("country"),
+    state: text("state"),
+    timezone: text("timezone"),
+    paymentVerified: boolean("payment_verified"),
+    rating: numeric("rating", { precision: 3, scale: 2 }),
+    reviewsCount: integer("reviews_count"),
+    totalSpent: numeric("total_spent", { precision: 14, scale: 2 }),
+    totalHires: integer("total_hires"),
+    jobsWithHires: integer("jobs_with_hires"),
+    activeContracts: integer("active_contracts"),
+    hoursTotal: numeric("hours_total", { precision: 12, scale: 2 }),
+    jobsPosted: integer("jobs_posted"),
+    openJobs: integer("open_jobs"),
+    hireRatePercent: integer("hire_rate_percent"),
+    recentReviews: jsonb("recent_reviews")
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    workHistory: jsonb("work_history")
+      .notNull()
+      .default(sql`'{"open":[],"closed":[]}'::jsonb`),
+    otherOpenJobs: jsonb("other_open_jobs")
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("clients_source_client_uq").on(t.source, t.sourceClientId)],
+);
+
 export const jobs = pgTable(
   "jobs",
   {
@@ -317,6 +357,24 @@ export const jobs = pgTable(
       .default(sql`'[]'::jsonb`),
     category: text("category"),
     postedAt: timestamp("posted_at", { withTimezone: true }),
+    /** Set once a job-detail call identified the client; kept when later imports lack details. */
+    clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
+    subcategory: text("subcategory"),
+    experienceLevel: text("experience_level"),
+    duration: text("duration"),
+    workload: text("workload"),
+    personsToHire: integer("persons_to_hire"),
+    proposalsTier: text("proposals_tier"),
+    connectsCost: integer("connects_cost"),
+    featured: boolean("featured"),
+    /** This posting's hiring funnel, as last seen. */
+    invitesSent: integer("invites_sent"),
+    interviewing: integer("interviewing"),
+    offersMade: integer("offers_made"),
+    hiresMade: integer("hires_made"),
+    workflowStatus: text("workflow_status"),
+    preferredQualifications: jsonb("preferred_qualifications"),
+    detailsFetchedAt: timestamp("details_fetched_at", { withTimezone: true }),
     sourceMetadata: jsonb("source_metadata")
       .notNull()
       .default(sql`'{}'::jsonb`),
@@ -327,6 +385,7 @@ export const jobs = pgTable(
   (t) => [
     uniqueIndex("jobs_source_source_job_id_uq").on(t.source, t.sourceJobId),
     index("jobs_first_seen_idx").on(t.firstSeenAt),
+    index("jobs_client_idx").on(t.clientId),
   ],
 );
 

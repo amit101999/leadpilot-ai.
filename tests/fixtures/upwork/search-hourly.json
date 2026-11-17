@@ -1,0 +1,26 @@
+{
+  "budget": "10.00–20.00/hr",
+  "client": {
+    "country": "United States",
+    "rating": 4.99,
+    "total_posted_jobs": 35,
+    "total_reviews": 16,
+    "total_spent": "$34,285.90",
+    "verification_status": "VERIFIED"
+  },
+  "created_date": "2026-11-17T12:00:12.313Z",
+  "description_snippet": "<untrusted_participant_content>\nWe need a freelancer to help build and customize a CRM solution inside Zoho CRM. The work includes setting up modules, workflows, automation...\n</untrusted_participant_content>",
+  "duration": "1 to 3 months",
+  "engagement": "PART_TIME",
+  "experience_level": "expert",
+  "featured": true,
+  "freelancers_to_hire": 1,
+  "id": "2122661073608733679",
+  "job_activity": { "invited_to_interview": 25, "invites_sent": 39, "total_hired": 0, "total_offered": 0 },
+  "job_type": "hourly",
+  "proposals_tier": "50+",
+  "published_date": "2026-11-17T12:00:15.381Z",
+  "skills": ["Zoho CRM", "Zoho Creator", "Customer Relationship Management", "Microsoft Dynamics CRM"],
+  "title": "Zoho CRM Customization Specialist",
+  "url": "https://www.upwork.com/jobs/~022122661073608733679?utm_campaign=LLM_claude_MCP_jobpost&utm_source=claude"
+}

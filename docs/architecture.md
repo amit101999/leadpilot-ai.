@@ -76,7 +76,10 @@ Transitions are declared in `src/modules/runs/transitions.ts`; any other transit
    currency is UNKNOWN unless a fixed rate is configured), required/optional skills with aliases and word boundaries,
    include/exclude keywords, client rating/hires/spend/location, URL host checks, and "already notified to this
    recipient".
-2. **AI evaluation** (`src/modules/ai`): the model gets only a minimal profile slice and the job text. Its output must
+2. **AI evaluation** (`src/modules/ai`, prompt `prompts/v2.ts`, version `lead-eval-v2`): the model gets only a minimal
+   profile slice, the job text, the posting's terms and hiring activity, and the client's numbers (rating, reviews,
+   spend, hires, hire rate, hours, active contracts, jobs posted). The client's review comments and contract titles are
+   never sent. Its output must
    match a strict schema (`output-schema.ts`); invalid output is retried within the profile's `maxRetries` and
    otherwise recorded as `AI_ERROR`. The model's own total score is ignored. The app computes the weighted score from
    the five dimension scores (integer, round half up). The prompt version and a hash of the input are stored with each

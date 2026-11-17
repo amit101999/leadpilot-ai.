@@ -8,7 +8,7 @@ import { AppError } from "@/lib/http/errors";
 import { sanitizeErrorMessage } from "@/lib/security/sanitize";
 import { uuidParam } from "@/lib/validation/common";
 import { recordAudit, userActor } from "@/modules/audit/service";
-import type { NormalizedJob } from "@/modules/job-sources/types";
+import type { JobPosting, NormalizedClient, NormalizedJob } from "@/modules/job-sources/types";
 import {
   normalizeUpworkMcpJob,
   parseStagedJob,
@@ -27,9 +27,13 @@ import { syncDue } from "./schedule";
 export const SYNC_LIMITS = {
   pagesPerSearch: 2,
   resultsPerPage: 10,
-  maxDetailCalls: 15,
+  /** Detail calls per sync: every screened-in job up to this ceiling (Upwork throttles job opens). */
+  maxDetailCalls: 40,
   maxJobsPerCommit: 100,
 };
+
+/** Details fetched within this window are reused; older ones are fetched again so client data stays current. */
+const DETAILS_FRESH_MS = 24 * 3_600_000;
 
 export const importJobsSchema = z.object({
   profileId: uuidParam,
@@ -98,28 +102,35 @@ interface PriorCopy {
   clientHires: number | null;
   category: string | null;
   sourceMetadata: Record<string, unknown>;
+  /** Only queued copies carry these; for stored jobs the upsert keeps the stored columns. */
+  posting?: JobPosting;
+  client?: NormalizedClient | null;
+}
+
+/** Each posting field from the incoming copy, or the earlier copy's value where the incoming one is unknown. */
+function mergePosting(incoming: JobPosting, prior: JobPosting | undefined): JobPosting {
+  if (!prior) return incoming;
+  const merged = { ...incoming } as Record<keyof JobPosting, unknown>;
+  for (const key of Object.keys(incoming) as (keyof JobPosting)[]) merged[key] = incoming[key] ?? prior[key];
+  return merged as JobPosting;
 }
 
 /**
  * A re-import from search results must not erase details fetched earlier (full description, hires,
- * category, client record). Search data wins for everything it carries; detail-only fields are kept.
+ * category, posting details, client record). Search data wins for everything it carries; detail-only
+ * fields are kept.
  */
 function keepPriorDetails(incoming: NormalizedJob, prior: PriorCopy | undefined): NormalizedJob {
   if (incoming.sourceMetadata.detailsFetched || !prior?.sourceMetadata.detailsFetched) return incoming;
-  const meta = prior.sourceMetadata;
   return {
     ...incoming,
     // Search results carry only a snippet; the earlier detail call had the full text.
     description: prior.description || incoming.description,
     clientHires: incoming.clientHires ?? prior.clientHires,
     category: incoming.category ?? prior.category,
-    sourceMetadata: {
-      ...incoming.sourceMetadata,
-      detailsFetched: true,
-      client: meta.client ?? incoming.sourceMetadata.client,
-      job: meta.job ?? incoming.sourceMetadata.job,
-      preferredQualifications: meta.preferredQualifications ?? null,
-    },
+    posting: mergePosting(incoming.posting, prior.posting),
+    client: incoming.client ?? prior.client ?? null,
+    sourceMetadata: { ...incoming.sourceMetadata, detailsFetched: true },
   };
 }
 
@@ -228,7 +239,8 @@ export async function getImportContext(db: Database, actor: Actor, options: { sc
 
 /**
  * Screening (nothing is stored): runs the profile's hard filters on search data and returns which
- * jobs are worth a detail call. Jobs already alerted, or whose details were fetched before, are skipped.
+ * jobs are worth a detail call. Jobs already alerted, or whose details were fetched in the last 24 h,
+ * are skipped.
  */
 export async function screenJobs(db: Database, actor: Actor, input: z.infer<typeof importJobsSchema>) {
   const { config } = await importableProfile(db, actor, input.profileId);
@@ -244,6 +256,7 @@ export async function screenJobs(db: Database, actor: Actor, input: z.infer<type
   );
 
   const detailsWanted: string[] = [];
+  const now = Date.now();
   let rejected = 0;
   for (const job of valid) {
     const row = stored.get(job.sourceJobId);
@@ -255,10 +268,9 @@ export async function screenJobs(db: Database, actor: Actor, input: z.infer<type
       rejected += 1;
       continue;
     }
-    const detailsKnown = Boolean(
-      (row?.sourceMetadata as { detailsFetched?: boolean } | undefined)?.detailsFetched,
-    );
-    if (!detailsKnown) detailsWanted.push(job.sourceJobId);
+    const fetchedAt = row?.detailsFetchedAt?.getTime();
+    const detailsFresh = fetchedAt !== undefined && now - fetchedAt < DETAILS_FRESH_MS;
+    if (!detailsFresh) detailsWanted.push(job.sourceJobId);
   }
   return {
     received: input.jobs.length,
