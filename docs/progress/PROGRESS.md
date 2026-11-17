@@ -29,6 +29,7 @@ Plan: `C:\Users\ACER\.claude\plans\clever-noodling-finch.md`.
 | WhatsApp removal         | E-mail is the only alert channel                                          | ✅ On `main` (`7ad2c19`, 2026-11-14); all checks pass, e2e 19/19                                         |
 | CI/CD                    | GitHub Actions checks + auto-deploy over Cloudflare Tunnel                | 🟡 `a6f76ba` + review fixes `b3191c0` on `ci-cd` (2026-11-14), not pushed or merged; never run on GitHub |
 | Production data          | First search profile created in production (no code change)               | ✅ 2026-11-17; hourly sync for it not yet verified                                                       |
+| Codebase cleanup         | Dead-code removal, worktree and branch housekeeping                       | 🟡 `0e7b6cd` on `chore/codebase-cleanup` (2026-11-17), not pushed or merged; all checks pass             |
 
 ## Baseline (pre-existing work, committed 2026-10-11 as `703761f`)
 
@@ -1201,6 +1202,24 @@ The payload was validated locally against `createProfileSchema` before sending.
   has no e-mail recipient yet.
 
 Not verified: an actual hourly sync run for this profile. Open: add an e-mail recipient, then enable alerts (developer).
+
+## Codebase cleanup (`0e7b6cd`, 2026-11-17, branch `chore/codebase-cleanup`, not pushed or merged)
+
+- Dead-code scan with the TypeScript language service: no unreferenced source files. Removed 11 exports with zero
+  references (`StageStatus`, `ACTIVE_RUN_STATUSES`, `ProfileConfigInput`, `SourceUnavailableError`, `Dimension`,
+  `JobListItem`, `LeadListItem`, `stageIsComplete`, `isCancelRequested`, the `NotificationChannel` type, the `Skeleton`
+  component) across 8 files under `src/` (34 lines deleted). No behaviour change.
+- Folder structure (`src/app`, `components`, `lib`, `modules`) reviewed and kept as is.
+- Deliberately kept: WhatsApp backward-compatibility code (old stored records and configs; removal needs a DB
+  migration), Docker/Caddy/n8n files (documented self-hosting path), `.agents/skills` (managed by `skills-lock.json`).
+- Housekeeping: deleted 14 merged, clean worktrees under `.claude/worktrees` and 18 merged local branches
+  (`cloud-routine-sync`'s code was already in `main` via rebased commits). Left: locked worktree `pending-fixes`
+  (branch `worktree-pending-fixes`), the folder `.claude/worktrees/cloudflare-deploy` (held open by another process),
+  and the remote branches `ci-cd`, `cloud-routine-sync`, `worktree-cloudflare-deploy`, `worktree-pending-fixes` on origin.
+- Verification (reported by the implementing session, not re-run by the tracker): typecheck, lint, prettier clean;
+  172 unit and 81 integration tests pass; production build succeeds. E2e not reported.
+
+Open: push and merge the branch (developer).
 
 ## Environment notes
 
