@@ -34,8 +34,9 @@ services:
         value: gpt-4o-mini
       - key: EMAIL_PROVIDER
         value: brevo
+      # Runs use only jobs delivered by the Upwork sync (import API); never demo jobs.
       - key: JOB_SOURCE_PROVIDER
-        value: mock
+        value: import
       - key: UPWORK_SYNC_SCHEDULED_ALLOWED
         value: "false"
       # Generated once by Render (base64, 256 bits); signs sessions and import tokens. Never change it.

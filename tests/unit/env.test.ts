@@ -51,6 +51,14 @@ describe("mock providers in production", () => {
   });
 });
 
+describe("job source", () => {
+  it("accepts the import-only mode used in production, and defaults to mock", () => {
+    expect(load({ JOB_SOURCE_PROVIDER: "import" }).JOB_SOURCE_PROVIDER).toBe("import");
+    expect(load({}).JOB_SOURCE_PROVIDER).toBe("mock");
+    expect(() => load({ JOB_SOURCE_PROVIDER: "scrape" })).toThrow(/JOB_SOURCE_PROVIDER/);
+  });
+});
+
 describe("admin login settings", () => {
   it("is off by default", () => {
     const config = load({});

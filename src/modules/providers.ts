@@ -2,6 +2,7 @@ import { env } from "@/lib/configuration/env";
 import type { AiEvaluator } from "@/modules/ai/evaluator";
 import { MockAiEvaluator } from "@/modules/ai/mock-evaluator";
 import { OpenAiEvaluator } from "@/modules/ai/openai-evaluator";
+import { ImportJobSourceProvider } from "@/modules/job-sources/import-provider";
 import { MockJobSourceProvider } from "@/modules/job-sources/mock-provider";
 import type { JobSourceProvider } from "@/modules/job-sources/types";
 import { UpworkJobSourceProvider } from "@/modules/job-sources/upwork-provider";
@@ -30,13 +31,7 @@ export function getProviders(): Providers {
   if (cached) return cached;
   const config = env();
   cached = {
-    jobSource:
-      config.JOB_SOURCE_PROVIDER === "upwork"
-        ? new UpworkJobSourceProvider(
-            { clientId: config.UPWORK_CLIENT_ID, clientSecret: config.UPWORK_CLIENT_SECRET },
-            config.UPWORK_JOB_SEARCH_SCOPE_CONFIRMED,
-          )
-        : new MockJobSourceProvider(config.MOCK_SOURCE_SCENARIO),
+    jobSource: createJobSource(config),
     ai:
       config.AI_PROVIDER === "openai"
         ? new OpenAiEvaluator(config.OPENAI_API_KEY, config.OPENAI_MODEL, config.OPENAI_TIMEOUT_MS)
@@ -44,6 +39,21 @@ export function getProviders(): Providers {
     email: createEmailProvider(config),
   };
   return cached;
+}
+
+/** "import": every run (manual or started by an import) processes only the jobs the Upwork sync staged for it. */
+function createJobSource(config: ReturnType<typeof env>): JobSourceProvider {
+  switch (config.JOB_SOURCE_PROVIDER) {
+    case "upwork":
+      return new UpworkJobSourceProvider(
+        { clientId: config.UPWORK_CLIENT_ID, clientSecret: config.UPWORK_CLIENT_SECRET },
+        config.UPWORK_JOB_SEARCH_SCOPE_CONFIRMED,
+      );
+    case "import":
+      return new ImportJobSourceProvider();
+    default:
+      return new MockJobSourceProvider(config.MOCK_SOURCE_SCENARIO);
+  }
 }
 
 function createEmailProvider(config: ReturnType<typeof env>): EmailProvider {

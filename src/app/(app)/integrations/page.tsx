@@ -9,6 +9,7 @@ import { hasRole } from "@/lib/auth/authorization";
 import { requireUser } from "@/lib/auth/current-user";
 import { getDb } from "@/lib/database/client";
 import { getIntegrationStatuses } from "@/modules/integrations/service";
+import { IMPORT_SOURCE_ID } from "@/modules/job-sources/import-provider";
 import { listRecipients } from "@/modules/notifications/recipients";
 import { getProviders } from "@/modules/providers";
 
@@ -38,6 +39,7 @@ export default async function IntegrationsPage() {
     listRecipients(db, actor),
   ]);
   const canTest = hasRole(actor, "OPERATOR");
+  const usesImport = providers.jobSource.id === IMPORT_SOURCE_ID;
 
   const info: Record<string, { title: string; setup: ReactNode }> = {
     database: {
@@ -51,7 +53,20 @@ export default async function IntegrationsPage() {
     },
     job_source: {
       title: "Job source (Upwork)",
-      setup: (
+      setup: usesImport ? (
+        <>
+          <p>
+            Jobs come from the <strong>Upwork sync</strong>: Claude searches Upwork through Upwork&apos;s
+            official connector and sends the results to LeadPilot with an import token (Settings → Import
+            tokens). Every run, including <strong>Run now</strong> on a profile, processes only the jobs the
+            sync delivered for that profile; with nothing delivered it finds no jobs. No demo data is used.
+          </p>
+          <p className="mt-1">
+            The test only confirms this mode; check the last sync on each profile (Search &amp; sync) and in
+            Search History. See <code className="text-xs">docs/upwork-sync.md</code>.
+          </p>
+        </>
+      ) : (
         <>
           <p>
             Live Upwork search is <strong>blocked</strong> until Upwork approves an API key with job-search

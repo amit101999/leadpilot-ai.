@@ -24,6 +24,14 @@ Code: agent instructions `.claude/skills/upwork-sync/SKILL.md`; bridge script `s
 wrapper `scripts/upwork-sync.ps1`; server side `src/modules/imports/`, `src/modules/job-sources/import-provider.ts`,
 `src/modules/job-sources/upwork-import/normalize.ts`.
 
+## Job source setting
+
+Set `JOB_SOURCE_PROVIDER=import` where LeadPilot runs in production (already in `render.yaml`). Then every run,
+including **Run now** on a profile, processes only the jobs the sync delivered for that profile and finds none when
+nothing was delivered. With the default `mock`, manual runs use built-in demo jobs (links to `example.com`), which are
+for development and tests only: in production they would be scored by the real AI and could trigger real e-mails.
+Import runs (started by `commit`) always read the staged jobs, whatever this setting says.
+
 ## Setup
 
 1. Apply the migration: `npm run db:migrate` (adds import tokens, batches, staged jobs, sync state, e-mail recipients).

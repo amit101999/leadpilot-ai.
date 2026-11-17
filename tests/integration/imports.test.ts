@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/modules/runs/executor", () => ({ dispatchRun: vi.fn(async () => ({ ok: true })) }));
 
@@ -15,10 +15,11 @@ import { POST as createRecipient } from "@/app/api/recipients/route";
 import { POST as cancelRun } from "@/app/api/runs/[id]/cancel/route";
 import { POST as createRun } from "@/app/api/runs/route";
 import { getDb } from "@/lib/database/client";
-import { agentRuns, jobs, notifications, stagedJobs, syncState, users } from "@/lib/database/schema";
+import { agentRuns, jobs, notifications, runJobs, stagedJobs, syncState, users } from "@/lib/database/schema";
+import { ImportJobSourceProvider } from "@/modules/job-sources/import-provider";
 import type { MockEmailProvider } from "@/modules/notifications/mock-email";
 import { defaultProfileConfig, type ProfileConfig } from "@/modules/profiles/config-schema";
-import { getProviders } from "@/modules/providers";
+import { getProviders, setProvidersForTesting } from "@/modules/providers";
 import { failRun, runInProcess, runStep } from "@/modules/runs/engine";
 import { dispatchRun } from "@/modules/runs/executor";
 import { call, createUser, type TestUser } from "./helpers";
@@ -105,6 +106,7 @@ async function execute(runId: string) {
 }
 
 beforeEach(() => email().reset());
+afterEach(() => setProvidersForTesting(undefined));
 
 describe("import tokens", () => {
   it("shows a token once, lists it without the secret, and rejects it after revocation", async () => {
@@ -233,6 +235,45 @@ describe("import flow", () => {
       .from(stagedJobs)
       .where(and(eq(stagedJobs.profileId, profileId), eq(stagedJobs.status, "PENDING")));
     expect(pending).toHaveLength(0);
+  });
+
+  it("with JOB_SOURCE_PROVIDER=import, a manual run processes only the synced jobs, never demo jobs", async () => {
+    setProvidersForTesting({ ...getProviders(), jobSource: new ImportJobSourceProvider() });
+    const user = await createUser("OPERATOR");
+    const profileId = await newProfile(user);
+    const token = await newToken(user);
+    const manual = await call(createRun, {
+      method: "POST",
+      user,
+      body: { profileId },
+      headers: { "idempotency-key": randomUUID() },
+    });
+    expect(manual.status).toBe(201);
+    const manualId = manual.json.data.id as string;
+    // The job arrives while the manual run is queued, so it waits as PENDING and the manual run claims it.
+    const job = upworkJob();
+    expect((await commit(token.bearer, profileId, [job])).json.data.status).toBe("QUEUED");
+
+    await execute(manualId);
+    const [run] = await getDb().select().from(agentRuns).where(eq(agentRuns.id, manualId));
+    expect(run!.sourceProvider).toBe("upwork-import");
+    const linked = await getDb()
+      .select({ url: jobs.jobUrl })
+      .from(runJobs)
+      .innerJoin(jobs, eq(runJobs.jobId, jobs.id))
+      .where(eq(runJobs.runId, manualId));
+    expect(linked.map((l) => l.url)).toEqual([`https://www.upwork.com/jobs/~02${job.id}`]);
+
+    // Nothing left to import: a second manual run finds no jobs instead of inventing some.
+    const empty = await call(createRun, {
+      method: "POST",
+      user,
+      body: { profileId },
+      headers: { "idempotency-key": randomUUID() },
+    });
+    await execute(empty.json.data.id);
+    const none = await getDb().select().from(runJobs).where(eq(runJobs.runId, empty.json.data.id));
+    expect(none).toHaveLength(0);
   });
 
   it("e-mails a qualified imported job once, never again on a later import", async () => {
