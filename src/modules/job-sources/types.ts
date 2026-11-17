@@ -75,10 +75,3 @@ export class SourceNotAuthorizedError extends Error {
     this.name = "SourceNotAuthorizedError";
   }
 }
-
-export class SourceUnavailableError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "SourceUnavailableError";
-  }
-}

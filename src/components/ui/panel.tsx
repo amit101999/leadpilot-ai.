@@ -40,10 +40,6 @@ export function Panel({
   );
 }
 
-export function Skeleton({ className, ...props }: ComponentProps<"div">) {
-  return <div aria-hidden className={cn("animate-pulse rounded-control bg-sunken", className)} {...props} />;
-}
-
 /** Empty state: says what is missing and what to do next. */
 export function EmptyState({
   title,

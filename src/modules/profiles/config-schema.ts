@@ -215,7 +215,6 @@ export const profileConfigSchema = z
   });
 
 export type ProfileConfig = z.infer<typeof profileConfigSchema>;
-export type ProfileConfigInput = z.input<typeof profileConfigSchema>;
 
 /** Initial business configuration ("Web & Zoho Development"). Defaults only — never hardcoded rules. */
 export function defaultProfileConfig(emailRecipientId: string | null = null): ProfileConfig {

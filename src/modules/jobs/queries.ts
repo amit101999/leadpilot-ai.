@@ -117,7 +117,6 @@ function mapJobListRow(row: Record<string, unknown>) {
     notified: Boolean(row.notified),
   };
 }
-export type JobListItem = ReturnType<typeof mapJobListRow>;
 
 export interface LeadListFilters {
   offset: number;
@@ -242,7 +241,6 @@ function mapLeadRow(row: Record<string, unknown>) {
     notificationSentAt: toDate(row.notification_sent_at),
   };
 }
-export type LeadListItem = ReturnType<typeof mapLeadRow>;
 
 /** Full job detail: every run/evaluation/notification the actor is allowed to see. */
 export async function getJobDetail(db: Database, actor: Actor, jobId: string) {

@@ -1,11 +1,5 @@
 import type { ProfileConfig } from "@/modules/profiles/config-schema";
 
-/**
- * Channels stored in the database. "WHATSAPP" remains only so records from before
- * WhatsApp alerts were removed still load; new alerts are e-mail only.
- */
-export type NotificationChannel = "WHATSAPP" | "EMAIL";
-
 export interface ChannelTarget {
   channel: "EMAIL";
   recipientId: string;

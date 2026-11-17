@@ -173,11 +173,6 @@ export async function getStageRow(db: DbExecutor, runId: string, stage: RunStage
   return row ?? null;
 }
 
-export async function stageIsComplete(db: DbExecutor, runId: string, stage: RunStage): Promise<boolean> {
-  const row = await getStageRow(db, runId, stage);
-  return row?.status === "COMPLETED" || row?.status === "SKIPPED";
-}
-
 export async function beginStage(db: DbExecutor, runId: string, stage: RunStage): Promise<void> {
   await db
     .update(runStages)
@@ -327,8 +322,4 @@ export async function refreshRunCounters(db: DbExecutor, runId: string): Promise
     })
     .where(eq(agentRuns.id, runId));
   return counters;
-}
-
-export function isCancelRequested(run: RunRow): boolean {
-  return run.cancelRequestedAt !== null;
 }

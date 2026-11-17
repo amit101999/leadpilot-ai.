@@ -13,7 +13,6 @@ export const DIMENSIONS = [
   "client_credibility",
   "overall_relevance",
 ] as const;
-export type Dimension = (typeof DIMENSIONS)[number];
 
 const score = z.number().int().min(0).max(100);
 const shortText = z.string().max(600);
