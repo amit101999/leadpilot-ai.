@@ -10,26 +10,27 @@ Last updated: 2026-11-17
 
 Plan: `C:\Users\ACER\.claude\plans\clever-noodling-finch.md`.
 
-| Phase                    | Scope                                                                     | Status                                                                                                   |
-| ------------------------ | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Baseline                 | Pre-existing backend core committed                                       | ✅ Done (`703761f`)                                                                                      |
-| A. Foundation            | Seed, `.env.example`, page auth proxy, CSRF check                         | ✅ Merged to `main` (`ab4b7e1`); seed verified during B1                                                 |
-| B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                     | ✅ Merged to `main` (`0bed021`); Turbopack build verified on main                                        |
-| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook      | ✅ Merged to `main` (`41e8d95`); Turbopack build verified on main                                        |
-| C1. UI (part 1)          | Design system, app shell, login, Dashboard, Run Agent                     | ✅ Merged to `main` (`71a0b50`); Turbopack build verified on main                                        |
-| C2. UI (part 2)          | Search History and run detail, Qualified Leads, All Jobs                  | ✅ Merged to `main` (`d742e0a`); Turbopack build verified on main                                        |
-| C3a. UI (part 3a)        | Search Profiles list, editor, version history                             | ✅ Merged to `main` (fast-forward, `e650286` + docs `a82ddab`)                                           |
-| C3b. UI (part 3b)        | Notifications, Integrations, Settings (incl. change password), Audit Logs | ✅ Merged to `main` (fast-forward `a82ddab` → `727c19b`, 2026-10-15); `d18e5f8` + docs `3730daf`         |
-| D. n8n                   | Run workflow calling the app's internal step API, lease-safe `/fail`      | ✅ Merged to `main` (same fast-forward); `9cf72ad`                                                       |
-| E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                                | ✅ Merged to `main` (same fast-forward); `62d69cc` + `7e34456`                                           |
-| F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                       | ✅ Merged to `main` (same fast-forward); `b806b52` + docs `727c19b`                                      |
-| G. Docs and final review | README, `docs/*.md`, full verification                                    | ✅ On `main` (`9b7b102` + PROGRESS `f492a9b`)                                                            |
-| H. Upwork sync           | Upwork sync via Claude + Upwork MCP, import API, e-mail alerts            | ✅ On `main` (`main` is at `fe3500c`, which contains `05b064a`); e2e 19/19 and build passed              |
-| Cloudflare Tunnel        | `docker-compose.cloudflare.yml`, `deploy/Caddyfile.cloudflare`            | ✅ On `main` (`ae68cdf`, 2026-11-11); no real tunnel yet                                                 |
-| WhatsApp removal         | E-mail is the only alert channel                                          | ✅ On `main` (`7ad2c19`, 2026-11-14); all checks pass, e2e 19/19                                         |
-| CI/CD                    | GitHub Actions checks + auto-deploy over Cloudflare Tunnel                | 🟡 `a6f76ba` + review fixes `b3191c0` on `ci-cd` (2026-11-14), not pushed or merged; never run on GitHub |
-| Production data          | First search profile created in production (no code change)               | ✅ 2026-11-17; hourly sync for it not yet verified                                                       |
-| Codebase cleanup         | Dead-code removal, worktree and branch housekeeping                       | 🟡 `0e7b6cd` on `chore/codebase-cleanup` (2026-11-17), not pushed or merged; all checks pass             |
+| Phase                    | Scope                                                                     | Status                                                                                                    |
+| ------------------------ | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Baseline                 | Pre-existing backend core committed                                       | ✅ Done (`703761f`)                                                                                       |
+| A. Foundation            | Seed, `.env.example`, page auth proxy, CSRF check                         | ✅ Merged to `main` (`ab4b7e1`); seed verified during B1                                                  |
+| B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                     | ✅ Merged to `main` (`0bed021`); Turbopack build verified on main                                         |
+| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook      | ✅ Merged to `main` (`41e8d95`); Turbopack build verified on main                                         |
+| C1. UI (part 1)          | Design system, app shell, login, Dashboard, Run Agent                     | ✅ Merged to `main` (`71a0b50`); Turbopack build verified on main                                         |
+| C2. UI (part 2)          | Search History and run detail, Qualified Leads, All Jobs                  | ✅ Merged to `main` (`d742e0a`); Turbopack build verified on main                                         |
+| C3a. UI (part 3a)        | Search Profiles list, editor, version history                             | ✅ Merged to `main` (fast-forward, `e650286` + docs `a82ddab`)                                            |
+| C3b. UI (part 3b)        | Notifications, Integrations, Settings (incl. change password), Audit Logs | ✅ Merged to `main` (fast-forward `a82ddab` → `727c19b`, 2026-10-15); `d18e5f8` + docs `3730daf`          |
+| D. n8n                   | Run workflow calling the app's internal step API, lease-safe `/fail`      | ✅ Merged to `main` (same fast-forward); `9cf72ad`                                                        |
+| E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                                | ✅ Merged to `main` (same fast-forward); `62d69cc` + `7e34456`                                            |
+| F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                       | ✅ Merged to `main` (same fast-forward); `b806b52` + docs `727c19b`                                       |
+| G. Docs and final review | README, `docs/*.md`, full verification                                    | ✅ On `main` (`9b7b102` + PROGRESS `f492a9b`)                                                             |
+| H. Upwork sync           | Upwork sync via Claude + Upwork MCP, import API, e-mail alerts            | ✅ On `main` (`main` is at `fe3500c`, which contains `05b064a`); e2e 19/19 and build passed               |
+| Cloudflare Tunnel        | `docker-compose.cloudflare.yml`, `deploy/Caddyfile.cloudflare`            | ✅ On `main` (`ae68cdf`, 2026-11-11); no real tunnel yet                                                  |
+| WhatsApp removal         | E-mail is the only alert channel                                          | ✅ On `main` (`7ad2c19`, 2026-11-14); all checks pass, e2e 19/19                                          |
+| CI/CD                    | GitHub Actions checks + auto-deploy over Cloudflare Tunnel                | 🟡 `a6f76ba` + review fixes `b3191c0` on `ci-cd` (2026-11-14), not pushed or merged; never run on GitHub  |
+| Production data          | First search profile created in production (no code change)               | ✅ 2026-11-17; hourly sync for it not yet verified                                                        |
+| Codebase cleanup         | Dead-code removal, worktree and branch housekeeping                       | 🟡 `0e7b6cd` on `chore/codebase-cleanup` (2026-11-17), not pushed or merged; all checks pass              |
+| Rich job data            | `clients` table, posting details, AI prompt v2, client card on job page   | 🟡 `bfaae80` on `feat/rich-job-data` (2026-11-17, from cleanup branch), not pushed or merged; e2e not run |
 
 ## Baseline (pre-existing work, committed 2026-10-11 as `703761f`)
 
@@ -1220,6 +1221,60 @@ Not verified: an actual hourly sync run for this profile. Open: add an e-mail re
   172 unit and 81 integration tests pass; production build succeeds. E2e not reported.
 
 Open: push and merge the branch (developer).
+
+## Rich Upwork job and client data (`bfaae80`, 2026-11-17, branch `feat/rich-job-data`, not pushed or merged)
+
+Branched from `chore/codebase-cleanup`; neither branch is pushed or merged to `main`.
+
+### Decisions (taken with the developer, 2026-11-17, as stated in the update request)
+
+- Fetch job details for every job that passes the filters (not only a top subset).
+- Store free text (reviews, work history, other open jobs) but never send it to the AI.
+- Model: a separate `clients` table plus new columns on `jobs`.
+- Show the new data on the job detail page and in the AI prompt; not in e-mails and not as new profile filters.
+
+### Implemented
+
+- Database: `database/migrations/0003_rich_job_data.sql` (schema in `src/lib/database/schema.ts`). New `clients`
+  table keyed by source + Upwork client company id (location, time zone, rating, reviews, spend, hires, hire rate,
+  hours paid, active contracts, jobs posted/open, plus up to 5 recent reviews, work-history items and other open jobs;
+  comments capped at 2,000 chars). New `jobs` columns: subcategory, experience level, duration, workload, freelancers
+  to hire, proposals tier, Connects, featured, hiring funnel, status, preferred qualifications, `details_fetched_at`,
+  `client_id`. The migration backfills job columns from older imports' `source_metadata`; clients cannot be backfilled.
+- Import: agent allowlist `scripts/lib/import-payload.mjs` and server zod contract
+  `src/modules/job-sources/upwork-import/normalize.ts` extended; signed attachment links (temporary S3 credentials)
+  are dropped. New `src/modules/clients/repository.ts`; `src/modules/imports/service.ts`, `src/modules/jobs/repository.ts` updated.
+- Detail calls: all screened-in jobs, cap raised 15 -> 40 per sync, re-fetched when older than 24 h.
+- AI: `src/modules/ai/prompts/v1.ts` renamed to `v2.ts`, `PROMPT_VERSION` `lead-eval-v2`; adds client numbers and
+  posting terms/activity.
+- UI: Posting details panel on `src/app/(app)/jobs/[id]/page.tsx`, new `src/components/jobs/client-card.tsx`
+  (plain-text rendering); `Facts` moved to `src/components/ui/facts.tsx`.
+- Docs: `docs/architecture.md`, `docs/database.md`, `docs/security.md`, `docs/upwork-sync.md`.
+
+### Bug fixed
+
+- Hourly budgets from search results with an en dash (`10.00–20.00/hr`) were parsed as unknown; both dash forms are
+  now read, and the detail call's hourly terms are preferred.
+
+### Verification (reported by the implementing session, not re-run by the tracker)
+
+- Typecheck, lint, prettier clean; 184 unit tests (20 files) and 84 integration tests (11 files) pass; production build succeeds.
+- Live local test: real recorded Upwork responses imported through `scripts/leadpilot-import.mjs` (screen + commit)
+  into the local app; job stored with posting details and a linked client row; hourly range parsed; no signed links stored.
+- Not verified: e2e browser tests not run; the job page was checked by a server-render unit test
+  (`tests/unit/client-card.test.ts`), not in a browser (browser automation failed).
+
+### Incident during the session
+
+- Deleting old git worktree folders on Windows followed a `node_modules` junction and deleted part of the main
+  `node_modules`; restored with `npm install` (lockfile unchanged). The local `next dev` on :3001 stopped and was restarted.
+
+### Open items
+
+- Push and merge `chore/codebase-cleanup` and `feat/rich-job-data` (developer).
+- Production applies migration 0003 on deploy (`MIGRATE_ON_START`); confirm it ran.
+- Verify the next production hourly run fills `clients` rows and still produces qualified leads and e-mails.
+- AI scores will shift slightly with prompt v2.
 
 ## Environment notes
 
