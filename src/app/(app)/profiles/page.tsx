@@ -10,7 +10,22 @@ import { hasRole } from "@/lib/auth/authorization";
 import { requireUser } from "@/lib/auth/current-user";
 import { getDb } from "@/lib/database/client";
 import { formatMoney } from "@/lib/ui/format";
+import type { SyncOverview } from "@/modules/imports/schedule";
+import { listSyncOverviews } from "@/modules/imports/service";
 import { listProfiles, parseStoredConfig } from "@/modules/profiles/service";
+import { intervalText } from "@/components/profiles/sync-schedule";
+
+/** "Upwork sync: every 4 hours · last sync <time>", with a warning when the agent stopped checking in. */
+function SyncLine({ overview }: { overview: SyncOverview | undefined }) {
+  if (!overview?.enabled) return <p className="mt-0.5 text-[13px] text-muted">Upwork sync off</p>;
+  return (
+    <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[13px] text-muted">
+      Upwork sync: {intervalText(overview.everyHours).toLowerCase()} · last sync{" "}
+      <Time value={overview.lastSyncedAt} fallback="never" />
+      {overview.stale && <Badge tone="danger">Sync agent not checking in</Badge>}
+    </p>
+  );
+}
 
 export const metadata: Metadata = { title: "Search Profiles" };
 
@@ -21,7 +36,13 @@ export default async function ProfilesPage({
 }) {
   const { actor } = await requireUser();
   const showArchived = (await searchParams).archived === "1";
-  const profiles = await listProfiles(getDb(), actor, { includeArchived: showArchived });
+  const db = getDb();
+  const profiles = await listProfiles(db, actor, { includeArchived: showArchived });
+  const syncOverviews = await listSyncOverviews(
+    db,
+    actor,
+    profiles.map((p) => p.id),
+  );
   const canEdit = hasRole(actor, "OPERATOR");
 
   return (
@@ -103,6 +124,7 @@ export default async function ProfilesPage({
                         ? `on (up to ${config.notifications.maxPerRun})`
                         : "off"}
                     </p>
+                    <SyncLine overview={syncOverviews.get(profile.id)} />
                     <p className="mt-0.5 text-[13px] text-muted">
                       Version {profile.currentVersion}, updated <Time value={profile.updatedAt} />
                     </p>

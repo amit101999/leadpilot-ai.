@@ -42,7 +42,7 @@ Import runs (started by `commit`) always read the staged jobs, whatever this set
 4. In Claude Code, connect Upwork's official connector and sign in with your freelancer account. Check that headless
    Claude can use it: `claude -p "Call the Upwork tool list_accounts and reply with the account type only"`.
 5. On a search profile, open **Search & sync**: add keywords, optionally a keyword-coverage %, turn on the sync and
-   set the interval, active hours and time zone.
+   choose the interval (every 1, 2 or 4 hours), active hours and time zone.
 6. Run once by hand from the repository root: `powershell -File scripts\upwork-sync.ps1` (or `/upwork-sync` in an
    interactive Claude Code session). Check `logs\upwork-sync.log` and the run in **Search History**.
 
@@ -59,6 +59,25 @@ schtasks /Create /TN "LeadPilot Upwork sync" /SC HOURLY /TR "powershell -NoProfi
 ```
 
 The PC must be on and logged in, LeadPilot and Postgres must be running, and each sync uses some Claude usage.
+
+**How the schedule works.** The agent (the cloud routine below, or the PC task) wakes **every hour**. On each wake-up
+LeadPilot answers, per profile, whether it is due (`syncDue`, `src/modules/imports/schedule.ts`): sync on, keywords
+set, inside the active hours, and the profile's interval passed since its last sync attempt. The interval is chosen in
+the profile's **Search & sync** tab: **every 1, 2 or 4 hours**, never more often than hourly (saving any other value is
+refused; versions saved earlier with another value still load). New profiles default to every 4 hours, 00:00–23:59 UTC.
+Because the agent wakes hourly, changing the interval takes effect at the next hour; nothing has to change on claude.ai.
+
+**Scan window.** Each due profile gets a `window` in the context: from the end of its last _successful_ sync
+(`sync_state.window_end`) minus a 30-minute overlap (Upwork lists a job a few minutes after its posting time), or its
+interval back from now when it never synced, at most 24 hours back, up to now. The agent searches newest first and
+stops paging at jobs older than `window.from`, asks Upwork's feed for exactly that window, and reports
+`status ... OK --window-end <window.to>`. Only `OK` and `PARTIAL` move the window; `ERROR` leaves it, so the next sync
+scans the missed period again.
+
+**In the UI.** The profile page shows an **Upwork sync schedule** panel: the interval and active hours, the last sync
+with its status and any problem, the posting time jobs were scanned up to, and when the next sync is due. When a due
+profile has not been synced for 75 minutes past its due time, the panel (and the profile list) warns that the sync agent
+is not checking in: the Claude cloud routine is probably paused or failing.
 
 ## Running the sync in the cloud (production setup)
 
@@ -137,10 +156,15 @@ dash); budgets without a stated currency are treated as USD (Upwork marketplace 
 
 ## Duplicates, re-imports and queueing
 
-- Jobs are keyed by `(upwork, Upwork job id)`, the same key a future official API adapter will use. A re-import updates
-  the stored job (e.g. a raised budget) but keeps job details fetched earlier (full description, hires, category,
-  posting details, client link), whether they are stored or still queued, and a job is still alerted at most once per
-  recipient and channel.
+- Jobs are keyed by `(upwork, Upwork job id)`, the same key a future official API adapter will use.
+- **A job a profile has already processed is never imported, screened, AI-scored or alerted again by that profile's
+  sync**, even if it reappears in search results (`alreadySeen` in the screen and commit responses). Jobs posted before
+  the profile's scan window are dropped too (`outsideWindow`). Each import run therefore holds only jobs that are new
+  in the latest window, and alerts cover only those. Another profile still sees the job as new. When nothing new is
+  left, the commit answers `NOTHING_TO_IMPORT` and starts no run.
+- A job still waiting in the queue (not yet processed) is refreshed by a re-import, keeping details fetched earlier
+  (full description, hires, category, posting details, client link); a job is alerted at most once per recipient and
+  channel.
 - A job waits at most once per profile in `staged_jobs` (PENDING); a re-import while it waits refreshes it.
 - If a run for the profile is active when jobs arrive, they stay PENDING and the commit answers `QUEUED`. When any run
   of the profile ends, LeadPilot starts one follow-up import run for them, as the most recent importing user who can
@@ -159,8 +183,8 @@ values never reject at this point, and rules that need the full description or t
 skills, include keywords, keyword coverage, required combinations, client hires, category) are left to the run, after
 the detail call. Every rule is applied in full during the run.
 
-`detailsWanted` lists every job that passed screening, except jobs whose details were fetched in the last 24 hours (so
-client figures stay current without re-opening the same jobs every hour), up to `limits.maxDetailCalls` (40) per sync.
+`detailsWanted` lists every new job (not already processed by the profile, inside the scan window) that passed
+screening, up to `limits.maxDetailCalls` (40) per sync.
 The agent stops early when Upwork's job-browse cooldown starts; jobs without details are still imported with search
 data and get their details on a later sync.
 

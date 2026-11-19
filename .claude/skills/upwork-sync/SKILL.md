@@ -28,7 +28,10 @@ jobs yourself, and never change a job object you received from Upwork.
 2. Call `list_accounts` once and use the `org_uid` of the account whose `role_label` is
    `Freelancer`.
 
-3. For each due profile (use its `id`, `keywords`, `filters`, `lastSyncedAt`):
+3. For each due profile (use its `id`, `keywords`, `filters`, `window`). `window.from` and `window.to`
+   are the posting times this sync covers: only jobs posted since the last successful sync. LeadPilot
+   drops anything older, and any job this profile has already processed, so never re-send jobs on
+   purpose.
 
    a. **Search.** For every keyword, call `find_jobs` with `action: "search"` and params:
    - `query`: the keyword
@@ -38,18 +41,20 @@ jobs yourself, and never change a job object you received from Upwork.
    - `verified_payment_only`: `filters.verifiedPaymentOnly`
    - `limit`: `limits.resultsPerPage`; `include_full_details`: `false`
      Fetch the next page (same params plus `cursor`) only while `pageInfo.hasNextPage` is true, up to
-     `limits.pagesPerSearch` pages.
+     `limits.pagesPerSearch` pages, and stop early once a page holds a job whose `published_date` is
+     before `window.from` (results are newest first, so later pages are older still).
 
    b. **Upwork's own feed.** Call `find_jobs` with `action: "smart_search"`, `mode: "most_recent"`,
-   `from_date`: the date part (YYYY-MM-DD) of `lastSyncedAt`, or `days_posted: 1` when it is null,
-   and the same `job_type`, `budget_min` and `verified_payment_only` values. One page only.
+   `from_date`: `window.from` and `to_date`: `window.to` (full timestamps, exactly as given), and the
+   same `job_type`, `budget_min` and `verified_payment_only` values. One page only.
 
    c. **Save.** Write every job object from 3a and 3b, exactly as returned and including the `client`
    block, into one JSON array at `.upwork-sync/<profileId>/jobs.json`. Skip objects with
    `"applied": true` and repeated ids. Delete any old `.upwork-sync/<profileId>/details/` folder first.
 
    d. **Screen.** Run `node scripts/leadpilot-import.mjs screen <profileId>`. It prints `detailsWanted`:
-   the job ids that passed LeadPilot's basic rules.
+   the new job ids that passed LeadPilot's basic rules (jobs already seen or outside the window are
+   counted as `alreadySeen` / `outsideWindow` and never listed).
 
    e. **Details.** For each id in `detailsWanted` (at most `limits.maxDetailCalls`), call `find_jobs`
    with `action: "get"` and `params: { "id": "<id>" }`, and save the whole response as
@@ -58,12 +63,14 @@ jobs yourself, and never change a job object you received from Upwork.
    imported, just with less client data.
 
    f. **Import.** Run `node scripts/leadpilot-import.mjs commit <profileId>`. It prints the run that was
-   started (`STARTED`) or queued (`QUEUED`), or `FAILED` with an `error` when the run could not start
-   (the jobs stay queued in LeadPilot).
+   started (`STARTED`) or queued (`QUEUED`), `NOTHING_TO_IMPORT` when no job is new, or `FAILED` with an
+   `error` when the run could not start (the jobs stay queued in LeadPilot).
 
-   g. **Report.** Run `node scripts/leadpilot-import.mjs status <profileId> OK`, or `PARTIAL <reason>`
-   when details were cut short, or `ERROR <reason>` when the profile could not be synced or the import
-   printed `FAILED` (use its `error` as the reason).
+   g. **Report.** Run `node scripts/leadpilot-import.mjs status <profileId> OK --window-end <window.to>`,
+   or `PARTIAL <reason> --window-end <window.to>` when details were cut short (`NOTHING_TO_IMPORT` is
+   OK). Run `ERROR <reason>` without `--window-end` when the profile could not be searched or the
+   import printed `FAILED` (use its `error` as the reason): the window then stays open, and the next sync
+   scans it again.
 
-4. Reply with one line per profile: name, jobs found, jobs sent, details fetched, run status. Do not
+4. Reply with one line per profile: name, window, jobs found, new jobs, details fetched, run status. Do not
    list job titles or client details.

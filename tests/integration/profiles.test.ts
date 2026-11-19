@@ -5,6 +5,9 @@ import { POST as archive } from "@/app/api/profiles/[id]/archive/route";
 import { POST as restore } from "@/app/api/profiles/[id]/restore/route";
 import { POST as duplicate } from "@/app/api/profiles/[id]/duplicate/route";
 import { GET as versions } from "@/app/api/profiles/[id]/versions/route";
+import { getDb } from "@/lib/database/client";
+import { syncState } from "@/lib/database/schema";
+import { listSyncOverviews } from "@/modules/imports/service";
 import { defaultProfileConfig } from "@/modules/profiles/config-schema";
 import { call, createUser, type TestUser } from "./helpers";
 
@@ -70,6 +73,40 @@ describe("profiles API", () => {
     });
     expect(res.status).toBe(400);
     expect(res.json.error.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("saves a sync interval of 1, 2 or 4 hours and refuses anything else", async () => {
+    const user = await createUser("OPERATOR");
+    const profile = await newProfile(user);
+    const save = (everyHours: number, expectedVersion: number) => {
+      const config = defaultProfileConfig(null);
+      config.search.upworkSync.everyHours = everyHours;
+      return call(patchProfile, {
+        method: "PATCH",
+        user,
+        params: { id: profile.id },
+        body: { expectedVersion, configuration: config },
+      });
+    };
+    const refused = await save(3, 1);
+    expect(refused.status).toBe(400);
+    expect(JSON.stringify(refused.json)).toContain("Choose every 1, 2 or 4 hours");
+    expect((await save(2, 1)).status).toBe(200);
+    expect((await save(1, 2)).status).toBe(200);
+  });
+
+  it("shows each user the sync schedule of their own profiles only", async () => {
+    const owner = await createUser("OPERATOR");
+    const other = await createUser("OPERATOR");
+    const profile = await newProfile(owner);
+    await getDb()
+      .insert(syncState)
+      .values({ profileId: profile.id, lastSyncedAt: new Date(), lastStatus: "OK", windowEnd: new Date() });
+    const mine = await listSyncOverviews(getDb(), owner, [profile.id]);
+    expect(mine.get(profile.id)).toMatchObject({ lastStatus: "OK", everyHours: 4, stale: false });
+    expect(mine.get(profile.id)?.scannedUpTo).toBeInstanceOf(Date);
+    const theirs = await listSyncOverviews(getDb(), other, [profile.id]);
+    expect(theirs.size).toBe(0);
   });
 
   it("forbids VIEWERs from creating profiles", async () => {

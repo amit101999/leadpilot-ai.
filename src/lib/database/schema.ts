@@ -656,7 +656,10 @@ export const syncState = pgTable("sync_state", {
   profileId: uuid("profile_id")
     .primaryKey()
     .references(() => searchProfiles.id, { onDelete: "cascade" }),
+  /** Last sync attempt (any status); drives the "due" schedule. */
   lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+  /** End of the last successfully scanned window; the next sync scans from here. Never moved by a failed sync. */
+  windowEnd: timestamp("window_end", { withTimezone: true }),
   lastStatus: text("last_status"),
   lastError: text("last_error"),
   updatedAt: updatedAt(),

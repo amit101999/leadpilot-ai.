@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProfileActions } from "@/components/profiles/profile-actions";
 import { ProfileEditor } from "@/components/profiles/profile-editor";
+import { SyncSchedule } from "@/components/profiles/sync-schedule";
 import { toRecipientOptions } from "@/components/profiles/recipient-options";
 import { VersionHistory, type VersionEntry } from "@/components/profiles/version-history";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,7 @@ import { requireUser } from "@/lib/auth/current-user";
 import { getDb } from "@/lib/database/client";
 import { AppError } from "@/lib/http/errors";
 import { uuidParam } from "@/lib/validation/common";
+import { listSyncOverviews } from "@/modules/imports/service";
 import { listRecipients } from "@/modules/notifications/recipients";
 import { diffConfigs } from "@/modules/profiles/diff";
 import { getProfile, listVersionsWithAuthors, parseStoredConfig } from "@/modules/profiles/service";
@@ -30,10 +32,12 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
     if (error instanceof AppError && error.code === "NOT_FOUND") notFound();
     throw error;
   }
-  const [versionRows, recipientViews] = await Promise.all([
+  const [versionRows, recipientViews, syncOverviews] = await Promise.all([
     listVersionsWithAuthors(db, actor, profile.id),
     listRecipients(db, actor, true),
+    listSyncOverviews(db, actor, [profile.id]),
   ]);
+  const syncOverview = syncOverviews.get(profile.id);
   const canEdit = hasRole(actor, "OPERATOR");
   const archived = Boolean(profile.archivedAt);
   const recipientName = (id: string) => {
@@ -85,6 +89,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
           />
         )}
       </header>
+
+      {syncOverview && <SyncSchedule overview={syncOverview} />}
 
       <Panel id="editor">
         <ProfileEditor

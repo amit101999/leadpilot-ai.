@@ -75,10 +75,16 @@ export const searchConfigSchema = z.object({
 });
 export type SearchConfig = z.infer<typeof searchConfigSchema>;
 
+/**
+ * Sync intervals a profile can be saved with. The Claude cloud routine wakes every hour, so an hour is
+ * the shortest. Older saved versions may hold other values (1–24); they still load.
+ */
+export const SYNC_INTERVALS = [1, 2, 4] as const;
+
 export const DEFAULT_SEARCH_CONFIG: SearchConfig = {
   keywords: [],
   keywordCoveragePercent: null,
-  upworkSync: { enabled: false, everyHours: 3, activeFrom: "08:00", activeTo: "22:00", timezone: "UTC" },
+  upworkSync: { enabled: false, everyHours: 4, activeFrom: "00:00", activeTo: "23:59", timezone: "UTC" },
 };
 
 export const profileConfigSchema = z
@@ -148,7 +154,8 @@ export const profileConfigSchema = z
       sendRunSummary: z.boolean(),
       alertOnFailure: z.boolean(),
     }),
-    search: searchConfigSchema.default(DEFAULT_SEARCH_CONFIG),
+    // A fresh copy each time: callers may change the parsed config, and must never change the default.
+    search: searchConfigSchema.default(() => structuredClone(DEFAULT_SEARCH_CONFIG)),
   })
   .superRefine((config, ctx) => {
     const { budget, skills } = config;
@@ -282,7 +289,8 @@ export function defaultProfileConfig(emailRecipientId: string | null = null): Pr
       alertOnFailure: true,
     },
     search: {
-      ...DEFAULT_SEARCH_CONFIG,
+      // A deep copy, so changing this profile's schedule never changes the shared default.
+      ...structuredClone(DEFAULT_SEARCH_CONFIG),
       keywords: ["React", "Node.js", "Zoho", "API integration"],
     },
   };

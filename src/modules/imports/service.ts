@@ -3,7 +3,15 @@ import { z } from "zod";
 import { ownerFilter, requireRole, type Actor } from "@/lib/auth/authorization";
 import { env } from "@/lib/configuration/env";
 import type { Database } from "@/lib/database/client";
-import { importBatches, jobs, searchProfiles, stagedJobs, syncState } from "@/lib/database/schema";
+import {
+  agentRuns,
+  importBatches,
+  jobs,
+  runJobs,
+  searchProfiles,
+  stagedJobs,
+  syncState,
+} from "@/lib/database/schema";
 import { AppError } from "@/lib/http/errors";
 import { sanitizeErrorMessage } from "@/lib/security/sanitize";
 import { uuidParam } from "@/lib/validation/common";
@@ -19,9 +27,8 @@ import type { ProfileConfig } from "@/modules/profiles/config-schema";
 import { getProfile, parseStoredConfig } from "@/modules/profiles/service";
 import type { Providers } from "@/modules/providers";
 import { evaluateHardChecks, type HardRule } from "@/modules/qualification/hard-filters";
-import { alreadyNotifiedJobIds } from "@/modules/runs/engine/filtering";
 import { createRun } from "@/modules/runs/service";
-import { syncDue } from "./schedule";
+import { buildSyncOverview, scanWindow, syncDue, type SyncOverview } from "./schedule";
 
 /** Limits handed to the agent so one sync stays small and inside Upwork's browse throttle. */
 export const SYNC_LIMITS = {
@@ -31,9 +38,6 @@ export const SYNC_LIMITS = {
   maxDetailCalls: 40,
   maxJobsPerCommit: 100,
 };
-
-/** Details fetched within this window are reused; older ones are fetched again so client data stays current. */
-const DETAILS_FRESH_MS = 24 * 3_600_000;
 
 export const importJobsSchema = z.object({
   profileId: uuidParam,
@@ -45,12 +49,68 @@ export const syncStatusSchema = z.object({
   profileId: uuidParam,
   status: z.enum(["OK", "PARTIAL", "ERROR"]),
   message: z.string().max(1000).optional(),
+  /** The `window.to` this sync scanned up to (from the context). Stored only for OK and PARTIAL. */
+  windowEnd: z.iso.datetime({ offset: true }).optional(),
 });
 
 interface InvalidItem {
   index: number;
   id: string | null;
   error: string;
+}
+
+/**
+ * Source job ids this profile has already processed in any run. Such jobs are never imported, screened
+ * or scored again by the sync; another profile still sees them as new.
+ */
+async function seenByProfile(db: Database, profileId: string, sourceJobIds: string[]): Promise<Set<string>> {
+  if (sourceJobIds.length === 0) return new Set();
+  const rows = await db
+    .selectDistinct({ sourceJobId: jobs.sourceJobId })
+    .from(runJobs)
+    .innerJoin(agentRuns, eq(agentRuns.id, runJobs.runId))
+    .innerJoin(jobs, eq(jobs.id, runJobs.jobId))
+    .where(
+      and(
+        eq(agentRuns.profileId, profileId),
+        eq(jobs.source, UPWORK_SOURCE),
+        inArray(jobs.sourceJobId, sourceJobIds),
+      ),
+    );
+  return new Set(rows.map((r) => r.sourceJobId));
+}
+
+/** The posting-time window of the profile's current sync, from its sync state. */
+async function profileWindow(db: Database, profileId: string, config: ProfileConfig, now: Date) {
+  const [state] = await db
+    .select({ windowEnd: syncState.windowEnd })
+    .from(syncState)
+    .where(eq(syncState.profileId, profileId))
+    .limit(1);
+  return scanWindow(state?.windowEnd ?? null, config.search.upworkSync.everyHours, now);
+}
+
+/**
+ * Keeps only jobs new to this profile's current window. Dropped: jobs the profile already processed,
+ * and jobs posted before the window (the server's window, never the agent's). Jobs without a posting
+ * time are kept.
+ */
+async function newJobsOnly(db: Database, profileId: string, config: ProfileConfig, valid: NormalizedJob[]) {
+  const window = await profileWindow(db, profileId, config, new Date());
+  const seen = await seenByProfile(
+    db,
+    profileId,
+    valid.map((j) => j.sourceJobId),
+  );
+  const fresh: NormalizedJob[] = [];
+  let alreadySeen = 0;
+  let outsideWindow = 0;
+  for (const job of valid) {
+    if (seen.has(job.sourceJobId)) alreadySeen += 1;
+    else if (job.postedAt && job.postedAt < window.from) outsideWindow += 1;
+    else fresh.push(job);
+  }
+  return { fresh, alreadySeen, outsideWindow };
 }
 
 async function importableProfile(db: Database, actor: Actor, profileId: string) {
@@ -188,7 +248,7 @@ export async function getImportContext(db: Database, actor: Actor, options: { sc
   requireRole(actor, "OPERATOR");
   const owner = ownerFilter(actor);
   const rows = await db
-    .select({ profile: searchProfiles, lastSyncedAt: syncState.lastSyncedAt })
+    .select({ profile: searchProfiles, lastSyncedAt: syncState.lastSyncedAt, windowEnd: syncState.windowEnd })
     .from(searchProfiles)
     .leftJoin(syncState, eq(syncState.profileId, searchProfiles.id))
     .where(
@@ -201,13 +261,14 @@ export async function getImportContext(db: Database, actor: Actor, options: { sc
   const scheduledAllowed = env().UPWORK_SYNC_SCHEDULED_ALLOWED;
   const now = new Date();
   const profiles = rows
-    .map(({ profile, lastSyncedAt }) => ({
+    .map(({ profile, lastSyncedAt, windowEnd }) => ({
       profile,
       lastSyncedAt,
+      windowEnd,
       config: parseStoredConfig(profile.configuration),
     }))
     .filter(({ config }) => config.search.upworkSync.enabled)
-    .map(({ profile, lastSyncedAt, config }) => {
+    .map(({ profile, lastSyncedAt, windowEnd, config }) => {
       let decision = syncDue(config.search, lastSyncedAt, now);
       if (options.scheduled && !scheduledAllowed) {
         decision = {
@@ -224,6 +285,8 @@ export async function getImportContext(db: Database, actor: Actor, options: { sc
         due: decision.due,
         reason: decision.due ? null : decision.reason,
         lastSyncedAt,
+        // Scan only jobs posted in this window; a successful sync reports `window.to` as its windowEnd.
+        window: scanWindow(windowEnd, config.search.upworkSync.everyHours, now),
         keywords: config.search.keywords,
         filters: {
           jobType: config.budget.jobType,
@@ -239,42 +302,25 @@ export async function getImportContext(db: Database, actor: Actor, options: { sc
 
 /**
  * Screening (nothing is stored): runs the profile's hard filters on search data and returns which
- * jobs are worth a detail call. Jobs already alerted, or whose details were fetched in the last 24 h,
- * are skipped.
+ * jobs are worth a detail call. Jobs this profile already processed, or posted before the scan window,
+ * are skipped and never asked for.
  */
 export async function screenJobs(db: Database, actor: Actor, input: z.infer<typeof importJobsSchema>) {
-  const { config } = await importableProfile(db, actor, input.profileId);
+  const { profile, config } = await importableProfile(db, actor, input.profileId);
   const { valid, invalid } = parseItems(input.jobs);
-  const stored = await storedJobs(
-    db,
-    valid.map((j) => j.sourceJobId),
-  );
-  const notified = await alreadyNotifiedJobIds(
-    db,
-    config,
-    [...stored.values()].map((s) => s.id),
-  );
+  const { fresh, alreadySeen, outsideWindow } = await newJobsOnly(db, profile.id, config, valid);
 
   const detailsWanted: string[] = [];
-  const now = Date.now();
   let rejected = 0;
-  for (const job of valid) {
-    const row = stored.get(job.sourceJobId);
-    if (row && notified.has(row.id)) {
-      rejected += 1;
-      continue;
-    }
-    if (rejectedAtScreening(job, config)) {
-      rejected += 1;
-      continue;
-    }
-    const fetchedAt = row?.detailsFetchedAt?.getTime();
-    const detailsFresh = fetchedAt !== undefined && now - fetchedAt < DETAILS_FRESH_MS;
-    if (!detailsFresh) detailsWanted.push(job.sourceJobId);
+  for (const job of fresh) {
+    if (rejectedAtScreening(job, config)) rejected += 1;
+    else detailsWanted.push(job.sourceJobId);
   }
   return {
     received: input.jobs.length,
     valid: valid.length,
+    alreadySeen,
+    outsideWindow,
     rejected,
     invalid,
     detailsWanted: detailsWanted.slice(0, SYNC_LIMITS.maxDetailCalls),
@@ -293,14 +339,15 @@ export async function commitJobs(
   input: z.infer<typeof importJobsSchema>,
   requestId?: string,
 ) {
-  const { profile } = await importableProfile(db, actor, input.profileId);
+  const { profile, config } = await importableProfile(db, actor, input.profileId);
   const { valid, invalid } = parseItems(input.jobs);
+  const { fresh, alreadySeen, outsideWindow } = await newJobsOnly(db, profile.id, config, valid);
   const priors = await priorCopies(
     db,
     profile.id,
-    valid.map((j) => j.sourceJobId),
+    fresh.map((j) => j.sourceJobId),
   );
-  const toStage = valid.map((job) => keepPriorDetails(job, priors.get(job.sourceJobId)));
+  const toStage = fresh.map((job) => keepPriorDetails(job, priors.get(job.sourceJobId)));
 
   const batch = await db.transaction(async (tx) => {
     const [created] = await tx
@@ -339,6 +386,8 @@ export async function commitJobs(
         batchId: created!.id,
         origin: input.origin,
         accepted: toStage.length,
+        alreadySeen,
+        outsideWindow,
         invalid: invalid.length,
       },
       requestId,
@@ -380,22 +429,81 @@ export async function commitJobs(
     error,
     received: input.jobs.length,
     accepted: toStage.length,
+    alreadySeen,
+    outsideWindow,
     invalid,
   };
 }
 
+/**
+ * Records a sync attempt. Only a successful sync (OK or PARTIAL) moves the scan window forward, so a
+ * failed sync's window is scanned again by the next one.
+ */
 export async function recordSyncStatus(db: Database, actor: Actor, input: z.infer<typeof syncStatusSchema>) {
   await importableProfile(db, actor, input.profileId);
+  const now = new Date();
+  const [state] = await db
+    .select({ windowEnd: syncState.windowEnd })
+    .from(syncState)
+    .where(eq(syncState.profileId, input.profileId))
+    .limit(1);
+  let windowEnd = state?.windowEnd ?? null;
+  if (input.windowEnd && input.status !== "ERROR") {
+    const reported = new Date(input.windowEnd);
+    // A minute of slack for clock differences between the agent and the server.
+    if (reported.getTime() > now.getTime() + 60_000) {
+      throw new AppError("VALIDATION_ERROR", "windowEnd cannot be in the future", [
+        { path: "windowEnd", message: "Must not be later than now" },
+      ]);
+    }
+    // A late report of an older window never moves the window backwards.
+    if (!windowEnd || reported > windowEnd) windowEnd = reported;
+  }
   const values = {
-    lastSyncedAt: new Date(),
+    lastSyncedAt: now,
+    windowEnd,
     lastStatus: input.status,
     lastError:
       input.status === "OK" ? null : sanitizeErrorMessage(input.message ?? "Sync reported a problem"),
-    updatedAt: new Date(),
+    updatedAt: now,
   };
   await db
     .insert(syncState)
     .values({ profileId: input.profileId, ...values })
     .onConflictDoUpdate({ target: syncState.profileId, set: values });
   return { profileId: input.profileId, ...values };
+}
+
+/**
+ * The sync schedule of each profile the actor can see (all of them, or the listed ones), keyed by
+ * profile id: interval, last sync, scanned-up-to, next sync and whether the agent stopped checking in.
+ */
+export async function listSyncOverviews(
+  db: Database,
+  actor: Actor,
+  profileIds?: string[],
+): Promise<Map<string, SyncOverview>> {
+  if (profileIds && profileIds.length === 0) return new Map();
+  const owner = ownerFilter(actor);
+  const rows = await db
+    .select({
+      id: searchProfiles.id,
+      configuration: searchProfiles.configuration,
+      lastSyncedAt: syncState.lastSyncedAt,
+      lastStatus: syncState.lastStatus,
+      lastError: syncState.lastError,
+      windowEnd: syncState.windowEnd,
+    })
+    .from(searchProfiles)
+    .leftJoin(syncState, eq(syncState.profileId, searchProfiles.id))
+    .where(
+      and(
+        owner ? eq(searchProfiles.ownerUserId, owner) : undefined,
+        profileIds ? inArray(searchProfiles.id, profileIds) : undefined,
+      ),
+    );
+  const now = new Date();
+  return new Map(
+    rows.map((row) => [row.id, buildSyncOverview(parseStoredConfig(row.configuration).search, row, now)]),
+  );
 }

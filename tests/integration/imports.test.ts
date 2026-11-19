@@ -50,7 +50,8 @@ function upworkJob(overrides: Record<string, unknown> = {}) {
     skills: ["React", "Node.js", "Zoho CRM"],
     experience_level: "intermediate",
     proposals_tier: "5 to 10",
-    published_date: "2026-11-03T23:07:50.332Z",
+    // Inside the first sync's window (the profile's interval back from now).
+    published_date: new Date(Date.now() - 10 * 60_000).toISOString(),
     client: {
       country: "United States",
       rating: 4.81,
@@ -261,26 +262,37 @@ describe("import flow", () => {
     expect(consumed).toHaveLength(1);
   });
 
-  it("stores a re-imported job once, updates it, and keeps details fetched earlier", async () => {
+  it("never imports, screens or scores a job this profile already processed; other profiles still get it", async () => {
     const user = await createUser("OPERATOR");
     const profileId = await newProfile(user);
+    const otherProfileId = await newProfile(user);
     const token = await newToken(user);
     const job = upworkJob();
     const first = await commit(token.bearer, profileId, [{ ...job, details: details(42) }]);
     await execute(first.json.data.runId);
-    const second = await commit(token.bearer, profileId, [{ ...job, budget: "1200.00" }]);
-    await execute(second.json.data.runId);
 
-    const rows = await getDb()
+    const screened = await call(screenJobs, {
+      method: "POST",
+      headers: token.bearer,
+      body: { profileId, origin: "upwork-mcp", jobs: [{ ...job, budget: "1200.00" }] },
+    });
+    expect(screened.json.data).toMatchObject({ alreadySeen: 1, detailsWanted: [] });
+    const second = await commit(token.bearer, profileId, [{ ...job, budget: "1200.00" }]);
+    expect(second.json.data).toMatchObject({
+      status: "NOTHING_TO_IMPORT",
+      runId: null,
+      accepted: 0,
+      alreadySeen: 1,
+    });
+    const [stored] = await getDb()
       .select()
       .from(jobs)
       .where(and(eq(jobs.source, "upwork"), eq(jobs.sourceJobId, job.id)));
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ budgetAmount: "1200.00", clientHires: 42 });
-    // Detail-only data survives the search-only re-import.
-    expect(rows[0]).toMatchObject({ subcategory: "Web Development", connectsCost: 16 });
-    expect(rows[0]!.clientId).not.toBeNull();
-    expect(rows[0]!.detailsFetchedAt).not.toBeNull();
+    // Untouched: the second copy was never imported.
+    expect(stored).toMatchObject({ budgetAmount: "900.00", clientHires: 42, subcategory: "Web Development" });
+
+    const forOther = await commit(token.bearer, otherProfileId, [job]);
+    expect(forOther.json.data).toMatchObject({ status: "STARTED", accepted: 1, alreadySeen: 0 });
   });
 
   it("links every job of the same client to one client row that later imports refresh", async () => {
@@ -392,15 +404,21 @@ describe("import flow", () => {
     expect(email().sent).toHaveLength(1);
     expect(email().sent[0]!.subject).toContain("React and Node.js dashboard");
 
-    const again = await commit(token.bearer, profileId, [job]);
+    // The next sync brings the old job back plus a new one: only the new one is run and e-mailed.
+    const newer = upworkJob({ title: "Second Zoho CRM API integration with a React and Node.js dashboard" });
+    const again = await commit(token.bearer, profileId, [job, newer]);
+    expect(again.json.data).toMatchObject({ status: "STARTED", accepted: 1, alreadySeen: 1 });
     await execute(again.json.data.runId);
-    expect(email().sent).toHaveLength(1);
+    expect(email().sent).toHaveLength(2);
+    expect(email().sent[1]!.subject).toContain("Second Zoho CRM");
+    const secondRun = await getDb().select().from(runJobs).where(eq(runJobs.runId, again.json.data.runId));
+    expect(secondRun).toHaveLength(1);
     const claims = await getDb()
       .select()
       .from(notifications)
       .where(eq(notifications.recipientId, recipient.json.data.id));
-    expect(claims).toHaveLength(1);
-    expect(claims[0]!.channel).toBe("EMAIL");
+    expect(claims).toHaveLength(2);
+    expect(claims.every((c) => c.channel === "EMAIL")).toBe(true);
   });
 });
 
@@ -511,27 +529,50 @@ describe("import robustness (code review fixes)", () => {
     });
   });
 
-  it("asks for details again only once the stored copy is more than a day old", async () => {
+  it("scans only the window since the last successful sync; a failed sync never moves it", async () => {
     const user = await createUser("OPERATOR");
-    const profileId = await newProfile(user);
+    const profileId = await newProfile(user, (c) => {
+      c.search.upworkSync.everyHours = 4;
+    });
     const token = await newToken(user);
-    const job = upworkJob();
-    const first = await commit(token.bearer, profileId, [{ ...job, details: details(5) }]);
-    await execute(first.json.data.runId);
-    // Already alerted jobs are skipped for another reason; this profile has no e-mail, so none are.
-    const screen = () =>
-      call(screenJobs, {
-        method: "POST",
-        headers: token.bearer,
-        body: { profileId, origin: "upwork-mcp", jobs: [job] },
-      });
+    const windowOf = async () => {
+      const res = await call(importContext, { headers: token.bearer, path: "/api/import/context" });
+      const profile = (res.json.data.profiles as { id: string; window: { from: string; to: string } }[]).find(
+        (p) => p.id === profileId,
+      )!;
+      return { from: new Date(profile.window.from), to: new Date(profile.window.to) };
+    };
+    const report = (body: Record<string, unknown>) =>
+      call(syncStatus, { method: "POST", headers: token.bearer, body: { profileId, ...body } });
+    const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000);
 
-    expect((await screen()).json.data.detailsWanted).toEqual([]);
-    await getDb()
-      .update(jobs)
-      .set({ detailsFetchedAt: new Date(Date.now() - 25 * 3_600_000) })
-      .where(eq(jobs.sourceJobId, job.id));
-    expect((await screen()).json.data.detailsWanted).toEqual([job.id]);
+    // Never synced: the profile's interval back from now.
+    const first = await windowOf();
+    expect(Math.abs(first.to.getTime() - first.from.getTime() - 4 * 3_600_000)).toBeLessThan(5_000);
+
+    // A successful sync moves the window to its end (minus the 30-minute overlap).
+    const end = hoursAgo(1);
+    expect((await report({ status: "OK", windowEnd: end.toISOString() })).status).toBe(200);
+    expect((await windowOf()).from.getTime()).toBe(end.getTime() - 30 * 60_000);
+
+    // A failed sync records the attempt but leaves the window open for the next sync.
+    expect(
+      (await report({ status: "ERROR", message: "search failed", windowEnd: new Date().toISOString() }))
+        .status,
+    ).toBe(200);
+    expect((await windowOf()).from.getTime()).toBe(end.getTime() - 30 * 60_000);
+    // An older report never moves it back; a future one is refused.
+    await report({ status: "OK", windowEnd: hoursAgo(3).toISOString() });
+    expect((await windowOf()).from.getTime()).toBe(end.getTime() - 30 * 60_000);
+    expect(
+      (await report({ status: "OK", windowEnd: new Date(Date.now() + 3_600_000).toISOString() })).status,
+    ).toBe(400);
+
+    // Jobs posted before the window are dropped, jobs inside it are imported.
+    const old = upworkJob({ published_date: hoursAgo(5).toISOString() });
+    const recent = upworkJob({ published_date: new Date().toISOString() });
+    const res = await commit(token.bearer, profileId, [old, recent]);
+    expect(res.json.data).toMatchObject({ status: "STARTED", accepted: 1, outsideWindow: 1, alreadySeen: 0 });
   });
 
   it("migration 0003 copies older imports' extra data into the new columns", async () => {

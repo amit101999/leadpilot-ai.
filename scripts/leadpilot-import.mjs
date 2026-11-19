@@ -7,7 +7,7 @@
  *   node scripts/leadpilot-import.mjs context [--scheduled]
  *   node scripts/leadpilot-import.mjs screen <profileId>
  *   node scripts/leadpilot-import.mjs commit <profileId>
- *   node scripts/leadpilot-import.mjs status <profileId> <OK|PARTIAL|ERROR> [message]
+ *   node scripts/leadpilot-import.mjs status <profileId> <OK|PARTIAL|ERROR> [message] [--window-end ISO]
  *
  * Files for a profile: .upwork-sync/<profileId>/jobs.json (array of search items, as returned by
  * Upwork) and .upwork-sync/<profileId>/details/<jobId>.json (raw `find_jobs get` responses).
@@ -113,7 +113,15 @@ if (command === "context") {
   print(data);
 } else if (command === "screen") {
   const jobs = loadJobs(args[0]);
-  const totals = { received: 0, valid: 0, rejected: 0, invalid: 0, detailsWanted: [] };
+  const totals = {
+    received: 0,
+    valid: 0,
+    alreadySeen: 0,
+    outsideWindow: 0,
+    rejected: 0,
+    invalid: 0,
+    detailsWanted: [],
+  };
   for (const chunk of chunkJobs(jobs)) {
     const data = await api("POST", "/api/import/jobs/screen", {
       profileId: args[0],
@@ -122,6 +130,8 @@ if (command === "context") {
     });
     totals.received += data.received;
     totals.valid += data.valid;
+    totals.alreadySeen += data.alreadySeen;
+    totals.outsideWindow += data.outsideWindow;
     totals.rejected += data.rejected;
     totals.invalid += data.invalid.length;
     totals.detailsWanted.push(...data.detailsWanted);
@@ -140,6 +150,8 @@ if (command === "context") {
       status: data.status,
       runId: data.runId,
       accepted: data.accepted,
+      alreadySeen: data.alreadySeen,
+      outsideWindow: data.outsideWindow,
       invalid: data.invalid.length,
       withDetails: chunk.filter((j) => j.details).length,
       ...(data.error ? { error: data.error } : {}),
@@ -147,17 +159,24 @@ if (command === "context") {
   }
   if (jobs.length === 0) print({ status: "NOTHING_TO_IMPORT" });
 } else if (command === "status") {
-  const [profileId, status, ...message] = args;
+  const flag = args.indexOf("--window-end");
+  const windowEnd = flag >= 0 ? args[flag + 1] : undefined;
+  if (flag >= 0 && (!windowEnd || Number.isNaN(Date.parse(windowEnd)))) {
+    fail("--window-end needs the ISO time from the context's window.to");
+  }
+  const [profileId, status, ...message] =
+    flag >= 0 ? args.filter((_, i) => i !== flag && i !== flag + 1) : args;
   if (!["OK", "PARTIAL", "ERROR"].includes(status)) fail("status must be OK, PARTIAL or ERROR");
   profileDir(profileId);
   await api("POST", "/api/import/sync-status", {
     profileId,
     status,
     ...(message.length ? { message: message.join(" ").slice(0, 1000) } : {}),
+    ...(windowEnd ? { windowEnd } : {}),
   });
-  print({ profileId, status });
+  print({ profileId, status, ...(windowEnd ? { windowEnd } : {}) });
 } else {
   fail(
-    "usage: context [--scheduled] | screen <profileId> | commit <profileId> | status <profileId> <OK|PARTIAL|ERROR> [message]",
+    "usage: context [--scheduled] | screen <profileId> | commit <profileId> | status <profileId> <OK|PARTIAL|ERROR> [message] [--window-end ISO]",
   );
 }

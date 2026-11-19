@@ -7,7 +7,14 @@ import {
   toDecimal,
   upworkMcpJobSchema,
 } from "@/modules/job-sources/upwork-import/normalize";
-import { localClock, syncDue, withinActiveHours } from "@/modules/imports/schedule";
+import {
+  localClock,
+  nextSyncAt,
+  scanWindow,
+  syncDue,
+  syncIsStale,
+  withinActiveHours,
+} from "@/modules/imports/schedule";
 import detailsFixed from "../fixtures/upwork/details-fixed.json";
 import detailsHourly from "../fixtures/upwork/details-hourly.json";
 import searchHourly from "../fixtures/upwork/search-hourly.json";
@@ -311,9 +318,50 @@ describe("sync schedule", () => {
     const now = at("2026-11-04T23:30:00Z");
     expect(syncDue(search({ enabled: false }), null, now).due).toBe(false);
     expect(syncDue({ ...search(), keywords: [] }, null, now).due).toBe(false);
-    expect(syncDue(search(), null, now)).toMatchObject({
+    const daytime = search({ activeFrom: "08:00", activeTo: "22:00" });
+    expect(syncDue(daytime, null, now)).toMatchObject({
       due: false,
       reason: expect.stringContaining("active hours"),
     });
+    // The default now syncs around the clock.
+    expect(syncDue(search(), null, now)).toEqual({ due: true });
+  });
+
+  it("scans from the last successful window end minus the overlap, at most 24 h back", () => {
+    const now = at("2026-11-18T12:00:00Z");
+    expect(scanWindow(null, 4, now)).toEqual({ from: at("2026-11-18T08:00:00Z"), to: now });
+    expect(scanWindow(at("2026-11-18T08:18:00Z"), 4, now).from).toEqual(at("2026-11-18T07:48:00Z"));
+    expect(scanWindow(at("2026-11-10T00:00:00Z"), 4, now).from).toEqual(at("2026-11-17T12:00:00Z"));
+    // A window end later than now (clock skew) never yields a window starting in the future.
+    expect(scanWindow(at("2026-11-18T12:40:00Z"), 4, now).from).toEqual(now);
+  });
+
+  it("tells when the profile is next due", () => {
+    const now = at("2026-11-18T12:00:00Z");
+    expect(nextSyncAt(search({ everyHours: 4 }), null, now)).toEqual(now);
+    expect(nextSyncAt(search({ everyHours: 4 }), at("2026-11-18T10:18:00Z"), now)).toEqual(
+      at("2026-11-18T14:13:00Z"),
+    );
+    expect(nextSyncAt(search({ everyHours: 1 }), at("2026-11-18T10:18:00Z"), now)).toEqual(now);
+    // Outside active hours it moves to the next window start.
+    const daytime = search({ everyHours: 2, activeFrom: "08:00", activeTo: "22:00" });
+    // Synced at 21:30, due again at 23:25 = after 22:00, so next morning at 08:00.
+    expect(nextSyncAt(daytime, at("2026-11-18T21:30:00Z"), at("2026-11-18T22:00:00Z"))).toEqual(
+      at("2026-11-19T08:00:00Z"),
+    );
+    expect(nextSyncAt(search({ enabled: false }), null, now)).toBeNull();
+    expect(nextSyncAt({ ...search(), keywords: [] }, null, now)).toBeNull();
+  });
+
+  it("flags a profile the sync agent has stopped checking in for", () => {
+    const last = at("2026-11-18T08:18:00Z");
+    // Due at 12:13; the hourly routine should have come by 13:28.
+    expect(syncIsStale(search({ everyHours: 4 }), last, at("2026-11-18T13:20:00Z"))).toBe(false);
+    expect(syncIsStale(search({ everyHours: 4 }), last, at("2026-11-18T13:30:00Z"))).toBe(true);
+    // Overnight inactivity is not the agent's fault: due again at 08:00, stale only after 09:15.
+    const daytime = search({ everyHours: 2, activeFrom: "08:00", activeTo: "22:00" });
+    expect(syncIsStale(daytime, at("2026-11-18T21:30:00Z"), at("2026-11-19T08:30:00Z"))).toBe(false);
+    expect(syncIsStale(daytime, at("2026-11-18T21:30:00Z"), at("2026-11-19T09:20:00Z"))).toBe(true);
+    expect(syncIsStale(search(), null, at("2026-11-19T09:20:00Z"))).toBe(false);
   });
 });
