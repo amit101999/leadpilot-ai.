@@ -4,7 +4,7 @@ Curated record of what has been built, decided and verified. Maintained by the
 `project-tracker` subagent (`.claude/agents/project-tracker.md`). The raw,
 automatic history is in `activity-log.md` (local, gitignored).
 
-Last updated: 2026-11-19
+Last updated: 2026-11-21
 
 ## Phase status
 
@@ -32,6 +32,7 @@ Plan: `C:\Users\ACER\.claude\plans\clever-noodling-finch.md`.
 | Codebase cleanup         | Dead-code removal, worktree and branch housekeeping                       | 🟡 `0e7b6cd` on `chore/codebase-cleanup` (2026-11-17), not pushed or merged; all checks pass                |
 | Rich job data            | `clients` table, posting details, AI prompt v2, client card on job page   | 🟡 `bfaae80` on `feat/rich-job-data` (2026-11-17, from cleanup branch), not pushed or merged; e2e not run   |
 | Sync windows + schedule  | Per-profile scan windows, no re-scanning, 1/2/4 h schedule panel in UI    | 🟡 `6b8845b` on `feat/sync-schedule` (2026-11-19, from rich-data branch), not pushed or merged; e2e not run |
+| Scheduler + active       | App-wide sync scheduler, one active profile per user (replaces default)   | 🟡 `6e0f0d5` on `feat/scheduler-active-profile` (2026-11-21), not pushed or merged; e2e not run             |
 
 ## Baseline (pre-existing work, committed 2026-10-11 as `703761f`)
 
@@ -1331,6 +1332,64 @@ Branched from `feat/rich-job-data` (`8b3a0fb`). Chain: `chore/codebase-cleanup` 
 - Then set the Zoho profile to every 4 h, 00:00-23:59 UTC (it is currently every 1 h, 08:00-22:00 UTC), and set the
   routine to hourly and enable it.
 - Verify the first production runs (windows advance, no duplicate jobs, e-mails only for new qualified jobs).
+
+## App-wide sync scheduler and a single active profile (`6e0f0d5`, 2026-11-21, branch `feat/scheduler-active-profile`, not pushed or merged)
+
+Branched from `feat/sync-schedule` (`b798f2f`). Chain: `chore/codebase-cleanup` -> `feat/rich-job-data` ->
+`feat/sync-schedule` -> `feat/scheduler-active-profile`; none is pushed or merged to `main`.
+
+### Decisions (developer, 2026-11-20/21, as stated in the update request)
+
+- One scheduler per user (not per profile) that stays as set until changed; intervals 1, 2, 3, 4, 6, 8, 12 or 24 h.
+- "Default" is merged into "Active". Only the active profile is synced and receives imports; inactive profiles can
+  still be run by hand.
+
+### Implemented
+
+- Scheduler: table `sync_schedules` (`owner_user_id` PK, `enabled`, `every_hours` with a CHECK on the 8 steps,
+  `active_from`/`active_to` HH:MM CHECK, `timezone`, `updated_by`; `src/lib/database/schema.ts`). With no row the
+  default is on, every 4 h, 00:00-23:59, UTC. `src/modules/scheduler/{schema,service}.ts`;
+  `GET/PUT /api/sync-schedule` (`src/app/api/sync-schedule/route.ts`; VIEWER reads, OPERATOR saves, audited
+  `scheduler.update`); Settings > Sync scheduler form (`src/components/settings/sync-scheduler.tsx`).
+- `src/modules/imports/schedule.ts`: `syncDue`, `nextSyncAt`, `syncIsStale`, `scanWindow` take a `SyncTarget`
+  (`{schedule, active, keywords}`).
+- Per-profile `search.upworkSync` fields removed from the editor (`src/components/profiles/profile-editor.tsx`) but
+  kept in stored configs (no longer read). Version-diff labels for them read "(old per-profile setting)"
+  (`src/modules/profiles/diff.ts`) so history stays readable; deviation from the plan, which said to remove them.
+- Active profile: `search_profiles.active` exclusive per owner (partial unique index
+  `profiles_one_active_per_owner_uq`), `is_default` dropped. `setActive` and `POST /api/profiles/:id/activate`
+  (audit `profile.activate`) replace `setDefault` and `/default` (route deleted); per-owner advisory transaction lock
+  (`src/modules/profiles/service.ts`). New profile is active only if none is; duplicates start inactive; archiving
+  the active one leaves none; restore comes back inactive.
+- Imports (`src/modules/imports/service.ts`): context lists only the active profile; imports to an inactive profile
+  are refused with 409. Manual runs allowed for inactive profiles; Run page and launcher list all non-archived
+  profiles marked (active)/(inactive); profile list and page show an Active badge and the sync line.
+- Migration `database/migrations/0005_scheduler_and_active_profile.sql`: copies each owner's kept profile
+  (non-archived default, else most recently updated) `upworkSync` settings into `sync_schedules`, interval rounded
+  up to the next step (e.g. 5 -> 6); keeps only that profile active; then creates the unique index and drops
+  `is_default`.
+- Also changed: seed, skill `.claude/skills/upwork-sync/SKILL.md`, `README.md`, `docs/api.md`, `docs/database.md`,
+  `docs/upwork-sync.md`; tests in `tests/unit/sync-schedule.test.ts`, `tests/unit/upwork-import.test.ts`,
+  `tests/integration/profiles.test.ts`, `tests/integration/imports.test.ts`.
+
+### Verification (reported by the implementing session, not re-run by the tracker)
+
+- Typecheck, lint, prettier clean; 198 unit tests (21 files) pass.
+- Integration: 90 tests in 11 files; full run 89 passed, 1 failed (wrong expected status code in a new test). The
+  test was fixed and that file re-run: 14/14 pass. The full integration suite was not re-run after this fix.
+- Production build passes with `next build --webpack`.
+- Not verified: e2e browser tests not run; UI checked by server-render unit tests only. The local dev database was
+  not migrated (the main checkout still runs older code on it).
+- Environment: Docker Desktop had stopped and was restarted for the integration tests; Postgres came back healthy.
+
+### Open items
+
+- Push and merge the four branches (developer).
+- Deploy; migrations 0003, 0004 and 0005 apply on start.
+- Check that Settings > Sync scheduler shows the timing migrated from the Zoho profile; set it to every 4 h,
+  00:00-23:59 if wanted.
+- Enable the Claude cloud routine hourly (cron `18 * * * *`), with developer confirmation.
+- Verify the first production runs.
 
 ## Environment notes
 
