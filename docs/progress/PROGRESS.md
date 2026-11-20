@@ -33,6 +33,7 @@ Plan: `C:\Users\ACER\.claude\plans\clever-noodling-finch.md`.
 | Rich job data            | `clients` table, posting details, AI prompt v2, client card on job page   | 🟡 `bfaae80` on `feat/rich-job-data` (2026-11-17, from cleanup branch), not pushed or merged; e2e not run   |
 | Sync windows + schedule  | Per-profile scan windows, no re-scanning, 1/2/4 h schedule panel in UI    | 🟡 `6b8845b` on `feat/sync-schedule` (2026-11-19, from rich-data branch), not pushed or merged; e2e not run |
 | Scheduler + active       | App-wide sync scheduler, one active profile per user (replaces default)   | 🟡 `6e0f0d5` on `feat/scheduler-active-profile` (2026-11-21), not pushed or merged; e2e not run             |
+| Hunting checklist rules  | Competition and hire-rate hard rules, priority-country score bonus        | 🟡 `44d1079` on `feat/hunting-rules` (2026-11-21), not pushed or merged; e2e not run                        |
 
 ## Baseline (pre-existing work, committed 2026-10-11 as `703761f`)
 
@@ -1389,6 +1390,60 @@ Branched from `feat/sync-schedule` (`b798f2f`). Chain: `chore/codebase-cleanup` 
 - Check that Settings > Sync scheduler shows the timing migrated from the Zoho profile; set it to every 4 h,
   00:00-23:59 if wanted.
 - Enable the Claude cloud routine hourly (cron `18 * * * *`), with developer confirmation.
+- Verify the first production runs.
+
+## Upwork hunting checklist rules (`44d1079`, 2026-11-21, branch `feat/hunting-rules`, not pushed or merged)
+
+Branched from `feat/scheduler-active-profile` (`a78573f`). Chain: `chore/codebase-cleanup` -> `feat/rich-job-data` ->
+`feat/sync-schedule` -> `feat/scheduler-active-profile` -> `feat/hunting-rules`; none is pushed or merged. Source: the
+team's "How to find and hunt jobs on Upwork" checklist, shared by the developer.
+
+### Decisions (developer, as stated in the update request)
+
+- Competition checks reject, with editable thresholds: proposals at most the "10 to 15" band, interviewing at most 3,
+  invites at most 10; a posting where the client already hired always rejects.
+- Preferred countries (USA, Canada, Australia, UK, European countries) boost the score instead of rejecting.
+- Client hire rate is a hard rule, minimum 50%; unknown follows `unknownClientDataPolicy` (default NEEDS_REVIEW).
+
+### Implemented
+
+- Profile config (`src/modules/profiles/config-schema.ts`): `competition{maxProposalsTier, maxInterviewing,
+maxInvitesSent, rejectIfHired}`, `client.minHireRatePercent`, `client.preferredCountries` (USA, Canada, Australia,
+  UK, EU27, Switzerland, Norway, Iceland), `ai.preferredCountryBonus` (default 5, range 0-20). Defaults apply to older
+  stored profiles, so the production Zoho profile gets the rules switched on. No migration.
+- Hard rules (`src/modules/qualification/hard-filters.ts`): ALREADY_HIRED, PROPOSALS, INTERVIEWING, INVITES (unknown
+  counts pass; screened at import from search data, so no job-detail call is spent), CLIENT_HIRE_RATE (run stage; the
+  filtering stage now loads the client record, `src/modules/runs/engine/filtering.ts`).
+- Score = min(100, weighted + bonus) (`src/modules/qualification/scoring.ts`); the bonus is stored in the
+  qualification evidence (`priorityCountry`, `priorityBonus`) and shown on the job page
+  (`src/app/(app)/jobs/[id]/page.tsx`).
+- Lead e-mail adds Client and Competition rows (`src/modules/notifications/message.ts`).
+- Profile editor: Client tab (hire rate, priority countries, Competition block), AI tab (bonus); summary and diff
+  labels (`src/components/profiles/profile-{editor,summary}.tsx`, `src/modules/profiles/diff.ts`).
+- Demo mock source builds a client record with hire rate 70% so the demo still produces leads
+  (`src/modules/job-sources/mock-{provider,fixtures}.ts`).
+- Tests: `tests/unit/hunting-rules.test.ts` (new), `tests/integration/imports.test.ts`, `tests/fixtures/jobs.ts`. Docs:
+  `README.md`, `docs/architecture.md`, `docs/upwork-sync.md`.
+
+### Behaviour change to note
+
+- With the default policy, an Upwork job imported without its full details (no client record, e.g. when detail calls
+  were throttled) now goes to NEEDS_REVIEW instead of AI scoring, because its hire rate is unknown.
+
+### Verification (reported by the implementing session, not re-run by the tracker)
+
+- Unit: 210 tests (22 files) pass. Integration: 94 tests (11 files) pass in a full run after the last code change.
+- Typecheck, lint, prettier clean. One lint run overlapped with the build and scanned the build output (thousands of
+  findings); lint re-run alone was clean.
+- Production build passes with `next build --webpack`.
+- Not verified: e2e browser tests not run; UI not checked in a browser.
+
+### Open items
+
+- Push and merge the five branches (developer).
+- Deploy; migrations 0003, 0004 and 0005 apply on start.
+- Review the new rule defaults on the live Zoho profile.
+- Enable the Claude cloud routine hourly, with developer confirmation.
 - Verify the first production runs.
 
 ## Environment notes
