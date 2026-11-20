@@ -4,6 +4,7 @@ import { env } from "@/lib/configuration/env";
 import { jobs, notifications, qualifications, runJobs } from "@/lib/database/schema";
 import type { RiskFlag } from "@/modules/ai/output-schema";
 import { enabledChannels, type ChannelTarget } from "@/modules/notifications/channels";
+import { getClient } from "@/modules/clients/repository";
 import { buildLeadEmail } from "@/modules/notifications/message";
 import { getRecipientForSend } from "@/modules/notifications/recipients";
 import { RECLAIMABLE_NOTIFICATION_STATUSES } from "@/modules/notifications/transitions";
@@ -163,6 +164,8 @@ async function reserveForChannel(
         continue;
       }
 
+      const evidence = candidate.qualification.evidence as { priorityCountry?: string };
+      const clientRecord = candidate.job.clientId ? await getClient(tx, candidate.job.clientId) : null;
       const input = {
         title: candidate.job.title,
         budgetAmount: candidate.job.budgetAmount,
@@ -180,6 +183,17 @@ async function reserveForChannel(
         riskFlags: (candidate.qualification.riskFlags as RiskFlag[]) ?? [],
         jobUrl: candidate.job.jobUrl ?? "",
         dashboardUrl: `${baseUrl}/jobs/${candidate.jobId}`,
+        client: {
+          country: clientRecord?.country ?? candidate.job.clientCountry,
+          priorityCountry: Boolean(evidence.priorityCountry),
+          hireRatePercent: clientRecord?.hireRatePercent ?? null,
+          totalSpent: clientRecord?.totalSpent ?? candidate.job.clientTotalSpent,
+        },
+        competition: {
+          proposalsTier: candidate.job.proposalsTier,
+          interviewing: candidate.job.interviewing,
+          invitesSent: candidate.job.invitesSent,
+        },
       };
       const email = buildLeadEmail(input, config.notifications.messageFormat);
       const payload = { kind: "lead", email };

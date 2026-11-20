@@ -8,7 +8,7 @@ import { getClient } from "@/modules/clients/repository";
 import { rowToNormalized, type JobRow } from "@/modules/jobs/repository";
 import { decideEligibility } from "@/modules/qualification/eligibility";
 import type { HardCheckResult } from "@/modules/qualification/hard-filters";
-import { computeAuthoritativeScore } from "@/modules/qualification/scoring";
+import { computeAuthoritativeScore, priorityCountryBonus, withBonus } from "@/modules/qualification/scoring";
 import {
   beginStage,
   completeStage,
@@ -84,7 +84,11 @@ async function evaluateOne(ctx: RunContext, runJob: RunJobRow, jobRow: JobRow): 
     }
   }
 
-  const score = output ? computeAuthoritativeScore(output.dimension_scores, config.ai.weights) : null;
+  // Weighted AI score, plus the priority-country bonus (the client record's country is the current one).
+  const bonus = output ? priorityCountryBonus(client?.country ?? jobRow.clientCountry, config) : null;
+  const score = output
+    ? withBonus(computeAuthoritativeScore(output.dimension_scores, config.ai.weights), bonus)
+    : null;
   const notified = await alreadyNotifiedJobIds(db, config, [jobRow.id]);
   const decision = decideEligibility(
     {
@@ -120,6 +124,7 @@ async function evaluateOne(ctx: RunContext, runJob: RunJobRow, jobRow: JobRow): 
           scopeSummary: output.scope_summary,
           positiveSignals: output.positive_signals,
           reasoningSummary: output.reasoning_summary,
+          ...(bonus ? { priorityCountry: bonus.country, priorityBonus: bonus.points } : {}),
         }
       : {},
     riskFlags: output?.risk_flags ?? [],

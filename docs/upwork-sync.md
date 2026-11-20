@@ -188,9 +188,12 @@ dash); budgets without a stated currency are treated as USD (Upwork marketplace 
 ## Screening
 
 `/api/import/jobs/screen` only rejects a job on a definite failure of a rule that search results can decide: job type,
-budget, currency, payment verification, client rating, client spend, client location and excluded keywords. Unknown
+budget, currency, payment verification, client rating, client spend, client location, excluded keywords, and the
+competition checks (already hired, proposal band, freelancers interviewing, invites sent: search results carry them, so
+crowded or filled postings never cost a detail call). Unknown
 values never reject at this point, and rules that need the full description or the client's hiring record (required
-skills, include keywords, keyword coverage, required combinations, client hires, category) are left to the run, after
+skills, include keywords, keyword coverage, required combinations, client hires, client hire rate, category) are left
+to the run, after
 the detail call. Every rule is applied in full during the run.
 
 `detailsWanted` lists every new job (not already processed by the profile, inside the scan window) that passed

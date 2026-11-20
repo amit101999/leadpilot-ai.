@@ -244,6 +244,12 @@ const SCREENABLE_RULES = new Set<HardRule>([
   "CLIENT_SPEND",
   "CLIENT_LOCATION",
   "EXCLUDE_KEYWORDS",
+  // Competition counts and the proposal band come with search results, so crowded or already
+  // filled postings never cost a job-detail call.
+  "ALREADY_HIRED",
+  "PROPOSALS",
+  "INTERVIEWING",
+  "INVITES",
 ]);
 
 /** Only a definite failure of a screenable rule rejects; unknown values may be filled in by the details. */

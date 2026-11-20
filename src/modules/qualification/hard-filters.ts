@@ -2,7 +2,7 @@ import { centsToString, convertCents, toCents, type Cents } from "@/lib/money/de
 import { validateJobUrl } from "@/lib/security/url";
 import type { NormalizedJob } from "@/modules/job-sources/types";
 import { enabledChannels } from "@/modules/notifications/channels";
-import type { ProfileConfig, UnknownPolicy } from "@/modules/profiles/config-schema";
+import { PROPOSAL_TIERS, type ProfileConfig, type UnknownPolicy } from "@/modules/profiles/config-schema";
 import {
   containsTerm,
   matchSkill,
@@ -28,6 +28,11 @@ export type HardRule =
   | "CLIENT_HIRES"
   | "CLIENT_SPEND"
   | "CLIENT_LOCATION"
+  | "CLIENT_HIRE_RATE"
+  | "ALREADY_HIRED"
+  | "PROPOSALS"
+  | "INTERVIEWING"
+  | "INVITES"
   | "CATEGORY"
   | "REQUIRED_SKILLS"
   | "INCLUDE_KEYWORDS"
@@ -80,6 +85,7 @@ export function evaluateHardChecks(
     ...checkBudget(job, config),
     checkPaymentVerified(job, config),
     ...checkClient(job, config),
+    ...checkCompetition(job, config),
     checkCategory(job, config),
     checkRequiredSkills(skillMatches, config),
     checkIncludeKeywords(searchable, config),
@@ -375,6 +381,29 @@ function checkClient(job: NormalizedJob, config: ProfileConfig): HardCheckResult
     );
   }
 
+  // The hire rate is in the client's full record (job-detail call); search results never carry it.
+  const hireRate = job.client?.hireRatePercent ?? null;
+  if (client.minHireRatePercent === null) {
+    checks.push(notApplicable("CLIENT_HIRE_RATE", "No minimum client hire rate"));
+  } else if (hireRate === null) {
+    checks.push(
+      result("CLIENT_HIRE_RATE", "UNKNOWN", unknown, "HIRE_RATE_UNKNOWN", "Client hire rate is unavailable"),
+    );
+  } else {
+    checks.push(
+      hireRate >= client.minHireRatePercent
+        ? pass("CLIENT_HIRE_RATE", `Client hires on ${hireRate}% of their jobs`)
+        : result(
+            "CLIENT_HIRE_RATE",
+            "FAIL",
+            "REJECT",
+            "HIRE_RATE_BELOW_MINIMUM",
+            `Client hire rate ${hireRate}% is below ${client.minHireRatePercent}%`,
+            { observed: `${hireRate}%`, expected: `>= ${client.minHireRatePercent}%` },
+          ),
+    );
+  }
+
   const allowed = client.allowedCountries.map((c) => c.toLowerCase());
   const blocked = client.blockedCountries.map((c) => c.toLowerCase());
   if (allowed.length === 0 && blocked.length === 0) {
@@ -401,6 +430,87 @@ function checkClient(job: NormalizedJob, config: ProfileConfig): HardCheckResult
           ),
     );
   }
+  return checks;
+}
+
+/**
+ * Competition on the posting (the team's checklist: low competition, not already filled). Search
+ * results carry these counts; when one is missing the rule passes rather than dropping the job.
+ */
+function checkCompetition(job: NormalizedJob, config: ProfileConfig): HardCheckResult[] {
+  const { competition } = config;
+  const { posting } = job;
+  const checks: HardCheckResult[] = [];
+
+  if (!competition.rejectIfHired) {
+    checks.push(notApplicable("ALREADY_HIRED", "Jobs with a hire are allowed"));
+  } else if (posting.hiresMade === null) {
+    checks.push(pass("ALREADY_HIRED", "Hires on this job are unknown"));
+  } else {
+    checks.push(
+      posting.hiresMade > 0
+        ? result(
+            "ALREADY_HIRED",
+            "FAIL",
+            "REJECT",
+            "ALREADY_HIRED",
+            "The client has already hired for this job",
+            {
+              observed: posting.hiresMade,
+            },
+          )
+        : pass("ALREADY_HIRED", "Nobody hired yet"),
+    );
+  }
+
+  const maxTier = competition.maxProposalsTier;
+  const tierIndex = (tier: string | null) =>
+    tier === null ? -1 : PROPOSAL_TIERS.findIndex((t) => t.toLowerCase() === tier.trim().toLowerCase());
+  if (maxTier === null) {
+    checks.push(notApplicable("PROPOSALS", "No limit on proposals"));
+  } else if (tierIndex(posting.proposalsTier) < 0) {
+    checks.push(pass("PROPOSALS", "Number of proposals is unknown"));
+  } else {
+    checks.push(
+      tierIndex(posting.proposalsTier) <= tierIndex(maxTier)
+        ? pass("PROPOSALS", `Proposals: ${posting.proposalsTier}`)
+        : result(
+            "PROPOSALS",
+            "FAIL",
+            "REJECT",
+            "TOO_MANY_PROPOSALS",
+            `Too many proposals (${posting.proposalsTier})`,
+            { observed: posting.proposalsTier, expected: `${maxTier} or fewer` },
+          ),
+    );
+  }
+
+  const countRule = (
+    rule: HardRule,
+    observed: number | null,
+    max: number | null,
+    reasonCode: string,
+    label: string,
+  ): HardCheckResult => {
+    if (max === null) return notApplicable(rule, `No limit on ${label}`);
+    if (observed === null) return pass(rule, `${label[0]!.toUpperCase()}${label.slice(1)} unknown`);
+    return observed <= max
+      ? pass(rule, `${observed} ${label}`)
+      : result(rule, "FAIL", "REJECT", reasonCode, `Too many ${label} (${observed})`, {
+          observed,
+          expected: `<= ${max}`,
+        });
+  };
+  checks.push(
+    countRule(
+      "INTERVIEWING",
+      posting.interviewing,
+      competition.maxInterviewing,
+      "TOO_MANY_INTERVIEWING",
+      "freelancers interviewing",
+    ),
+    countRule("INVITES", posting.invitesSent, competition.maxInvitesSent, "TOO_MANY_INVITES", "invites sent"),
+  );
   return checks;
 }
 

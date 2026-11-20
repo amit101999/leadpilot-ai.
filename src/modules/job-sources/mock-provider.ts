@@ -92,7 +92,29 @@ export class MockJobSourceProvider implements JobSourceProvider {
       category: r.category ?? null,
       postedAt: r.posted ? new Date(r.posted) : null,
       posting: EMPTY_POSTING,
-      client: null,
+      // Demo jobs come with a client record, like an Upwork job whose details were fetched.
+      client: r.client
+        ? {
+            sourceClientId: `mock-${r.id.trim()}`,
+            country: r.client.country ?? null,
+            state: null,
+            timezone: null,
+            paymentVerified: typeof r.client.verified === "boolean" ? r.client.verified : null,
+            rating: typeof r.client.rating === "number" ? r.client.rating.toFixed(2) : null,
+            reviewsCount: null,
+            totalSpent: decimal(r.client.spent),
+            totalHires: typeof r.client.hires === "number" ? r.client.hires : null,
+            jobsWithHires: null,
+            activeContracts: null,
+            hoursTotal: null,
+            jobsPosted: null,
+            openJobs: null,
+            hireRatePercent: typeof r.client.hireRate === "number" ? r.client.hireRate : null,
+            recentReviews: [],
+            workHistory: { open: [], closed: [] },
+            otherOpenJobs: [],
+          }
+        : null,
       sourceMetadata: r.mockAi ? { mockAi: r.mockAi, mock: true } : { mock: true },
     };
   }

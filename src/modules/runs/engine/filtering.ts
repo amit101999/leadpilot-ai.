@@ -1,6 +1,6 @@
 import { and, eq, inArray, or, sql } from "drizzle-orm";
 import type { DbExecutor } from "@/lib/database/client";
-import { jobs, notifications, runJobs, runStages } from "@/lib/database/schema";
+import { clients, jobs, notifications, runJobs, runStages } from "@/lib/database/schema";
 import { rowToNormalized } from "@/modules/jobs/repository";
 import { enabledChannels } from "@/modules/notifications/channels";
 import { CLAIMED_NOTIFICATION_STATUSES } from "@/modules/notifications/transitions";
@@ -36,9 +36,11 @@ export async function filterStep(ctx: RunContext): Promise<StageResponse> {
 
   const metrics = await db.transaction(async (tx) => {
     const pending = await tx
-      .select({ runJob: runJobs, job: jobs })
+      .select({ runJob: runJobs, job: jobs, client: clients })
       .from(runJobs)
       .innerJoin(jobs, eq(jobs.id, runJobs.jobId))
+      // The client record carries figures some rules need (hire rate); null for search-only jobs.
+      .leftJoin(clients, eq(clients.id, jobs.clientId))
       .where(and(eq(runJobs.runId, run.id), eq(runJobs.processingStatus, "NEW")))
       .for("update", { of: runJobs });
 
@@ -51,8 +53,8 @@ export async function filterStep(ctx: RunContext): Promise<StageResponse> {
     const counts = { evaluated: pending.length, passed: 0, filteredOut: 0, needsReview: 0, capped: 0 };
     const passing: Array<{ runJobId: string; postedAt: Date | null; sourceJobId: string }> = [];
 
-    for (const { runJob, job } of pending) {
-      const summary = evaluateHardChecks(rowToNormalized(job), config, {
+    for (const { runJob, job, client } of pending) {
+      const summary = evaluateHardChecks(rowToNormalized(job, client), config, {
         sourceAuthorized,
         alreadyNotified: notified.has(job.id),
       });

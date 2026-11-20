@@ -99,6 +99,8 @@ interface Qualification {
     scopeSummary?: string;
     positiveSignals?: string[];
     reasoningSummary?: string;
+    priorityCountry?: string;
+    priorityBonus?: number;
   };
   riskFlags: Array<{ code: string; severity: string; evidence?: string }>;
   missingInformation: string[];
@@ -341,6 +343,12 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           <div className="flex flex-col gap-4 px-4 py-4 text-sm">
             {latest.error && <p className="text-danger">AI error: {latest.error}</p>}
             {latest.evidence.reasoningSummary && <p>{latest.evidence.reasoningSummary}</p>}
+            {latest.evidence.priorityBonus ? (
+              <p className="text-muted">
+                The score includes a +{latest.evidence.priorityBonus} priority-country bonus (
+                {latest.evidence.priorityCountry}).
+              </p>
+            ) : null}
             {latest.decisionReasons.length > 0 && (
               <div>
                 <h3 className="font-medium">Decision</h3>

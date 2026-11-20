@@ -17,6 +17,31 @@ export interface LeadMessageInput {
   riskFlags: RiskFlag[];
   jobUrl: string;
   dashboardUrl: string | null;
+  /** Client facts from the hunting checklist; omitted values are shown as unknown. */
+  client?: {
+    country: string | null;
+    priorityCountry: boolean;
+    hireRatePercent: number | null;
+    totalSpent: string | null;
+  };
+  /** Competition on the posting when the job was imported. */
+  competition?: { proposalsTier: string | null; interviewing: number | null; invitesSent: number | null };
+}
+
+/** "United States (priority country) · hires on 77% · spent USD 34,286". */
+function clientText(client: NonNullable<LeadMessageInput["client"]>): string {
+  const country = client.country
+    ? `${client.country}${client.priorityCountry ? " (priority country)" : ""}`
+    : "Country unknown";
+  const hireRate =
+    client.hireRatePercent === null ? "hire rate unknown" : `hires on ${client.hireRatePercent}%`;
+  const spent = client.totalSpent ? `spent ${formatMoney(client.totalSpent, "USD")}` : "spend unknown";
+  return [country, hireRate, spent].join(" · ");
+}
+
+function competitionText(c: NonNullable<LeadMessageInput["competition"]>): string {
+  const known = (v: string | number | null) => (v === null ? "unknown" : String(v));
+  return `Proposals ${known(c.proposalsTier)} · interviewing ${known(c.interviewing)} · invites ${known(c.invitesSent)}`;
 }
 
 export interface EmailContent {
@@ -91,6 +116,12 @@ export function buildLeadEmail(input: LeadMessageInput, format: "STANDARD" | "CO
     ["Budget", oneLine(budgetText(input), 60)],
     ["Job type", jobType],
     ["Payment verified", verified],
+    ...(input.client
+      ? ([["Client", oneLine(clientText(input.client), 160)]] as Array<[string, string]>)
+      : []),
+    ...(input.competition
+      ? ([["Competition", oneLine(competitionText(input.competition), 120)]] as Array<[string, string]>)
+      : []),
     ["Matched skills", oneLine(input.skills.length > 0 ? input.skills.join(", ") : "-")],
     ["AI match score", score],
     ["Reason", oneLine(format === "COMPACT" ? input.reason.slice(0, 80) : input.reason, 300)],

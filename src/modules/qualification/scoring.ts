@@ -1,5 +1,5 @@
 import type { DimensionScores } from "@/modules/ai/output-schema";
-import type { ScoringWeights } from "@/modules/profiles/config-schema";
+import type { ProfileConfig, ScoringWeights } from "@/modules/profiles/config-schema";
 
 export const RUBRIC_VERSION = "rubric-2026-10-v1";
 
@@ -55,4 +55,28 @@ export function normalizeWeights(weights: ScoringWeights): ScoringWeights {
     missing -= 1;
   }
   return Object.fromEntries(parts.map((p) => [p.key, p.value])) as ScoringWeights;
+}
+
+export interface PriorityBonus {
+  country: string;
+  points: number;
+}
+
+/**
+ * The team prioritizes clients in developed markets: a client in one of the profile's preferred
+ * countries adds `ai.preferredCountryBonus` points to the score. Other countries are not penalized.
+ */
+export function priorityCountryBonus(
+  clientCountry: string | null,
+  config: Pick<ProfileConfig, "client" | "ai">,
+): PriorityBonus | null {
+  if (!clientCountry || config.ai.preferredCountryBonus === 0) return null;
+  const country = clientCountry.trim().toLowerCase();
+  const preferred = config.client.preferredCountries.some((c) => c.toLowerCase() === country);
+  return preferred ? { country: clientCountry, points: config.ai.preferredCountryBonus } : null;
+}
+
+/** The weighted score plus any priority bonus, never above 100. */
+export function withBonus(score: number, bonus: PriorityBonus | null): number {
+  return Math.min(100, score + (bonus?.points ?? 0));
 }

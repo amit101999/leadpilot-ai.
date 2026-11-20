@@ -74,8 +74,13 @@ Transitions are declared in `src/modules/runs/transitions.ts`; any other transit
 1. **Hard filters** (`src/modules/qualification`): budget minimum (exact decimal arithmetic, `$499.99` fails `$500`),
    fixed-price only, payment verification required (unknown counts as not verified), currency policy (foreign
    currency is UNKNOWN unless a fixed rate is configured), required/optional skills with aliases and word boundaries,
-   include/exclude keywords, client rating/hires/spend/location, URL host checks, and "already notified to this
-   recipient".
+   include/exclude keywords, client rating/hires/spend/location, the client's hire rate (default at least 50%),
+   competition on the posting (default: Upwork proposal band "10 to 15" or fewer, at most 3 freelancers interviewing,
+   at most 10 invites sent, nobody hired yet; unknown counts pass), URL host checks, and "already notified to this
+   recipient". These follow the team's Upwork hunting checklist; each limit is editable per profile.
+   **Priority countries:** a client in one of the profile's preferred countries (default: USA, Canada, Australia, UK
+   and European countries) is not required, but adds `ai.preferredCountryBonus` points (default 5) to the score,
+   capped at 100. The bonus is stored in the qualification's evidence and shown on the job page and in the lead e-mail.
 2. **AI evaluation** (`src/modules/ai`, prompt `prompts/v2.ts`, version `lead-eval-v2`): the model gets only a minimal
    profile slice, the job text, the posting's terms and hiring activity, and the client's numbers (rating, reviews,
    spend, hires, hire rate, hours, active contracts, jobs posted). The client's review comments and contract titles are

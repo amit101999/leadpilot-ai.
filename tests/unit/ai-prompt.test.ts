@@ -57,7 +57,7 @@ describe("AI prompt v2", () => {
   });
 
   it("marks client facts unknown instead of inventing them when no client record exists", () => {
-    const data = jobData(buildUserMessage({ job: makeJob({ clientRating: null }), profile }));
+    const data = jobData(buildUserMessage({ job: makeJob({ clientRating: null, client: null }), profile }));
     expect(data.client).toMatchObject({
       rating: "unknown",
       hire_rate_percent: "unknown",

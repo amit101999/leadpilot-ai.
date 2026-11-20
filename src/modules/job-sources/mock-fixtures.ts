@@ -21,6 +21,8 @@ export interface MockSourceRecord {
     hires?: number | null;
     spent?: string | number | null;
     country?: string | null;
+    /** Share of posted jobs that led to a hire, as a job-detail call would report it. */
+    hireRate?: number | null;
   };
   tags?: string[];
   category?: string | null;
@@ -40,7 +42,14 @@ const all = (n: number) => ({
   client_credibility: n,
   overall_relevance: n,
 });
-const goodClient = { verified: true, rating: 4.8, hires: 14, spent: "32000", country: "United States" };
+const goodClient = {
+  verified: true,
+  rating: 4.8,
+  hires: 14,
+  spent: "32000",
+  country: "United States",
+  hireRate: 70,
+};
 const longText = (summary: string) =>
   `${summary} The project has a defined scope with milestones, acceptance criteria and access to existing documentation. We expect regular updates and clean, tested code.`;
 

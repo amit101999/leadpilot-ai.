@@ -423,7 +423,7 @@ export function ProfileEditor({
     {
       key: "client",
       label: "Client",
-      alert: sectionHasError("client"),
+      alert: sectionHasError("client") || sectionHasError("competition"),
       content: section(
         <>
           <Checkbox
@@ -462,6 +462,21 @@ export function ProfileEditor({
                 {...register("configuration.client.minTotalSpent", { setValueAs: nullableText })}
               />
             </Field>
+            <Field
+              id={id("minHireRate")}
+              label="Minimum hire rate (%)"
+              hint="Share of the client's posted jobs that led to a hire. Empty: no minimum."
+              error={err("client", "minHireRatePercent")}
+            >
+              <Input
+                id={id("minHireRate")}
+                type="number"
+                min={0}
+                max={100}
+                className="w-24"
+                {...register("configuration.client.minHireRatePercent", { setValueAs: nullableNumber })}
+              />
+            </Field>
           </div>
           <Field id={id("allowed")} label="Allowed client countries" hint="Empty: any country.">
             <Controller
@@ -494,9 +509,28 @@ export function ProfileEditor({
             />
           </Field>
           <Field
+            id={id("preferred")}
+            label="Priority countries"
+            hint="Clients here get the priority bonus (AI scoring tab) and are marked in the lead e-mail. Other countries are not rejected."
+          >
+            <Controller
+              control={control}
+              name="configuration.client.preferredCountries"
+              render={({ field }) => (
+                <ChipInput
+                  id={id("preferred")}
+                  value={field.value ?? []}
+                  onChange={field.onChange}
+                  max={100}
+                  placeholder="Country, then Enter"
+                />
+              )}
+            />
+          </Field>
+          <Field
             id={id("unknownClient")}
             label="When the source does not provide client data"
-            hint="Applies to the rating, hires, spend and country conditions above."
+            hint="Applies to the rating, hires, spend, hire rate and country conditions above."
           >
             <Select id={id("unknownClient")} {...register("configuration.client.unknownClientDataPolicy")}>
               <option value="FAIL">Reject the job</option>
@@ -504,6 +538,62 @@ export function ProfileEditor({
               <option value="IGNORE">Ignore that condition</option>
             </Select>
           </Field>
+          <h3 className="mt-2 text-sm font-semibold">Competition on the posting</h3>
+          <p className="-mt-2 text-sm text-muted">
+            Skip crowded postings and postings the client is already filling. Checked on search results, so
+            these jobs cost no job-detail call. Unknown counts never reject a job.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field
+              id={id("maxProposals")}
+              label="Most proposals"
+              error={err("competition", "maxProposalsTier")}
+            >
+              <Select
+                id={id("maxProposals")}
+                {...register("configuration.competition.maxProposalsTier", { setValueAs: nullableText })}
+              >
+                <option value="">No limit</option>
+                {["Less than 5", "5 to 10", "10 to 15", "15 to 20", "20 to 50"].map((tier) => (
+                  <option key={tier} value={tier}>
+                    {tier}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field
+              id={id("maxInterviewing")}
+              label="Most freelancers interviewing"
+              hint="Empty: no limit."
+              error={err("competition", "maxInterviewing")}
+            >
+              <Input
+                id={id("maxInterviewing")}
+                type="number"
+                min={0}
+                className="w-24"
+                {...register("configuration.competition.maxInterviewing", { setValueAs: nullableNumber })}
+              />
+            </Field>
+            <Field
+              id={id("maxInvites")}
+              label="Most invites sent"
+              hint="Empty: no limit."
+              error={err("competition", "maxInvitesSent")}
+            >
+              <Input
+                id={id("maxInvites")}
+                type="number"
+                min={0}
+                className="w-24"
+                {...register("configuration.competition.maxInvitesSent", { setValueAs: nullableNumber })}
+              />
+            </Field>
+          </div>
+          <Checkbox
+            label="Skip jobs where the client has already hired someone"
+            {...register("configuration.competition.rejectIfHired")}
+          />
         </>,
       ),
     },
@@ -581,6 +671,21 @@ export function ProfileEditor({
                 max={3}
                 className="w-24"
                 {...register("configuration.ai.maxRetries", { valueAsNumber: true })}
+              />
+            </Field>
+            <Field
+              id={id("bonus")}
+              label="Priority-country bonus (points)"
+              hint="Added to the score when the client is in a priority country (Client tab). 0 to 20; the score never exceeds 100."
+              error={err("ai", "preferredCountryBonus")}
+            >
+              <Input
+                id={id("bonus")}
+                type="number"
+                min={0}
+                max={20}
+                className="w-24"
+                {...register("configuration.ai.preferredCountryBonus", { valueAsNumber: true })}
               />
             </Field>
           </div>

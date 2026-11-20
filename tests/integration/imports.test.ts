@@ -22,6 +22,7 @@ import {
   clients,
   jobs,
   notifications,
+  qualifications,
   runJobs,
   stagedJobs,
   syncState,
@@ -423,14 +424,18 @@ describe("import flow", () => {
       c.notifications.emailRecipientId = recipient.json.data.id;
     });
     const token = await newToken(user);
-    const job = upworkJob();
+    // Jobs reach the e-mail stage with their details (client record) fetched.
+    const job = { ...upworkJob(), details: details(5) };
     const first = await commit(token.bearer, profileId, [job]);
     await execute(first.json.data.runId);
     expect(email().sent).toHaveLength(1);
     expect(email().sent[0]!.subject).toContain("React and Node.js dashboard");
 
     // The next sync brings the old job back plus a new one: only the new one is run and e-mailed.
-    const newer = upworkJob({ title: "Second Zoho CRM API integration with a React and Node.js dashboard" });
+    const newer = {
+      ...upworkJob({ title: "Second Zoho CRM API integration with a React and Node.js dashboard" }),
+      details: details(5),
+    };
     const again = await commit(token.bearer, profileId, [job, newer]);
     expect(again.json.data).toMatchObject({ status: "STARTED", accepted: 1, alreadySeen: 1 });
     await execute(again.json.data.runId);
@@ -444,6 +449,106 @@ describe("import flow", () => {
       .where(eq(notifications.recipientId, recipient.json.data.id));
     expect(claims).toHaveLength(2);
     expect(claims.every((c) => c.channel === "EMAIL")).toBe(true);
+  });
+});
+
+describe("hunting checklist", () => {
+  /** The same job from a client in another country (search row and job-detail record). */
+  function fromCountry(country: string, hires = 5) {
+    const d = details(hires);
+    d.data.marketplaceJobPosting.clientCompanyPublic.country = { name: country };
+    return {
+      ...upworkJob({ client: { ...upworkJob().client, country } }),
+      details: d,
+    };
+  }
+  const qualificationOf = async (sourceJobId: string) => {
+    const [row] = await getDb()
+      .select({ q: qualifications })
+      .from(qualifications)
+      .innerJoin(jobs, eq(jobs.id, qualifications.jobId))
+      .where(eq(jobs.sourceJobId, sourceJobId));
+    return row?.q;
+  };
+
+  it("screens out postings already filled or too crowded, without asking for their details", async () => {
+    const user = await createUser("OPERATOR");
+    const profileId = await newProfile(user);
+    const token = await newToken(user);
+    const good = upworkJob();
+    const hired = upworkJob({
+      job_activity: { invites_sent: 2, invited_to_interview: 1, total_offered: 1, total_hired: 1 },
+    });
+    const crowded = upworkJob({ proposals_tier: "20 to 50" });
+    const interviewing = upworkJob({
+      job_activity: { invites_sent: 2, invited_to_interview: 8, total_offered: 0, total_hired: 0 },
+    });
+    const res = await call(screenJobs, {
+      method: "POST",
+      headers: token.bearer,
+      body: { profileId, origin: "upwork-mcp", jobs: [good, hired, crowded, interviewing] },
+    });
+    expect(res.json.data).toMatchObject({ rejected: 3, detailsWanted: [good.id] });
+  });
+
+  it("filters a client who rarely hires", async () => {
+    const user = await createUser("OPERATOR");
+    const profileId = await newProfile(user);
+    const token = await newToken(user);
+    const d = details(5);
+    d.client_record.hire_rate_percent = 30;
+    const job = { ...upworkJob(), details: d };
+    const res = await commit(token.bearer, profileId, [job]);
+    await execute(res.json.data.runId);
+    const [row] = await getDb()
+      .select({ status: runJobs.processingStatus, reasons: runJobs.rejectionReasons })
+      .from(runJobs)
+      .where(eq(runJobs.runId, res.json.data.runId));
+    expect(row).toMatchObject({ status: "FILTERED_OUT" });
+    expect(JSON.stringify(row!.reasons)).toContain("hire rate 30%");
+  });
+
+  it("adds the priority-country bonus to clients in preferred countries only", async () => {
+    const user = await createUser("OPERATOR");
+    const profileId = await newProfile(user);
+    const token = await newToken(user);
+    const us = fromCountry("United States");
+    const india = fromCountry("India");
+    const res = await commit(token.bearer, profileId, [us, india]);
+    await execute(res.json.data.runId);
+
+    const usQ = await qualificationOf(us.id);
+    const indiaQ = await qualificationOf(india.id);
+    // Same text, so the same AI score; only the bonus differs.
+    expect(usQ!.score! - indiaQ!.score!).toBe(5);
+    expect(usQ!.evidence).toMatchObject({ priorityCountry: "United States", priorityBonus: 5 });
+    expect(indiaQ!.evidence).not.toHaveProperty("priorityBonus");
+  });
+
+  it("accepts all of these postings when the profile turns the rules off", async () => {
+    const user = await createUser("OPERATOR");
+    const profileId = await newProfile(user, (c) => {
+      c.competition = {
+        maxProposalsTier: null,
+        maxInterviewing: null,
+        maxInvitesSent: null,
+        rejectIfHired: false,
+      };
+      c.client.minHireRatePercent = null;
+    });
+    const token = await newToken(user);
+    const d = details(5);
+    d.client_record.hire_rate_percent = 10;
+    const job = {
+      ...upworkJob({
+        proposals_tier: "50+",
+        job_activity: { invites_sent: 40, invited_to_interview: 20, total_offered: 2, total_hired: 1 },
+      }),
+      details: d,
+    };
+    const res = await commit(token.bearer, profileId, [job]);
+    await execute(res.json.data.runId);
+    expect((await qualificationOf(job.id))?.decision).toBe("QUALIFIED");
   });
 });
 

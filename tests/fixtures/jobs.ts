@@ -1,7 +1,32 @@
-import { EMPTY_POSTING, type NormalizedJob } from "@/modules/job-sources/types";
+import { EMPTY_POSTING, type NormalizedClient, type NormalizedJob } from "@/modules/job-sources/types";
 import type { AiOutput } from "@/modules/ai/output-schema";
 
-/** A job that satisfies every hard filter of the default profile. */
+/** A client record as a job-detail call supplies it: a good client by the team's checklist. */
+export function makeClient(overrides: Partial<NormalizedClient> = {}): NormalizedClient {
+  return {
+    sourceClientId: "client-1",
+    country: "United States",
+    state: "CA",
+    timezone: "America/Los_Angeles",
+    paymentVerified: true,
+    rating: "4.90",
+    reviewsCount: 10,
+    totalSpent: "25000.00",
+    totalHires: 12,
+    jobsWithHires: 10,
+    activeContracts: 2,
+    hoursTotal: "500.00",
+    jobsPosted: 14,
+    openJobs: 1,
+    hireRatePercent: 71,
+    recentReviews: [],
+    workHistory: { open: [], closed: [] },
+    otherOpenJobs: [],
+    ...overrides,
+  };
+}
+
+/** A job (with its client's full record) that satisfies every hard filter of the default profile. */
 export function makeJob(overrides: Partial<NormalizedJob> = {}): NormalizedJob {
   return {
     source: "mock",
@@ -25,7 +50,7 @@ export function makeJob(overrides: Partial<NormalizedJob> = {}): NormalizedJob {
     category: "Web Development",
     postedAt: new Date("2026-10-01T10:00:00Z"),
     posting: EMPTY_POSTING,
-    client: null,
+    client: makeClient(),
     sourceMetadata: {},
     ...overrides,
   };

@@ -85,6 +85,63 @@ export const DEFAULT_SEARCH_CONFIG: SearchConfig = {
   upworkSync: { enabled: false, everyHours: 4, activeFrom: "00:00", activeTo: "23:59", timezone: "UTC" },
 };
 
+/** Upwork's proposal bands, fewest first. A posting's band is compared with the profile's maximum. */
+export const PROPOSAL_TIERS = ["Less than 5", "5 to 10", "10 to 15", "15 to 20", "20 to 50", "50+"] as const;
+/** Bands a profile can set as its maximum ("50+" would allow everything, so it is not offered). */
+const MAX_PROPOSAL_TIERS = ["Less than 5", "5 to 10", "10 to 15", "15 to 20", "20 to 50"] as const;
+
+/**
+ * Competition on a posting, from the team's hunting checklist: avoid crowded postings, postings where
+ * the client is already interviewing or inviting many freelancers, and postings already filled.
+ */
+export const DEFAULT_COMPETITION = {
+  maxProposalsTier: "10 to 15" as (typeof MAX_PROPOSAL_TIERS)[number] | null,
+  maxInterviewing: 3 as number | null,
+  maxInvitesSent: 10 as number | null,
+  rejectIfHired: true,
+};
+
+/** Developed markets the team prioritizes: USA, Canada, Australia, UK and Europe (Upwork's country names). */
+export const DEFAULT_PREFERRED_COUNTRIES = [
+  "United States",
+  "Canada",
+  "Australia",
+  "United Kingdom",
+  "Austria",
+  "Belgium",
+  "Bulgaria",
+  "Croatia",
+  "Cyprus",
+  "Czech Republic",
+  "Denmark",
+  "Estonia",
+  "Finland",
+  "France",
+  "Germany",
+  "Greece",
+  "Hungary",
+  "Ireland",
+  "Italy",
+  "Latvia",
+  "Lithuania",
+  "Luxembourg",
+  "Malta",
+  "Netherlands",
+  "Poland",
+  "Portugal",
+  "Romania",
+  "Slovakia",
+  "Slovenia",
+  "Spain",
+  "Sweden",
+  "Switzerland",
+  "Norway",
+  "Iceland",
+];
+
+export const DEFAULT_MIN_HIRE_RATE = 50;
+export const DEFAULT_PREFERRED_COUNTRY_BONUS = 5;
+
 export const profileConfigSchema = z
   .object({
     schemaVersion: z.literal(CONFIG_SCHEMA_VERSION).default(CONFIG_SCHEMA_VERSION),
@@ -130,9 +187,25 @@ export const profileConfigSchema = z
       minTotalSpent: decimalAmount.nullable(),
       allowedCountries: termList(100),
       blockedCountries: termList(100),
+      /** Minimum share of the client's posted jobs that led to a hire. null = rule off. */
+      minHireRatePercent: z.number().int().min(0).max(100).nullable().default(DEFAULT_MIN_HIRE_RATE),
+      /** Countries that earn the priority bonus (ai.preferredCountryBonus); others are not rejected. */
+      preferredCountries: termList(100).default(() => [...DEFAULT_PREFERRED_COUNTRIES]),
       /** Applies to optional client checks when the source does not supply the data. */
       unknownClientDataPolicy: unknownPolicy,
     }),
+    competition: z
+      .object({
+        /** Highest proposal band still worth a proposal. null = rule off. */
+        maxProposalsTier: z.enum(MAX_PROPOSAL_TIERS).nullable(),
+        /** Most freelancers the client may already be interviewing. null = rule off. */
+        maxInterviewing: z.number().int().min(0).max(100).nullable(),
+        /** Most invitations the client may already have sent. null = rule off. */
+        maxInvitesSent: z.number().int().min(0).max(1000).nullable(),
+        /** Skip postings where the client already hired someone. */
+        rejectIfHired: z.boolean(),
+      })
+      .default(() => ({ ...DEFAULT_COMPETITION })),
     ai: z.object({
       minScore: z.number().int().min(0).max(100),
       weights: scoringWeightsSchema,
@@ -140,6 +213,8 @@ export const profileConfigSchema = z
       riskSensitivity: z.enum(["LOW", "MEDIUM", "HIGH"]),
       disqualifyingRiskFlags: termList(30),
       maxRetries: z.number().int().min(0).max(3),
+      /** Points added to the score when the client is in a preferred country (capped at 100). */
+      preferredCountryBonus: z.number().int().min(0).max(20).default(DEFAULT_PREFERRED_COUNTRY_BONUS),
     }),
     // Configurations saved while WhatsApp alerts existed also hold `whatsappEnabled` and `recipientId`;
     // unknown keys are dropped when parsing, so those versions still load.
@@ -262,9 +337,12 @@ export function defaultProfileConfig(emailRecipientId: string | null = null): Pr
       minTotalSpent: null,
       allowedCountries: [],
       blockedCountries: [],
+      minHireRatePercent: DEFAULT_MIN_HIRE_RATE,
+      preferredCountries: [...DEFAULT_PREFERRED_COUNTRIES],
       // Imported jobs often lack some client data; review rather than silently drop them.
       unknownClientDataPolicy: "NEEDS_REVIEW",
     },
+    competition: { ...DEFAULT_COMPETITION },
     ai: {
       minScore: 75,
       weights: {
@@ -277,6 +355,7 @@ export function defaultProfileConfig(emailRecipientId: string | null = null): Pr
       riskSensitivity: "MEDIUM",
       disqualifyingRiskFlags: [],
       maxRetries: 2,
+      preferredCountryBonus: DEFAULT_PREFERRED_COUNTRY_BONUS,
     },
     notifications: {
       emailEnabled: emailRecipientId !== null,

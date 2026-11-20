@@ -25,7 +25,7 @@ function Terms({ items, empty = "None" }: { items: string[]; empty?: string }) {
  * rule (used for a run's frozen snapshot); the short form shows the headline rules.
  */
 export function ProfileSummary({ config, detailed = false }: { config: ProfileConfig; detailed?: boolean }) {
-  const { budget, client, skills, ai, notifications, general } = config;
+  const { budget, client, competition, skills, ai, notifications, general } = config;
   const jobType = { FIXED: "Fixed-price only", HOURLY: "Hourly only", BOTH: "Fixed-price and hourly" }[
     budget.jobType
   ];
@@ -81,6 +81,32 @@ export function ProfileSummary({ config, detailed = false }: { config: ProfileCo
       ],
       ["Allowed client countries", <Terms key="allowed" items={client.allowedCountries} empty="Any" />],
       ["Blocked client countries", <Terms key="blocked" items={client.blockedCountries} />],
+      [
+        "Minimum client hire rate",
+        client.minHireRatePercent === null ? "None" : `${client.minHireRatePercent}%`,
+      ],
+      [
+        "Priority countries",
+        <span key="preferred">
+          <Terms items={client.preferredCountries} />
+          {client.preferredCountries.length > 0 && ` (+${ai.preferredCountryBonus} points)`}
+        </span>,
+      ],
+      [
+        "Competition",
+        [
+          competition.maxProposalsTier
+            ? `proposals ${competition.maxProposalsTier} or fewer`
+            : "any proposals",
+          competition.maxInterviewing === null
+            ? "any interviewing"
+            : `at most ${competition.maxInterviewing} interviewing`,
+          competition.maxInvitesSent === null
+            ? "any invites"
+            : `at most ${competition.maxInvitesSent} invites`,
+          competition.rejectIfHired ? "skip if already hired" : "already-hired allowed",
+        ].join(", "),
+      ],
       [
         "Unknown client data",
         `When a client condition cannot be checked, ${POLICY[client.unknownClientDataPolicy]}`,
