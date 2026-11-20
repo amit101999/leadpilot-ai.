@@ -14,7 +14,7 @@ leads with the reasons behind each decision.
 
 | Area            | Status                                                                                                                                                                                                                  |
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Search profiles | ✅ Create, edit (versioned, optimistic locking), duplicate, archive, restore an old version                                                                                                                             |
+| Search profiles | ✅ Create, edit (versioned, optimistic locking), duplicate, archive, restore an old version; one active profile per user (the one synced from Upwork)                                                                   |
 | Runs            | ✅ Seven idempotent stages with leases; in-process or n8n executor; cancel; live progress (2 s polling)                                                                                                                 |
 | Hard filters    | ✅ Budget, fixed-price/hourly, payment verification, currency, skills/keywords, keyword coverage %, client conditions, URLs                                                                                             |
 | AI scoring      | ✅ Mock evaluator; OpenAI adapter (strict JSON schema), unit-tested with mocked HTTP, not run live                                                                                                                      |

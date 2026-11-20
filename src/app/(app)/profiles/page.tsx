@@ -17,7 +17,14 @@ import { intervalText } from "@/components/profiles/sync-schedule";
 
 /** "Upwork sync: every 4 hours · last sync <time>", with a warning when the agent stopped checking in. */
 function SyncLine({ overview }: { overview: SyncOverview | undefined }) {
-  if (!overview?.enabled) return <p className="mt-0.5 text-[13px] text-muted">Upwork sync off</p>;
+  if (!overview?.active) {
+    return (
+      <p className="mt-0.5 text-[13px] text-muted">Inactive: not synced from Upwork (can be run by hand)</p>
+    );
+  }
+  if (!overview.enabled) {
+    return <p className="mt-0.5 text-[13px] text-muted">Active, but the sync scheduler is off</p>;
+  }
   return (
     <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[13px] text-muted">
       Upwork sync: {intervalText(overview.everyHours).toLowerCase()} · last sync{" "}
@@ -108,7 +115,7 @@ export default async function ProfilesPage({
                       >
                         {profile.name}
                       </Link>
-                      {profile.isDefault && <Badge tone="accent">Default</Badge>}
+                      {profile.active && <Badge tone="success">Active</Badge>}
                       {archived && <Badge>Archived</Badge>}
                     </div>
                     {profile.description && (
@@ -131,7 +138,7 @@ export default async function ProfilesPage({
                   </div>
                   {canEdit && (
                     <ProfileActions
-                      profile={{ id: profile.id, name: profile.name, isDefault: profile.isDefault, archived }}
+                      profile={{ id: profile.id, name: profile.name, active: profile.active, archived }}
                     />
                   )}
                 </li>

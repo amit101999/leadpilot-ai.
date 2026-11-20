@@ -1,4 +1,4 @@
-import type { SearchConfig } from "@/modules/profiles/config-schema";
+import type { Schedule } from "@/modules/scheduler/schema";
 
 /** The hourly scheduler fires a little early or late; this much slack keeps "every 3 h" on the hour. */
 const TOLERANCE_MS = 5 * 60_000;
@@ -48,10 +48,20 @@ const SEARCH_LIMIT_MS = 48 * 3_600_000;
 /** The cloud routine wakes hourly; a profile due for longer than this means the routine is not checking in. */
 export const STALE_AFTER_MS = 75 * 60_000;
 
-/** The earliest moment at or after `from` inside the profile's active hours (5-minute precision). */
-function firstActiveMoment(sync: SearchConfig["upworkSync"], from: Date): Date | null {
+/** What decides whether a profile is synced: the owner's scheduler and the profile itself. */
+export interface SyncTarget {
+  schedule: Schedule;
+  /** Only the owner's active profile is ever synced. */
+  active: boolean;
+  keywords: string[];
+}
+
+/** The earliest moment at or after `from` inside the scheduler's active hours (5-minute precision). */
+function firstActiveMoment(schedule: Schedule, from: Date): Date | null {
   for (let t = from.getTime(); t <= from.getTime() + SEARCH_LIMIT_MS; t += STEP_MS) {
-    if (withinActiveHours(localClock(new Date(t), sync.timezone), sync.activeFrom, sync.activeTo)) {
+    if (
+      withinActiveHours(localClock(new Date(t), schedule.timezone), schedule.activeFrom, schedule.activeTo)
+    ) {
       return new Date(t);
     }
   }
@@ -59,40 +69,37 @@ function firstActiveMoment(sync: SearchConfig["upworkSync"], from: Date): Date |
 }
 
 /** When the profile became (or becomes) due after its last sync attempt. */
-function dueAfterLastSync(search: SearchConfig, lastSyncedAt: Date): Date | null {
-  const sync = search.upworkSync;
+function dueAfterLastSync(schedule: Schedule, lastSyncedAt: Date): Date | null {
   return firstActiveMoment(
-    sync,
-    new Date(lastSyncedAt.getTime() + sync.everyHours * 3_600_000 - TOLERANCE_MS),
+    schedule,
+    new Date(lastSyncedAt.getTime() + schedule.everyHours * 3_600_000 - TOLERANCE_MS),
   );
 }
 
+const syncable = (t: SyncTarget) => t.active && t.schedule.enabled && t.keywords.length > 0;
+
 /**
- * When the profile is next due for a sync (now, if it is due already); null when its sync is off or it
- * has no keywords. The agent syncs at the first cloud-routine run from then on. Pure.
+ * When the profile is next due for a sync (now, if it is due already); null when it is not synced at all
+ * (inactive, scheduler off, or no keywords). The agent syncs at the first hourly check from then on. Pure.
  */
-export function nextSyncAt(search: SearchConfig, lastSyncedAt: Date | null, now: Date): Date | null {
-  if (!search.upworkSync.enabled || search.keywords.length === 0) return null;
-  const due = lastSyncedAt ? dueAfterLastSync(search, lastSyncedAt) : null;
-  return firstActiveMoment(search.upworkSync, due && due > now ? due : now);
+export function nextSyncAt(target: SyncTarget, lastSyncedAt: Date | null, now: Date): Date | null {
+  if (!syncable(target)) return null;
+  const due = lastSyncedAt ? dueAfterLastSync(target.schedule, lastSyncedAt) : null;
+  return firstActiveMoment(target.schedule, due && due > now ? due : now);
 }
 
 /**
- * True when the profile has been due for longer than the routine's hourly rhythm explains: the
- * Upwork sync agent (the Claude cloud routine) is probably paused or failing. Pure.
+ * True when the profile has been due for longer than the routine's hourly rhythm explains: the Upwork
+ * sync agent (the Claude cloud routine) is probably paused or failing. Pure.
  */
-export function syncIsStale(search: SearchConfig, lastSyncedAt: Date | null, now: Date): boolean {
-  if (!search.upworkSync.enabled || search.keywords.length === 0 || !lastSyncedAt) return false;
-  const due = dueAfterLastSync(search, lastSyncedAt);
+export function syncIsStale(target: SyncTarget, lastSyncedAt: Date | null, now: Date): boolean {
+  if (!syncable(target) || !lastSyncedAt) return false;
+  const due = dueAfterLastSync(target.schedule, lastSyncedAt);
   return due !== null && now.getTime() - due.getTime() > STALE_AFTER_MS;
 }
 
-export interface SyncOverview {
-  enabled: boolean;
-  everyHours: number;
-  activeFrom: string;
-  activeTo: string;
-  timezone: string;
+export interface SyncOverview extends Schedule {
+  active: boolean;
   hasKeywords: boolean;
   lastSyncedAt: Date | null;
   lastStatus: string | null;
@@ -104,9 +111,9 @@ export interface SyncOverview {
   stale: boolean;
 }
 
-/** What the UI shows about a profile's sync schedule. Pure. */
+/** What the UI shows about a profile's sync. Pure. */
 export function buildSyncOverview(
-  search: SearchConfig,
+  target: SyncTarget,
   state: {
     lastSyncedAt: Date | null;
     lastStatus: string | null;
@@ -115,38 +122,38 @@ export function buildSyncOverview(
   } | null,
   now: Date,
 ): SyncOverview {
-  const sync = search.upworkSync;
   const lastSyncedAt = state?.lastSyncedAt ?? null;
   return {
-    enabled: sync.enabled,
-    everyHours: sync.everyHours,
-    activeFrom: sync.activeFrom,
-    activeTo: sync.activeTo,
-    timezone: sync.timezone,
-    hasKeywords: search.keywords.length > 0,
+    ...target.schedule,
+    active: target.active,
+    hasKeywords: target.keywords.length > 0,
     lastSyncedAt,
     lastStatus: state?.lastStatus ?? null,
     lastError: state?.lastError ?? null,
     scannedUpTo: state?.windowEnd ?? null,
-    nextSyncAt: nextSyncAt(search, lastSyncedAt, now),
-    stale: syncIsStale(search, lastSyncedAt, now),
+    nextSyncAt: nextSyncAt(target, lastSyncedAt, now),
+    stale: syncIsStale(target, lastSyncedAt, now),
   };
 }
 
 /** Whether the import agent should sync this profile now. Pure, for unit tests. */
-export function syncDue(search: SearchConfig, lastSyncedAt: Date | null, now: Date): DueDecision {
-  const sync = search.upworkSync;
-  if (!sync.enabled) return { due: false, reason: "Upwork sync is off for this profile" };
-  if (search.keywords.length === 0) return { due: false, reason: "No search keywords" };
-  const clock = localClock(now, sync.timezone);
-  if (!withinActiveHours(clock, sync.activeFrom, sync.activeTo)) {
+export function syncDue(target: SyncTarget, lastSyncedAt: Date | null, now: Date): DueDecision {
+  const { schedule } = target;
+  if (!target.active) return { due: false, reason: "Not the active profile" };
+  if (!schedule.enabled) return { due: false, reason: "The sync scheduler is off" };
+  if (target.keywords.length === 0) return { due: false, reason: "No search keywords" };
+  const clock = localClock(now, schedule.timezone);
+  if (!withinActiveHours(clock, schedule.activeFrom, schedule.activeTo)) {
     return {
       due: false,
-      reason: `Outside active hours (${sync.activeFrom}–${sync.activeTo} ${sync.timezone})`,
+      reason: `Outside active hours (${schedule.activeFrom}–${schedule.activeTo} ${schedule.timezone})`,
     };
   }
-  if (lastSyncedAt && now.getTime() - lastSyncedAt.getTime() < sync.everyHours * 3_600_000 - TOLERANCE_MS) {
-    return { due: false, reason: `Synced less than ${sync.everyHours} h ago` };
+  if (
+    lastSyncedAt &&
+    now.getTime() - lastSyncedAt.getTime() < schedule.everyHours * 3_600_000 - TOLERANCE_MS
+  ) {
+    return { due: false, reason: `Synced less than ${schedule.everyHours} h ago` };
   }
   return { due: true };
 }

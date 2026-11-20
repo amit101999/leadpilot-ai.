@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, ArchiveRestore, Copy, Star } from "lucide-react";
+import { Archive, ArchiveRestore, Copy, Power } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -8,12 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
 import { ApiError, apiFetch } from "@/lib/http/client";
 
-/** Duplicate, set as default, archive and restore. Each action is audited on the server. */
+/** Duplicate, make active, archive and restore. Each action is audited on the server. */
 export function ProfileActions({
   profile,
   size = "sm",
 }: {
-  profile: { id: string; name: string; isDefault: boolean; archived: boolean };
+  profile: { id: string; name: string; active: boolean; archived: boolean };
   size?: "sm" | "md";
 }) {
   const router = useRouter();
@@ -51,17 +51,21 @@ export function ProfileActions({
         <Copy />
         Duplicate
       </Button>
-      {!profile.archived && !profile.isDefault && (
+      {!profile.archived && !profile.active && (
         <Button
           variant="secondary"
           size={size}
           disabled={busy}
           onClick={async () => {
-            if (await act("default", `"${profile.name}" is now the default profile.`)) router.refresh();
+            const ok = await act(
+              "activate",
+              `"${profile.name}" is now the active profile. The Upwork sync fetches jobs only for it.`,
+            );
+            if (ok) router.refresh();
           }}
         >
-          <Star />
-          Set as default
+          <Power />
+          Make active
         </Button>
       )}
       {profile.archived ? (
@@ -70,7 +74,8 @@ export function ProfileActions({
           size={size}
           disabled={busy}
           onClick={async () => {
-            if (await act("restore", "Profile restored. It can be edited and run again.")) router.refresh();
+            if (await act("restore", "Profile restored (inactive). Make it active to sync it."))
+              router.refresh();
           }}
         >
           <ArchiveRestore />
@@ -86,7 +91,11 @@ export function ProfileActions({
       <Dialog open={confirmArchive} onOpenChange={(open) => !busy && setConfirmArchive(open)}>
         <DialogContent
           title={`Archive "${profile.name}"?`}
-          description="Archived profiles cannot be run or edited until restored. Their runs and history are kept."
+          description={
+            profile.active
+              ? "This is the active profile: archiving it stops the Upwork sync until another profile is made active. Archived profiles cannot be run or edited until restored; their runs and history are kept."
+              : "Archived profiles cannot be run or edited until restored. Their runs and history are kept."
+          }
         >
           <div className="flex justify-end gap-2">
             <DialogClose asChild>

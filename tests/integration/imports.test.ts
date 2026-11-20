@@ -11,6 +11,7 @@ import { POST as screenJobs } from "@/app/api/import/jobs/screen/route";
 import { POST as syncStatus } from "@/app/api/import/sync-status/route";
 import { POST as revokeToken } from "@/app/api/import-tokens/[id]/revoke/route";
 import { GET as listTokens, POST as createToken } from "@/app/api/import-tokens/route";
+import { POST as activateProfile } from "@/app/api/profiles/[id]/activate/route";
 import { POST as createProfile } from "@/app/api/profiles/route";
 import { POST as createRecipient } from "@/app/api/recipients/route";
 import { POST as cancelRun } from "@/app/api/runs/[id]/cancel/route";
@@ -265,7 +266,10 @@ describe("import flow", () => {
   it("never imports, screens or scores a job this profile already processed; other profiles still get it", async () => {
     const user = await createUser("OPERATOR");
     const profileId = await newProfile(user);
-    const otherProfileId = await newProfile(user);
+    // Another user's active profile: one user syncs only one active profile at a time.
+    const otherUser = await createUser("OPERATOR");
+    const otherProfileId = await newProfile(otherUser);
+    const otherToken = await newToken(otherUser);
     const token = await newToken(user);
     const job = upworkJob();
     const first = await commit(token.bearer, profileId, [{ ...job, details: details(42) }]);
@@ -291,8 +295,29 @@ describe("import flow", () => {
     // Untouched: the second copy was never imported.
     expect(stored).toMatchObject({ budgetAmount: "900.00", clientHires: 42, subcategory: "Web Development" });
 
-    const forOther = await commit(token.bearer, otherProfileId, [job]);
+    const forOther = await commit(otherToken.bearer, otherProfileId, [job]);
     expect(forOther.json.data).toMatchObject({ status: "STARTED", accepted: 1, alreadySeen: 0 });
+  });
+
+  it("syncs only the user's active profile and refuses imports into an inactive one", async () => {
+    const user = await createUser("OPERATOR");
+    const first = await newProfile(user);
+    const second = await newProfile(user);
+    const token = await newToken(user);
+    const listed = async () => {
+      const res = await call(importContext, { headers: token.bearer, path: "/api/import/context" });
+      return (res.json.data.profiles as { id: string }[]).map((p) => p.id);
+    };
+    // The first profile became active; the second was created inactive.
+    expect(await listed()).toEqual([first]);
+    const refused = await commit(token.bearer, second, [upworkJob()]);
+    expect(refused.status).toBe(409);
+    expect(JSON.stringify(refused.json)).toContain("Only the active profile receives Upwork jobs");
+
+    expect((await call(activateProfile, { method: "POST", user, params: { id: second } })).status).toBe(200);
+    expect(await listed()).toEqual([second]);
+    expect((await commit(token.bearer, first, [upworkJob()])).status).toBe(409);
+    expect((await commit(token.bearer, second, [upworkJob()])).json.data.status).toBe("STARTED");
   });
 
   it("links every job of the same client to one client row that later imports refresh", async () => {
@@ -531,9 +556,8 @@ describe("import robustness (code review fixes)", () => {
 
   it("scans only the window since the last successful sync; a failed sync never moves it", async () => {
     const user = await createUser("OPERATOR");
-    const profileId = await newProfile(user, (c) => {
-      c.search.upworkSync.everyHours = 4;
-    });
+    // The user's scheduler defaults to every 4 hours.
+    const profileId = await newProfile(user);
     const token = await newToken(user);
     const windowOf = async () => {
       const res = await call(importContext, { headers: token.bearer, path: "/api/import/context" });

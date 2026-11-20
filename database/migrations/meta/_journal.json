@@ -36,6 +36,13 @@
       "when": 1794934258606,
       "tag": "0004_sync_windows",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795196886589,
+      "tag": "0005_scheduler_and_active_profile",
+      "breakpoints": true
     }
   ]
 }

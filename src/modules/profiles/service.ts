@@ -32,7 +32,24 @@ export async function listProfiles(db: Database, actor: Actor, options: { includ
     .select()
     .from(searchProfiles)
     .where(conditions.length ? and(...conditions) : undefined)
-    .orderBy(desc(searchProfiles.isDefault), searchProfiles.name);
+    .orderBy(desc(searchProfiles.active), searchProfiles.name);
+}
+
+/**
+ * Serializes changes to which profile is active for one owner (create, activate) until the transaction
+ * ends; the partial unique index profiles_one_active_per_owner_uq is the final guarantee.
+ */
+async function lockOwnerProfiles(tx: DbExecutor, ownerUserId: string): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`profiles:${ownerUserId}`}))`);
+}
+
+async function ownerHasActiveProfile(tx: DbExecutor, ownerUserId: string): Promise<boolean> {
+  const [row] = await tx
+    .select({ id: searchProfiles.id })
+    .from(searchProfiles)
+    .where(and(eq(searchProfiles.ownerUserId, ownerUserId), eq(searchProfiles.active, true)))
+    .limit(1);
+  return Boolean(row);
 }
 
 export async function getProfile(db: DbExecutor, actor: Actor, id: string): Promise<ProfileRow> {
@@ -78,15 +95,22 @@ async function assertRecipientUsable(
   }
 }
 
+/**
+ * Creates a profile at version 1. It becomes the owner's active profile only when they have none
+ * (`activeIfNone`, the default); a duplicate is always created inactive.
+ */
 export async function createProfile(
   db: Database,
   actor: Actor,
   input: CreateProfileInput,
   requestId?: string,
+  options: { activeIfNone?: boolean } = {},
 ): Promise<ProfileRow> {
   requireRole(actor, "OPERATOR");
   return db.transaction(async (tx) => {
     await assertRecipientUsable(tx, actor.id, input.configuration);
+    await lockOwnerProfiles(tx, actor.id);
+    const active = (options.activeIfNone ?? true) && !(await ownerHasActiveProfile(tx, actor.id));
     const [profile] = await tx
       .insert(searchProfiles)
       .values({
@@ -95,6 +119,7 @@ export async function createProfile(
         description: input.description ?? null,
         configuration: input.configuration,
         currentVersion: 1,
+        active,
       })
       .returning();
     if (!profile) throw new Error("Profile insert returned no row");
@@ -209,6 +234,7 @@ export async function duplicateProfile(
       changeNote: `Duplicated from "${source.name}" v${source.currentVersion}`,
     },
     requestId,
+    { activeIfNone: false },
   );
 }
 
@@ -223,14 +249,11 @@ export async function setArchived(
   return db.transaction(async (tx) => {
     const current = await lockProfile(tx, actor, id);
     if (Boolean(current.archivedAt) === archived) return current;
+    // Archiving the active profile leaves the owner without one (the sync stops); a restored profile
+    // comes back inactive until it is made active.
     const [updated] = await tx
       .update(searchProfiles)
-      .set({
-        archivedAt: archived ? new Date() : null,
-        active: !archived,
-        isDefault: archived ? false : current.isDefault,
-        updatedAt: new Date(),
-      })
+      .set({ archivedAt: archived ? new Date() : null, active: false, updatedAt: new Date() })
       .where(eq(searchProfiles.id, id))
       .returning();
     await recordAudit(tx, {
@@ -244,7 +267,11 @@ export async function setArchived(
   });
 }
 
-export async function setDefault(
+/**
+ * Makes this the owner's only active profile: the one the Upwork sync fetches jobs for. Every other
+ * profile of the owner becomes inactive (they can still be run by hand).
+ */
+export async function setActive(
   db: Database,
   actor: Actor,
   id: string,
@@ -253,21 +280,28 @@ export async function setDefault(
   requireRole(actor, "OPERATOR");
   return db.transaction(async (tx) => {
     const current = await lockProfile(tx, actor, id);
-    if (current.archivedAt) throw new AppError("INVALID_STATE", "Archived profiles cannot be the default");
-    await tx
+    if (current.archivedAt) {
+      throw new AppError("INVALID_STATE", "Archived profiles cannot be active. Restore the profile first.");
+    }
+    if (current.active) return current;
+    await lockOwnerProfiles(tx, current.ownerUserId);
+    const [previous] = await tx
       .update(searchProfiles)
-      .set({ isDefault: false })
-      .where(and(eq(searchProfiles.ownerUserId, current.ownerUserId), eq(searchProfiles.isDefault, true)));
+      .set({ active: false, updatedAt: new Date() })
+      .where(and(eq(searchProfiles.ownerUserId, current.ownerUserId), eq(searchProfiles.active, true)))
+      .returning({ id: searchProfiles.id });
     const [updated] = await tx
       .update(searchProfiles)
-      .set({ isDefault: true, updatedAt: new Date() })
+      .set({ active: true, updatedAt: new Date() })
       .where(eq(searchProfiles.id, id))
       .returning();
     await recordAudit(tx, {
       actor: userActor(actor.id),
-      action: "profile.set_default",
+      action: "profile.activate",
       entityType: "search_profile",
       entityId: id,
+      before: { activeProfileId: previous?.id ?? null },
+      after: { activeProfileId: id },
       requestId,
     });
     return updated!;

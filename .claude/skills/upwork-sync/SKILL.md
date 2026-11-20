@@ -23,7 +23,8 @@ jobs yourself, and never change a job object you received from Upwork.
 
 1. Get the work list:
    `node scripts/leadpilot-import.mjs context` (add `--scheduled` if this run was started with
-   `--scheduled`). Process only profiles with `"due": true`. If none, reply "Nothing due" and stop.
+   `--scheduled`). It lists each user's one active profile; whether it is due follows that user's sync
+   scheduler in LeadPilot. Process only profiles with `"due": true`. If none, reply "Nothing due" and stop.
 
 2. Call `list_accounts` once and use the `org_uid` of the account whose `role_label` is
    `Freelancer`.

@@ -2,16 +2,20 @@ import type { ProfileRow } from "@/modules/profiles/service";
 import { parseStoredConfig } from "@/modules/profiles/service";
 import type { LaunchableProfile } from "./run-launcher";
 
-/** Active profiles as options for the run launcher (server side). */
+/**
+ * Profiles the run launcher offers (server side): every non-archived profile, the active one first.
+ * Inactive profiles are never synced from Upwork but can still be run by hand.
+ */
 export function toLaunchable(profiles: ProfileRow[]): LaunchableProfile[] {
   return profiles
-    .filter((p) => p.active && !p.archivedAt)
+    .filter((p) => !p.archivedAt)
+    .sort((a, b) => Number(b.active) - Number(a.active))
     .map((p) => {
       const config = parseStoredConfig(p.configuration);
       return {
         id: p.id,
         name: p.name,
-        isDefault: p.isDefault,
+        active: p.active,
         emailEnabled: config.notifications.emailEnabled,
         maxAlerts: config.notifications.maxPerRun,
       };

@@ -11,7 +11,7 @@ import { ApiError, apiFetch, newIdempotencyKey } from "@/lib/http/client";
 export interface LaunchableProfile {
   id: string;
   name: string;
-  isDefault: boolean;
+  active: boolean;
   emailEnabled: boolean;
   maxAlerts: number;
 }
@@ -89,7 +89,7 @@ export function RunLauncher({
           {profiles.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
-              {p.isDefault ? " (default)" : ""}
+              {p.active ? " (active)" : " (inactive)"}
             </option>
           ))}
         </Select>

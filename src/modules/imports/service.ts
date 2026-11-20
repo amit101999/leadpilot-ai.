@@ -28,6 +28,7 @@ import { getProfile, parseStoredConfig } from "@/modules/profiles/service";
 import type { Providers } from "@/modules/providers";
 import { evaluateHardChecks, type HardRule } from "@/modules/qualification/hard-filters";
 import { createRun } from "@/modules/runs/service";
+import { getSchedule, getSchedules } from "@/modules/scheduler/service";
 import { buildSyncOverview, scanWindow, syncDue, type SyncOverview } from "./schedule";
 
 /** Limits handed to the agent so one sync stays small and inside Upwork's browse throttle. */
@@ -81,13 +82,14 @@ async function seenByProfile(db: Database, profileId: string, sourceJobIds: stri
 }
 
 /** The posting-time window of the profile's current sync, from its sync state. */
-async function profileWindow(db: Database, profileId: string, config: ProfileConfig, now: Date) {
+async function profileWindow(db: Database, profile: { id: string; ownerUserId: string }, now: Date) {
   const [state] = await db
     .select({ windowEnd: syncState.windowEnd })
     .from(syncState)
-    .where(eq(syncState.profileId, profileId))
+    .where(eq(syncState.profileId, profile.id))
     .limit(1);
-  return scanWindow(state?.windowEnd ?? null, config.search.upworkSync.everyHours, now);
+  const schedule = await getSchedule(db, profile.ownerUserId);
+  return scanWindow(state?.windowEnd ?? null, schedule.everyHours, now);
 }
 
 /**
@@ -95,11 +97,15 @@ async function profileWindow(db: Database, profileId: string, config: ProfileCon
  * and jobs posted before the window (the server's window, never the agent's). Jobs without a posting
  * time are kept.
  */
-async function newJobsOnly(db: Database, profileId: string, config: ProfileConfig, valid: NormalizedJob[]) {
-  const window = await profileWindow(db, profileId, config, new Date());
+async function newJobsOnly(
+  db: Database,
+  profile: { id: string; ownerUserId: string },
+  valid: NormalizedJob[],
+) {
+  const window = await profileWindow(db, profile, new Date());
   const seen = await seenByProfile(
     db,
-    profileId,
+    profile.id,
     valid.map((j) => j.sourceJobId),
   );
   const fresh: NormalizedJob[] = [];
@@ -117,7 +123,10 @@ async function importableProfile(db: Database, actor: Actor, profileId: string) 
   requireRole(actor, "OPERATOR");
   const profile = await getProfile(db, actor, profileId);
   if (profile.archivedAt || !profile.active) {
-    throw new AppError("INVALID_STATE", "Archived profiles cannot receive imported jobs");
+    throw new AppError(
+      "INVALID_STATE",
+      "Only the active profile receives Upwork jobs. Make this profile active first.",
+    );
   }
   return { profile, config: parseStoredConfig(profile.configuration) };
 }
@@ -260,16 +269,22 @@ export async function getImportContext(db: Database, actor: Actor, options: { sc
     );
   const scheduledAllowed = env().UPWORK_SYNC_SCHEDULED_ALLOWED;
   const now = new Date();
+  // Each owner's scheduler decides when their (single) active profile is synced.
+  const schedules = await getSchedules(
+    db,
+    rows.map((r) => r.profile.ownerUserId),
+  );
   const profiles = rows
     .map(({ profile, lastSyncedAt, windowEnd }) => ({
       profile,
       lastSyncedAt,
       windowEnd,
+      schedule: schedules.get(profile.ownerUserId)!,
       config: parseStoredConfig(profile.configuration),
     }))
-    .filter(({ config }) => config.search.upworkSync.enabled)
-    .map(({ profile, lastSyncedAt, windowEnd, config }) => {
-      let decision = syncDue(config.search, lastSyncedAt, now);
+    .map(({ profile, lastSyncedAt, windowEnd, schedule, config }) => {
+      const target = { schedule, active: true, keywords: config.search.keywords };
+      let decision = syncDue(target, lastSyncedAt, now);
       if (options.scheduled && !scheduledAllowed) {
         decision = {
           due: false,
@@ -286,7 +301,8 @@ export async function getImportContext(db: Database, actor: Actor, options: { sc
         reason: decision.due ? null : decision.reason,
         lastSyncedAt,
         // Scan only jobs posted in this window; a successful sync reports `window.to` as its windowEnd.
-        window: scanWindow(windowEnd, config.search.upworkSync.everyHours, now),
+        window: scanWindow(windowEnd, schedule.everyHours, now),
+        everyHours: schedule.everyHours,
         keywords: config.search.keywords,
         filters: {
           jobType: config.budget.jobType,
@@ -308,7 +324,7 @@ export async function getImportContext(db: Database, actor: Actor, options: { sc
 export async function screenJobs(db: Database, actor: Actor, input: z.infer<typeof importJobsSchema>) {
   const { profile, config } = await importableProfile(db, actor, input.profileId);
   const { valid, invalid } = parseItems(input.jobs);
-  const { fresh, alreadySeen, outsideWindow } = await newJobsOnly(db, profile.id, config, valid);
+  const { fresh, alreadySeen, outsideWindow } = await newJobsOnly(db, profile, valid);
 
   const detailsWanted: string[] = [];
   let rejected = 0;
@@ -339,9 +355,9 @@ export async function commitJobs(
   input: z.infer<typeof importJobsSchema>,
   requestId?: string,
 ) {
-  const { profile, config } = await importableProfile(db, actor, input.profileId);
+  const { profile } = await importableProfile(db, actor, input.profileId);
   const { valid, invalid } = parseItems(input.jobs);
-  const { fresh, alreadySeen, outsideWindow } = await newJobsOnly(db, profile.id, config, valid);
+  const { fresh, alreadySeen, outsideWindow } = await newJobsOnly(db, profile, valid);
   const priors = await priorCopies(
     db,
     profile.id,
@@ -488,6 +504,8 @@ export async function listSyncOverviews(
   const rows = await db
     .select({
       id: searchProfiles.id,
+      ownerUserId: searchProfiles.ownerUserId,
+      active: searchProfiles.active,
       configuration: searchProfiles.configuration,
       lastSyncedAt: syncState.lastSyncedAt,
       lastStatus: syncState.lastStatus,
@@ -503,7 +521,18 @@ export async function listSyncOverviews(
       ),
     );
   const now = new Date();
+  const schedules = await getSchedules(
+    db,
+    rows.map((r) => r.ownerUserId),
+  );
   return new Map(
-    rows.map((row) => [row.id, buildSyncOverview(parseStoredConfig(row.configuration).search, row, now)]),
+    rows.map((row) => {
+      const target = {
+        schedule: schedules.get(row.ownerUserId)!,
+        active: row.active,
+        keywords: parseStoredConfig(row.configuration).search.keywords,
+      };
+      return [row.id, buildSyncOverview(target, row, now)];
+    }),
   );
 }

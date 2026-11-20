@@ -29,7 +29,10 @@ export const AUDIT_ACTIONS = [
   "profile.update",
   "profile.archive",
   "profile.restore",
+  "profile.activate",
+  // Older entries: "Default" was merged into "Active".
   "profile.set_default",
+  "scheduler.update",
   "recipient.create",
   "recipient.update",
   "run.create",
@@ -45,6 +48,7 @@ export const AUDIT_ACTIONS = [
 
 const ENTITY_TYPES = [
   { value: "search_profile", label: "Search profile" },
+  { value: "sync_schedule", label: "Sync scheduler" },
   { value: "agent_run", label: "Run" },
   { value: "notification", label: "Notification" },
   { value: "notification_recipient", label: "Recipient" },

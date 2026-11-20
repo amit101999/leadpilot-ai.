@@ -73,7 +73,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-[28px] leading-tight font-semibold">{profile.name}</h1>
-            {profile.isDefault && <Badge tone="accent">Default</Badge>}
+            {profile.active && <Badge tone="success">Active</Badge>}
             {archived && <Badge>Archived</Badge>}
           </div>
           <p className="mt-1 text-sm text-muted">
@@ -85,7 +85,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
         </div>
         {canEdit && (
           <ProfileActions
-            profile={{ id: profile.id, name: profile.name, isDefault: profile.isDefault, archived }}
+            profile={{ id: profile.id, name: profile.name, active: profile.active, archived }}
           />
         )}
       </header>

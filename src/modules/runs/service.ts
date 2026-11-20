@@ -43,7 +43,8 @@ export async function createRun(
   try {
     run = await db.transaction(async (tx) => {
       const profile = await getProfile(tx, actor, input.profileId);
-      if (profile.archivedAt || !profile.active) {
+      // Inactive profiles can still be run by hand (e.g. to test changes); only archived ones cannot.
+      if (profile.archivedAt) {
         throw new AppError("INVALID_STATE", "Archived profiles cannot be run. Restore the profile first.");
       }
       const version = await getCurrentVersion(tx, profile);

@@ -13,12 +13,13 @@ import {
   scanWindow,
   syncDue,
   syncIsStale,
+  type SyncTarget,
   withinActiveHours,
 } from "@/modules/imports/schedule";
 import detailsFixed from "../fixtures/upwork/details-fixed.json";
 import detailsHourly from "../fixtures/upwork/details-hourly.json";
 import searchHourly from "../fixtures/upwork/search-hourly.json";
-import { DEFAULT_SEARCH_CONFIG, type SearchConfig } from "@/modules/profiles/config-schema";
+import { DEFAULT_SCHEDULE, type Schedule } from "@/modules/scheduler/schema";
 
 /** Shape recorded from a real Upwork MCP `find_jobs` search result (2026-11-04). */
 const searchItem = {
@@ -289,12 +290,28 @@ describe("Upwork MCP job mapping", () => {
 });
 
 describe("sync schedule", () => {
-  const search = (sync: Partial<SearchConfig["upworkSync"]> = {}): SearchConfig => ({
-    ...DEFAULT_SEARCH_CONFIG,
+  /** The active profile with the given scheduler settings. */
+  const search = (sync: Partial<Schedule> = {}): SyncTarget => ({
+    schedule: { ...DEFAULT_SCHEDULE, ...sync },
+    active: true,
     keywords: ["Zoho"],
-    upworkSync: { ...DEFAULT_SEARCH_CONFIG.upworkSync, enabled: true, ...sync },
   });
   const at = (iso: string) => new Date(iso);
+
+  it("never syncs an inactive profile", () => {
+    const now = at("2026-11-18T12:00:00Z");
+    const inactive = { ...search(), active: false };
+    expect(syncDue(inactive, null, now)).toEqual({ due: false, reason: "Not the active profile" });
+    expect(nextSyncAt(inactive, null, now)).toBeNull();
+    expect(syncIsStale(inactive, at("2026-11-17T00:00:00Z"), now)).toBe(false);
+  });
+
+  it("is never due while the scheduler is off", () => {
+    expect(syncDue(search({ enabled: false }), null, at("2026-11-18T12:00:00Z"))).toEqual({
+      due: false,
+      reason: "The sync scheduler is off",
+    });
+  });
 
   it("reads the clock in the profile's time zone", () => {
     expect(localClock(at("2026-11-04T04:30:00Z"), "Asia/Kolkata")).toBe("10:00");

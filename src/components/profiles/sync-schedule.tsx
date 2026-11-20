@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Facts } from "@/components/ui/facts";
 import { Panel } from "@/components/ui/panel";
@@ -9,7 +10,7 @@ const STATUS: Record<string, { label: string; tone: BadgeTone }> = {
   ERROR: { label: "Error", tone: "danger" },
 };
 
-/** "17 Nov, 16:18 UTC" in the profile's time zone, so it reads like the active hours. */
+/** "17 Nov, 16:18 UTC" in the scheduler's time zone, so it reads like the active hours. */
 function at(date: Date, timeZone: string): string {
   const text = new Intl.DateTimeFormat("en-GB", {
     timeZone,
@@ -26,15 +27,16 @@ export function intervalText(everyHours: number): string {
   return everyHours === 1 ? "Every hour" : `Every ${everyHours} hours`;
 }
 
-/** The profile's Upwork sync schedule and how the last sync went. */
+/** How the app-wide sync scheduler applies to this profile, and how its last sync went. */
 export function SyncSchedule({ overview, now = new Date() }: { overview: SyncOverview; now?: Date }) {
   const { timezone } = overview;
   const allDay = overview.activeFrom === "00:00" && overview.activeTo === "23:59";
   const hours = allDay ? "around the clock" : `${overview.activeFrom}–${overview.activeTo}`;
   const status = overview.lastStatus ? STATUS[overview.lastStatus] : undefined;
 
-  let next = "Off";
-  if (overview.enabled && !overview.hasKeywords) next = "Never: add search keywords first";
+  let next = "Off: the sync scheduler is turned off";
+  if (!overview.active) next = "Never: this profile is inactive. Make it active to sync it.";
+  else if (overview.enabled && !overview.hasKeywords) next = "Never: add search keywords first";
   else if (overview.enabled && overview.nextSyncAt) {
     next =
       overview.nextSyncAt.getTime() <= now.getTime()
@@ -46,7 +48,15 @@ export function SyncSchedule({ overview, now = new Date() }: { overview: SyncOve
     <Panel
       id="sync-schedule"
       title="Upwork sync schedule"
-      description="The Claude sync agent checks in every hour; LeadPilot decides when this profile is due. Change the interval in the Search & sync tab."
+      description={
+        <>
+          Only the active profile is synced. The Claude sync agent checks in every hour; the{" "}
+          <Link href="/settings#sync-scheduler" className="text-accent hover:underline">
+            sync scheduler in Settings
+          </Link>{" "}
+          decides when a sync is due.
+        </>
+      }
     >
       {overview.stale && (
         <p role="alert" className="mx-4 mt-4 rounded-control bg-danger-soft px-3 py-2 text-sm text-danger">
@@ -59,8 +69,16 @@ export function SyncSchedule({ overview, now = new Date() }: { overview: SyncOve
       <Facts
         rows={[
           [
-            "Schedule",
+            "Scheduler",
             overview.enabled ? `${intervalText(overview.everyHours)}, ${hours} (${timezone})` : "Off",
+          ],
+          [
+            "This profile",
+            overview.active ? (
+              <Badge tone="success">Active: synced</Badge>
+            ) : (
+              <Badge>Inactive: not synced (can still be run by hand)</Badge>
+            ),
           ],
           [
             "Last sync",

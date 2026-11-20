@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ChangePasswordForm } from "@/components/settings/change-password-form";
 import { ImportTokensManager } from "@/components/settings/import-tokens-manager";
 import { RecipientsManager } from "@/components/settings/recipients-manager";
+import { SyncSchedulerForm } from "@/components/settings/sync-scheduler";
 import { ThemeChoice } from "@/components/settings/theme-choice";
 import { Panel } from "@/components/ui/panel";
 import { hasRole } from "@/lib/auth/authorization";
@@ -9,6 +10,7 @@ import { requireUser } from "@/lib/auth/current-user";
 import { getDb } from "@/lib/database/client";
 import { listImportTokens } from "@/modules/imports/tokens";
 import { listRecipients } from "@/modules/notifications/recipients";
+import { getSchedule } from "@/modules/scheduler/service";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -21,6 +23,7 @@ const ROLE_TEXT: Record<string, string> = {
 export default async function SettingsPage() {
   const { user, actor } = await requireUser();
   const recipients = await listRecipients(getDb(), actor, true);
+  const schedule = await getSchedule(getDb(), actor.id);
   const tokens = hasRole(actor, "OPERATOR") ? await listImportTokens(getDb(), actor) : [];
 
   return (
@@ -42,6 +45,14 @@ export default async function SettingsPage() {
           <dt className="text-muted">Role</dt>
           <dd>{ROLE_TEXT[user.role] ?? user.role}</dd>
         </dl>
+      </Panel>
+
+      <Panel
+        id="sync-scheduler"
+        title="Sync scheduler"
+        description="How often LeadPilot fetches new Upwork jobs for your active profile. It stays as set until you change it, whichever profile is active."
+      >
+        <SyncSchedulerForm schedule={schedule} canEdit={hasRole(actor, "OPERATOR")} />
       </Panel>
 
       <Panel id="password" title="Change password">

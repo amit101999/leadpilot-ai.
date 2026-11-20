@@ -14,18 +14,15 @@ import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
 import { Field, Input, Select } from "@/components/ui/field";
 import { Tabs } from "@/components/ui/tabs";
 import { ApiError, apiFetch } from "@/lib/http/client";
-import { SYNC_INTERVALS, type ProfileConfig } from "@/modules/profiles/config-schema";
-import { savableConfigSchema } from "@/modules/profiles/schema";
+import { profileConfigSchema, type ProfileConfig } from "@/modules/profiles/config-schema";
 import { CombinationEditor, RatesEditor, SkillListEditor } from "./list-editors";
 
 const editorSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters").max(120),
   description: z.string().trim().max(1000),
   changeNote: z.string().trim().max(500),
-  configuration: savableConfigSchema,
+  configuration: profileConfigSchema,
 });
-
-const intervalLabel = (hours: number) => (hours === 1 ? "Every hour" : `Every ${hours} hours`);
 type EditorInput = z.input<typeof editorSchema>;
 type EditorOutput = z.output<typeof editorSchema>;
 
@@ -88,8 +85,6 @@ export function ProfileEditor({
     formState: { errors, isDirty, isSubmitting },
   } = form;
   const config = useWatch({ control, name: "configuration" }) as ProfileConfig;
-  /** The saved interval; an older value outside SYNC_INTERVALS is shown until the user picks a new one. */
-  const savedInterval = profile?.configuration.search.upworkSync.everyHours;
   const id = (name: string) => `${ids}-${name}`;
   const cfgErrors = (errors.configuration ?? {}) as FieldErrors<ProfileConfig>;
   const err = (section: keyof ProfileConfig, field: string): string | undefined =>
@@ -655,57 +650,13 @@ export function ProfileEditor({
               {...register("configuration.search.keywordCoveragePercent", { setValueAs: nullableNumber })}
             />
           </Field>
-          <Checkbox
-            label="Sync this profile from Upwork on a schedule"
-            hint="The Upwork sync agent (Claude + Upwork) imports new jobs when this profile is due. Manual syncs always work."
-            {...register("configuration.search.upworkSync.enabled")}
-          />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              id={id("everyHours")}
-              label="Sync"
-              hint="Never more often than hourly. The Claude cloud routine checks in every hour; LeadPilot decides when this profile is due."
-              error={
-                (cfgErrors.search?.upworkSync as Record<string, { message?: string }> | undefined)?.everyHours
-                  ?.message
-              }
-            >
-              <Select
-                id={id("everyHours")}
-                className="w-48"
-                {...register("configuration.search.upworkSync.everyHours", { valueAsNumber: true })}
-              >
-                {SYNC_INTERVALS.map((hours) => (
-                  <option key={hours} value={hours}>
-                    {intervalLabel(hours)}
-                  </option>
-                ))}
-                {savedInterval !== undefined &&
-                  !(SYNC_INTERVALS as readonly number[]).includes(savedInterval) && (
-                    <option value={savedInterval} disabled>
-                      {intervalLabel(savedInterval)} (old setting; choose another)
-                    </option>
-                  )}
-              </Select>
-            </Field>
-            <Field id={id("timezone")} label="Time zone" hint="IANA name, e.g. Asia/Kolkata or UTC.">
-              <Input id={id("timezone")} {...register("configuration.search.upworkSync.timezone")} />
-            </Field>
-            <Field id={id("activeFrom")} label="Active from">
-              <Input
-                id={id("activeFrom")}
-                type="time"
-                {...register("configuration.search.upworkSync.activeFrom")}
-              />
-            </Field>
-            <Field id={id("activeTo")} label="Active until">
-              <Input
-                id={id("activeTo")}
-                type="time"
-                {...register("configuration.search.upworkSync.activeTo")}
-              />
-            </Field>
-          </div>
+          <p className="text-sm text-muted">
+            When and how often jobs are fetched is set once for all profiles in{" "}
+            <Link href="/settings#sync-scheduler" className="text-accent hover:underline">
+              Settings → Sync scheduler
+            </Link>
+            . Only the active profile is synced.
+          </p>
         </>,
       ),
     },

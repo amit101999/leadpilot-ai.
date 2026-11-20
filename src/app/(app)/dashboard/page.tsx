@@ -28,7 +28,7 @@ export default async function DashboardPage() {
     listProfiles(db, actor),
   ]);
   const launchable = toLaunchable(profiles);
-  const defaultProfile = launchable.find((p) => p.isDefault) ?? launchable[0];
+  const defaultProfile = launchable.find((p) => p.active) ?? launchable[0];
   const latest = data.latestRun;
   const t = data.totals;
 

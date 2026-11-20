@@ -41,8 +41,9 @@ Import runs (started by `commit`) always read the staged jobs, whatever this set
    `LEADPILOT_IMPORT_TOKEN` (created on that same LeadPilot instance).
 4. In Claude Code, connect Upwork's official connector and sign in with your freelancer account. Check that headless
    Claude can use it: `claude -p "Call the Upwork tool list_accounts and reply with the account type only"`.
-5. On a search profile, open **Search & sync**: add keywords, optionally a keyword-coverage %, turn on the sync and
-   choose the interval (every 1, 2 or 4 hours), active hours and time zone.
+5. Make the profile to sync **active** (Search Profiles → **Make active**; only one profile is active at a time) and
+   add its keywords in **Search & sync**. Set the timing once in **Settings → Sync scheduler**: on/off, every 1, 2, 3,
+   4, 6, 8, 12 or 24 hours, active hours and time zone.
 6. Run once by hand from the repository root: `powershell -File scripts\upwork-sync.ps1` (or `/upwork-sync` in an
    interactive Claude Code session). Check `logs\upwork-sync.log` and the run in **Search History**.
 
@@ -60,12 +61,21 @@ schtasks /Create /TN "LeadPilot Upwork sync" /SC HOURLY /TR "powershell -NoProfi
 
 The PC must be on and logged in, LeadPilot and Postgres must be running, and each sync uses some Claude usage.
 
+**Active profile.** Each user has **one active profile** (`search_profiles.active`, a unique index guarantees at most
+one). **Make active** on a profile makes every other profile of that user inactive. Only the active profile is synced
+from Upwork: the context lists it alone, and imports into any other profile are refused. Inactive profiles can still be
+opened, edited and run by hand. A new profile becomes active only when its owner has none; a duplicate starts inactive;
+archiving the active profile leaves none (the sync stops), and a restored profile comes back inactive.
+
 **How the schedule works.** The agent (the cloud routine below, or the PC task) wakes **every hour**. On each wake-up
-LeadPilot answers, per profile, whether it is due (`syncDue`, `src/modules/imports/schedule.ts`): sync on, keywords
-set, inside the active hours, and the profile's interval passed since its last sync attempt. The interval is chosen in
-the profile's **Search & sync** tab: **every 1, 2 or 4 hours**, never more often than hourly (saving any other value is
-refused; versions saved earlier with another value still load). New profiles default to every 4 hours, 00:00–23:59 UTC.
-Because the agent wakes hourly, changing the interval takes effect at the next hour; nothing has to change on claude.ai.
+LeadPilot answers whether the active profile is due (`syncDue`, `src/modules/imports/schedule.ts`): scheduler on,
+keywords set, inside the active hours, and the interval passed since the last sync attempt. The timing comes from the
+user's **sync scheduler** (`sync_schedules`, **Settings → Sync scheduler**, `GET`/`PUT /api/sync-schedule`): every
+**1, 2, 3, 4, 6, 8, 12 or 24 hours**, never more often than hourly, active hours and time zone. It belongs to the user,
+not to a profile, so it stays as set until changed there, whichever profile is active. A user who never saved it gets
+on, every 4 hours, 00:00–23:59 UTC. Because the agent wakes hourly, a change applies at the next hour; nothing has to
+change on claude.ai. (Profiles saved before 2026-11-20 kept these settings per profile; migration 0005 copied the
+active profile's settings into the scheduler, and the old fields are no longer read.)
 
 **Scan window.** Each due profile gets a `window` in the context: from the end of its last _successful_ sync
 (`sync_state.window_end`) minus a 30-minute overlap (Upwork lists a job a few minutes after its posting time), or its
@@ -74,10 +84,10 @@ stops paging at jobs older than `window.from`, asks Upwork's feed for exactly th
 `status ... OK --window-end <window.to>`. Only `OK` and `PARTIAL` move the window; `ERROR` leaves it, so the next sync
 scans the missed period again.
 
-**In the UI.** The profile page shows an **Upwork sync schedule** panel: the interval and active hours, the last sync
-with its status and any problem, the posting time jobs were scanned up to, and when the next sync is due. When a due
-profile has not been synced for 75 minutes past its due time, the panel (and the profile list) warns that the sync agent
-is not checking in: the Claude cloud routine is probably paused or failing.
+**In the UI.** The profile page shows an **Upwork sync schedule** panel: the scheduler's interval and hours, whether
+this profile is active, the last sync with its status and any problem, the posting time jobs were scanned up to, and
+when the next sync is due. When the active profile has not been synced for 75 minutes past its due time, the panel (and
+the profile list) warns that the sync agent is not checking in: the Claude cloud routine is probably paused or failing.
 
 ## Running the sync in the cloud (production setup)
 

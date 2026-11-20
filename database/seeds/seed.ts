@@ -6,7 +6,7 @@ import { hashPassword, MIN_PASSWORD_LENGTH } from "@/lib/auth/password";
 import { closeDb, getDb, type Database } from "@/lib/database/client";
 import { searchProfiles, users } from "@/lib/database/schema";
 import { defaultProfileConfig } from "@/modules/profiles/config-schema";
-import { createProfile, setDefault } from "@/modules/profiles/service";
+import { createProfile } from "@/modules/profiles/service";
 
 /**
  * Idempotent bootstrap: creates the first admin and the initial "Web & Zoho
@@ -71,13 +71,10 @@ async function ensureInitialProfile(db: Database, admin: Actor): Promise<void> {
     },
     "seed",
   );
-  const [currentDefault] = await db
-    .select({ id: searchProfiles.id })
-    .from(searchProfiles)
-    .where(and(eq(searchProfiles.ownerUserId, admin.id), eq(searchProfiles.isDefault, true)))
-    .limit(1);
-  if (!currentDefault) await setDefault(db, admin, profile.id, "seed");
-  console.warn(`Profile "${INITIAL_PROFILE_NAME}" created (version 1).`);
+  // createProfile makes it the admin's active profile when they have none yet.
+  console.warn(
+    `Profile "${INITIAL_PROFILE_NAME}" created (version 1${profile.active ? ", active" : ", inactive"}).`,
+  );
 }
 
 async function main(): Promise<void> {

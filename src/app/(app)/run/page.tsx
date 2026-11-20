@@ -20,9 +20,9 @@ export default async function RunAgentPage({
   const launchable = toLaunchable(profiles);
   const requested = (await searchParams).profileId;
   const selected =
-    profiles.find((p) => p.id === requested && p.active && !p.archivedAt) ??
-    profiles.find((p) => p.isDefault && !p.archivedAt) ??
-    profiles.find((p) => p.active && !p.archivedAt);
+    profiles.find((p) => p.id === requested && !p.archivedAt) ??
+    profiles.find((p) => p.active && !p.archivedAt) ??
+    profiles.find((p) => !p.archivedAt);
 
   return (
     <div className="flex flex-col gap-6">

@@ -61,10 +61,12 @@ parses and validates input with zod, calls a module in `src/modules`, and return
 | GET    | `/api/profiles/:id`           | VIEWER   | Profile with its current configuration                                                                                                                                |
 | PATCH  | `/api/profiles/:id`           | OPERATOR | Save a new version; requires the version being edited (`VERSION_CONFLICT` if stale). The UI's "Restore this version" saves an old configuration through this endpoint |
 | GET    | `/api/profiles/:id/versions`  | VIEWER   | Version history with authors                                                                                                                                          |
-| POST   | `/api/profiles/:id/archive`   | OPERATOR | Archive; archived profiles cannot run or be edited                                                                                                                    |
-| POST   | `/api/profiles/:id/restore`   | OPERATOR | Un-archive                                                                                                                                                            |
-| POST   | `/api/profiles/:id/duplicate` | OPERATOR | Copy as a new profile at version 1                                                                                                                                    |
-| POST   | `/api/profiles/:id/default`   | OPERATOR | Make it the default profile                                                                                                                                           |
+| POST   | `/api/profiles/:id/archive`   | OPERATOR | Archive; archived profiles cannot run or be edited. Archiving the active profile leaves the owner without one                                                         |
+| POST   | `/api/profiles/:id/restore`   | OPERATOR | Un-archive; the profile comes back inactive                                                                                                                           |
+| POST   | `/api/profiles/:id/duplicate` | OPERATOR | Copy as a new, inactive profile at version 1                                                                                                                          |
+| POST   | `/api/profiles/:id/activate`  | OPERATOR | Make it the owner's only active profile (the one the Upwork sync fetches for); all others become inactive. Replaces the former `/default`                             |
+| GET    | `/api/sync-schedule`          | VIEWER   | The signed-in user's sync scheduler `{ enabled, everyHours, activeFrom, activeTo, timezone }` (the default when never saved)                                          |
+| PUT    | `/api/sync-schedule`          | OPERATOR | Save it; `everyHours` must be 1, 2, 3, 4, 6, 8, 12 or 24, times `HH:MM`, an IANA time zone. Audited as `scheduler.update`                                             |
 
 ### Runs
 

@@ -44,8 +44,8 @@ export type ScoringWeights = z.infer<typeof scoringWeightsSchema>;
 export const unknownPolicy = z.enum(["FAIL", "NEEDS_REVIEW", "IGNORE"]);
 export type UnknownPolicy = z.infer<typeof unknownPolicy>;
 
-const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM (24-hour)");
-const timeZone = z
+export const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM (24-hour)");
+export const timeZone = z
   .string()
   .trim()
   .min(1)
@@ -65,6 +65,10 @@ export const searchConfigSchema = z.object({
   keywords: termList(20),
   /** Minimum share of keywords that must appear in the job (title, description, skills). null = rule off. */
   keywordCoveragePercent: z.number().int().min(1).max(100).nullable(),
+  /**
+   * Superseded by the app-wide sync scheduler (src/modules/scheduler); no longer read. Kept so stored
+   * versions keep loading and their history still shows the old per-profile settings.
+   */
   upworkSync: z.object({
     enabled: z.boolean(),
     everyHours: z.number().int().min(1).max(24),
@@ -74,12 +78,6 @@ export const searchConfigSchema = z.object({
   }),
 });
 export type SearchConfig = z.infer<typeof searchConfigSchema>;
-
-/**
- * Sync intervals a profile can be saved with. The Claude cloud routine wakes every hour, so an hour is
- * the shortest. Older saved versions may hold other values (1–24); they still load.
- */
-export const SYNC_INTERVALS = [1, 2, 4] as const;
 
 export const DEFAULT_SEARCH_CONFIG: SearchConfig = {
   keywords: [],

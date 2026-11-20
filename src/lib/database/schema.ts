@@ -180,17 +180,20 @@ export const searchProfiles = pgTable(
     /** Monotonic version counter; also the optimistic-locking token. */
     currentVersion: integer("current_version").notNull().default(1),
     configuration: jsonb("configuration").notNull(),
-    isDefault: boolean("is_default").notNull().default(false),
-    active: boolean("active").notNull().default(true),
+    /**
+     * The owner's one active profile: the only one the Upwork sync fetches jobs for, and the one
+     * pre-selected for runs. Inactive profiles can still be run by hand. Archived profiles are never active.
+     */
+    active: boolean("active").notNull().default(false),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     index("profiles_owner_idx").on(t.ownerUserId),
-    uniqueIndex("profiles_one_default_per_owner_uq")
+    uniqueIndex("profiles_one_active_per_owner_uq")
       .on(t.ownerUserId)
-      .where(sql`${t.isDefault} = true`),
+      .where(sql`${t.active} = true`),
   ],
 );
 
@@ -664,3 +667,30 @@ export const syncState = pgTable("sync_state", {
   lastError: text("last_error"),
   updatedAt: updatedAt(),
 });
+
+/**
+ * The Upwork sync scheduler, one per user: when the agent syncs that user's active profile. It does not
+ * change when another profile becomes active. No row = the code default (on, every 4 h, all day, UTC).
+ */
+export const syncSchedules = pgTable(
+  "sync_schedules",
+  {
+    ownerUserId: uuid("owner_user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    enabled: boolean("enabled").notNull().default(true),
+    everyHours: integer("every_hours").notNull().default(4),
+    activeFrom: text("active_from").notNull().default("00:00"),
+    activeTo: text("active_to").notNull().default("23:59"),
+    timezone: text("timezone").notNull().default("UTC"),
+    updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("sync_schedules_every_hours_chk", sql`${t.everyHours} in (1, 2, 3, 4, 6, 8, 12, 24)`),
+    check(
+      "sync_schedules_clock_chk",
+      sql`${t.activeFrom} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' and ${t.activeTo} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'`,
+    ),
+  ],
+);
