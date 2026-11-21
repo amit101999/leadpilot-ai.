@@ -1,22 +1,19 @@
 # Architecture
 
 One Next.js application serves the UI and the JSON API. PostgreSQL holds all state. External services (job source,
-AI model, e-mail) sit behind provider interfaces chosen by environment variables, with mocks as the default. n8n is
-an optional orchestrator that drives runs through the app's own API; it holds no business logic.
+AI model, e-mail) sit behind provider interfaces (`src/modules/providers.ts`). The app always uses the real ones;
+the automated tests substitute fakes from `tests/fakes`. Runs execute inside the app process.
 
 ```
- Browser ──HTTPS──► Caddy ──► Next.js app ─────────────────► PostgreSQL   (or Cloudflare ► cloudflared ► Caddy, see deployment.md)
-                               │  UI (App Router, React)      15 tables, Drizzle
-                               │  API (src/app/api/**)
-                               │  Modules (src/modules/**)
-                               │
-                               ├─► Job source provider ──► mock feed | Upwork API (blocked) | imported jobs
-                               │     ▲ Claude + Upwork MCP ──Bearer token──► /api/import/* (docs/upwork-sync.md)
-                               ├─► AI evaluator ─────────► mock | OpenAI Responses API
-                               ├─► E-mail provider ──────► mock | SMTP (e.g. Gmail)
-                               │
-                               └─► n8n webhook (RUN_EXECUTOR=n8n)
-                                     n8n ──HMAC-signed──► /api/internal/runs/:id/steps/:step
+ Browser ──HTTPS──► Render (TLS) ──► Next.js app (Docker) ─────────► Neon PostgreSQL
+                                  │  UI (App Router, React)          Drizzle
+                                  │  API (src/app/api/**)
+                                  │  Modules (src/modules/**), run engine (in-process)
+                                  │
+                                  ├─► Job source: imported jobs only
+                                  │     ▲ Claude cloud routine + Upwork MCP ──Bearer token──► /api/import/* (docs/upwork-sync.md)
+                                  ├─► AI evaluator ─────► OpenAI Responses API
+                                  └─► E-mail provider ──► Brevo HTTPS API | SMTP
 ```
 
 ## Code layout
@@ -28,15 +25,14 @@ an optional orchestrator that drives runs through the app's own API; it holds no
 | `src/app/api/**`           | Thin route handlers: parse and validate input, call a module, return JSON                                                                                                               |
 | `src/proxy.ts`             | Redirects signed-out page requests to `/login?next=…` (Next.js 16 "proxy", formerly middleware)                                                                                         |
 | `src/modules/*`            | Business logic per domain: `profiles`, `runs` (engine), `qualification`, `ai`, `notifications`, `job-sources`, `jobs`, `dashboard`, `exports`, `audit`, `integrations`, `auth`, `users` |
-| `src/modules/providers.ts` | Picks real or mock providers from the environment; tests inject their own                                                                                                               |
+| `src/modules/providers.ts` | Builds the real providers (import source, OpenAI, SMTP or Brevo); tests substitute fakes from `tests/fakes`                                                                             |
 | `src/lib/*`                | Shared infrastructure: env validation, database client and schema, auth, HTTP wrappers, security helpers, money, logging, UI helpers                                                    |
 | `src/components/**`        | React components per page area, plus `ui/` primitives                                                                                                                                   |
 | `database/`                | Migrations (`migrations/`), migrate runner, seed                                                                                                                                        |
-| `n8n/workflows/`           | The run workflow imported into n8n                                                                                                                                                      |
+| `tests/fakes/`             | Fake job source (demo jobs), AI and e-mail used only by the automated tests                                                                                                             |
 
-Route handlers use one of three wrappers from `src/lib/http/api.ts`: `userRoute(minRole, …)` (session cookie, role
-check, same-origin check on state-changing methods), `internalRoute` (HMAC-signed, for n8n) and `publicRoute` (login,
-logout, health); the import API uses `tokenRoute` (Bearer import token). The wrappers also attach a request id and turn
+Route handlers use one of the wrappers from `src/lib/http/api.ts`: `userRoute(minRole, …)` (session cookie, role
+check, same-origin check on state-changing methods) and `publicRoute` (login, logout, health); the import API uses `tokenRoute` (Bearer import token). The wrappers also attach a request id and turn
 every error into the standard error JSON.
 
 ## Run lifecycle
@@ -46,8 +42,7 @@ POST /api/runs (Idempotency-Key)
    │  createRun: freeze the profile configuration into agent_runs.configuration_snapshot,
    │             create 7 run_stages rows, status QUEUED
    ▼
-dispatchRun ── inprocess: next/server after() → runInProcess (same server process)
-           └── n8n:       POST n8n webhook → n8n calls one step at a time
+dispatchRun ── next/server after() → runInProcess (same server process)
    ▼
 runStep(step), each idempotent and protected by a lease (lease_owner, lease_expires_at):
   start     → SOURCE_CHECK   provider.checkConnection(); NOT_AUTHORIZED → BLOCKED_SOURCE (terminal)
@@ -61,9 +56,7 @@ runStep(step), each idempotent and protected by a lease (lease_owner, lease_expi
 ```
 
 Each step returns `{ next, terminal, retryAfterMs }`. The in-process runner loops with bounded per-step retries and
-fails the run if a step keeps failing. The n8n workflow does the same over HTTP: it retries a step 3 times, leaves a run
-alone when another execution holds the lease (`LEASE_HELD`), and otherwise reports the failure to
-`/api/internal/runs/:id/fail`. A run stuck after a crash can be resumed (`POST /api/runs/:id/resume`) once its lease
+fails the run if a step keeps failing. A run stuck after a crash can be resumed (`POST /api/runs/:id/resume`) once its lease
 has expired. The UI follows progress by polling `GET /api/runs/:id/events` every 2 seconds.
 
 Run statuses: `QUEUED → RUNNING → COMPLETED | COMPLETED_WITH_ERRORS | FAILED | CANCELLED | BLOCKED_SOURCE`.
@@ -94,9 +87,8 @@ Transitions are declared in `src/modules/runs/transitions.ts`; any other transit
 
 ## Notifications and delivery guarantees
 
-Alerts are e-mails (SMTP) to the profile's opted-in e-mail recipient (`src/modules/notifications/channels.ts`); the
-same recipient gets the optional run summary and failure alert. WhatsApp alerts were removed; their old rows stay in
-the database (channel `WHATSAPP`) and are never sent. Selection reserves at most `maxPerRun` notification rows under a
+Alerts are e-mails (Brevo or SMTP) to the profile's opted-in e-mail recipient
+(`src/modules/notifications/channels.ts`); the same recipient gets the optional run summary and failure alert. Selection reserves at most `maxPerRun` notification rows under a
 per-recipient advisory lock. A unique index on `(job_id, channel, recipient_id)` makes "never alert the same job to
 the same recipient twice" a database guarantee, even for concurrent runs. Sending is claim → send → record. The SMTP
 provider classifies every result (`classifySmtpError` in `src/modules/notifications/smtp-email.ts`):
@@ -112,22 +104,20 @@ The guarantee is **at most once per (job, recipient)**, not exactly once: an unc
 
 ## Key design decisions
 
-| Decision                                                         | Why                                                                               | Trade-off                                              |
-| ---------------------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| One Next.js app for UI and API                                   | One deployable, shared types and validation                                       | API and UI scale together                              |
-| n8n calls the app's step API instead of reimplementing the logic | One engine, testable in-process; n8n failure → switch to `RUN_EXECUTOR=inprocess` | Every step is an HTTP round trip                       |
-| Steps are idempotent with leases                                 | Safe retries, duplicate triggers, crash recovery                                  | More state per run (stages, leases)                    |
-| Configuration snapshot frozen per run (DB trigger)               | Results stay explainable after profile edits                                      | Snapshot duplicates profile data                       |
-| Database constraints for dedup and alert uniqueness              | Correct under concurrency without application locks                               | Callers must handle unique violations (mapped to 409)  |
-| Short polling (2 s) instead of SSE/WebSockets                    | Simple, works through any proxy                                                   | Up to 2 s delay, one request per 2 s per open run page |
-| Mock providers by default                                        | No accidental external calls or costs; full flow works offline                    | Live integrations need separate verification           |
-| Upwork adapter refuses to discover until access is confirmed     | No scraping, no guessed endpoints                                                 | No live data yet                                       |
+| Decision                                                         | Why                                                                 | Trade-off                                              |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------ |
+| One Next.js app for UI and API                                   | One deployable, shared types and validation                         | API and UI scale together                              |
+| Steps are idempotent with leases                                 | Safe retries, duplicate triggers, crash recovery                    | More state per run (stages, leases)                    |
+| Configuration snapshot frozen per run (DB trigger)               | Results stay explainable after profile edits                        | Snapshot duplicates profile data                       |
+| Database constraints for dedup and alert uniqueness              | Correct under concurrency without application locks                 | Callers must handle unique violations (mapped to 409)  |
+| Short polling (2 s) instead of SSE/WebSockets                    | Simple, works through any proxy                                     | Up to 2 s delay, one request per 2 s per open run page |
+| Fakes only in tests, never an app setting                        | A deployed site can never fall back to fake jobs, scores or e-mails | Running locally needs real keys or the import flow     |
+| Jobs only from the Upwork sync (official connector), no scraping | Stays within Upwork's terms; no Upwork API key needed               | Depends on the Claude cloud routine running            |
 
 ## Scalability and failure modes
 
-- One web container handles UI, API and (with `inprocess`) run execution. In-process runs live in the server process:
-  a restart interrupts them, and they need `resume` after the lease expires. With n8n, execution survives web
-  restarts.
+- One web container handles UI, API and run execution. Runs live in the server process: a restart interrupts them,
+  and they need `resume` after the lease expires.
 - Discovery is capped (pages and jobs per run) and records a `DISCOVERY_LIMIT_REACHED` warning when truncated.
 - AI calls are bounded by batch size and concurrency; rate limits and timeouts are classified and retried within the
   profile's limits.

@@ -22,7 +22,7 @@ nice to have.
 | Brevo (e-mail)                                  | ⚠️ Key and sender set in Render, but no e-mail sent yet; domain authentication missing                                                                                                                                                                                                                                                                                                                                                                       |
 | OpenAI (AI scoring)                             | ⚠️ Key set in Render, never tested live                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Upwork jobs → LeadPilot                         | ⚠️ Claude cloud routine "LeadPilot Upwork sync (hourly)" imported jobs into the live site on 2026-11-17, but was found **disabled** on 2026-11-18 (cron `18 */4 * * *`). To do after deploying the sync-window and schedule changes: set it to `18 * * * *` (hourly; each profile's 1/2/4 h interval in the UI decides) and enable it                                                                                                                        |
-| Job source setting                              | ✅ `JOB_SOURCE_PROVIDER=import` live 2026-11-17 (deploy of `5359322`): every run uses only jobs from the Upwork sync; no demo jobs in production                                                                                                                                                                                                                                                                                                             |
+| Job source setting                              | ✅ `JOB_SOURCE_PROVIDER=import` live 2026-11-17 (deploy of `5359322`; since 2026-11-21 import is the only source and the setting is gone): every run uses only jobs from the Upwork sync; no demo jobs in production                                                                                                                                                                                                                                         |
 
 ---
 
@@ -166,49 +166,42 @@ connector, searches Upwork and sends the jobs to LeadPilot's import API (`docs/u
    Upwork connector in claude.ai → Settings → Connectors.
 3. **P0 · You · 2 min: set up a search profile for syncing.** On a profile → **Search & sync**: keywords, interval,
    active hours, time zone, sync on.
-4. **P0 · You + Claude · 10 min: first live sync.** Run `powershell -File scripts\upwork-sync.ps1` (or `/upwork-sync`
-   here). The first request may take about a minute while Render wakes up. Check **Search History** for the run and
+4. **P0 · You + Claude · 10 min: first live sync.** Let the cloud routine run, or run `/upwork-sync` here. The first request may take about a minute while Render wakes up. Check **Search History** for the run and
    your inbox for an alert. Not yet verified: one uninterrupted run from search to e-mail (the November test was
-   interrupted by low memory on the PC).
-5. **P1 · Plan + You decide: automatic (scheduled) syncing.** Upwork's API & MCP terms reportedly limit automated,
-   continuous monitoring of job posts. LeadPilot therefore ignores scheduled syncs until
-   `UPWORK_SYNC_SCHEDULED_ALLOWED=true` (currently `false` in `render.yaml`). Read the terms, then decide. If yes:
-   change that setting and create the hourly Windows task (`docs/upwork-sync.md`, "Scheduling").
-6. **P1 · Plan: where the sync agent runs.** Today it needs **your PC on and signed in**. Options:
-   - **Keep the PC** (works now; syncs only while the PC is on).
-   - **Claude Code cloud routine** (Claude's scheduled agents run in the cloud, no PC needed). Not yet tested: whether
-     the Upwork connector and the import token work there. Worth a trial.
-   - **Claude on the web (claude.ai)** can use the Upwork connector in chat, but it cannot run the repository's sync
-     scripts, so it is not a replacement for the automated sync.
+   interrupted by low memory on the PC, with a wrapper script since removed).
+5. **Done (2026-11-17): automatic (scheduled) syncing allowed.** After reviewing Upwork's API & MCP terms,
+   `UPWORK_SYNC_SCHEDULED_ALLOWED=true` was set in `render.yaml`.
+6. **Done: where the sync agent runs.** A Claude Code cloud routine (hourly, no PC needed); the PC script was removed on
+   2026-11-21. The routine is paused until the cleanup branch is deployed (`docs/upwork-sync.md`).
 7. **P2 · Blocked: direct Upwork API.** LeadPilot calling Upwork itself needs an **approved Upwork API key** with
    job-search access. Upwork's own documentation says the API is not for commercial use. Blocked until Upwork approves
-   (`docs/upwork-access.md`).
+   (`docs/upwork-access.md`). The placeholder adapter was removed on 2026-11-21.
 
 ## Claude Code / MCP connections
 
-| Connection                   | Status                                      | Needed for                                   |
-| ---------------------------- | ------------------------------------------- | -------------------------------------------- |
-| Upwork (claude.ai connector) | ✅ connected                                | Upwork sync (essential)                      |
-| Render (plugin)              | ✅ connected                                | I can check deploys, logs and health         |
-| Claude in Chrome             | ✅ connected                                | dashboard clicks in Cloudflare, Neon, Render |
-| n8n-mcp                      | ❌ fails (points at local n8n, not running) | Not needed on Render. Remove it or leave it  |
-| Zoho Catalyst plugin         | ❌ invalid URL                              | Not related to LeadPilot. Remove or fix      |
-| Cloudflare, Neon, Brevo      | no connector                                | Not needed; the browser works                |
+| Connection                   | Status                                      | Needed for                                                      |
+| ---------------------------- | ------------------------------------------- | --------------------------------------------------------------- |
+| Upwork (claude.ai connector) | ✅ connected                                | Upwork sync (essential)                                         |
+| Render (plugin)              | ✅ connected                                | I can check deploys, logs and health                            |
+| Claude in Chrome             | ✅ connected                                | dashboard clicks in Cloudflare, Neon, Render                    |
+| n8n-mcp                      | ❌ fails (points at local n8n, not running) | n8n was removed from LeadPilot (2026-11-21); remove this server |
+| Zoho Catalyst plugin         | ❌ invalid URL                              | Not related to LeadPilot. Remove or fix                         |
+| Cloudflare, Neon, Brevo      | no connector                                | Not needed; the browser works                                   |
 
 ## Coding
 
-| #   | Priority | Item                                                                                                                                                                              | Effort            |
-| --- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
-| 1   | P1       | User management (script or Settings → Users page), see [Login and users 2](#login-and-users)                                                                                      | ½–1 day           |
-| 2   | P1       | HSTS header for production                                                                                                                                                        | 30 min            |
-| 3   | P1       | Check and, if needed, fix `clientIp` behind Render                                                                                                                                | 15–60 min         |
-| 4   | P1       | Weekly database backup job (GitHub Actions + `pg_dump`)                                                                                                                           | 1 h               |
-| 5   | P2       | Content-Security-Policy header (defence against script injection)                                                                                                                 | ½ day             |
-| 6   | P2       | Data-retention cleanup job                                                                                                                                                        | ½ day             |
-| 7   | P2       | Clean up the unused server deployment path: the CI `deploy` job (SSH), `scripts/deploy.sh`, Cloudflare Tunnel compose files. Keep them as a documented alternative or remove them | 1 h               |
-| 8   | P2       | Automatic resume of runs stopped by Render's sleep (today: manual **Resume**)                                                                                                     | ½ day             |
-| 9   | Blocked  | Live Upwork API adapter (needs an approved key)                                                                                                                                   | days              |
-| 10  | P2       | Dev-only `npm audit` advisories (`eslint-config-next`, `drizzle-kit`); 0 in production dependencies                                                                               | wait for upstream |
+| #   | Priority | Item                                                                                                                                                                                                                             | Effort            |
+| --- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| 1   | P1       | User management (script or Settings → Users page), see [Login and users 2](#login-and-users)                                                                                                                                     | ½–1 day           |
+| 2   | P1       | HSTS header for production                                                                                                                                                                                                       | 30 min            |
+| 3   | P1       | Check and, if needed, fix `clientIp` behind Render                                                                                                                                                                               | 15–60 min         |
+| 4   | P1       | Weekly database backup job (GitHub Actions + `pg_dump`)                                                                                                                                                                          | 1 h               |
+| 5   | P2       | Content-Security-Policy header (defence against script injection)                                                                                                                                                                | ½ day             |
+| 6   | P2       | Data-retention cleanup job                                                                                                                                                                                                       | ½ day             |
+| 7   | Done     | Removed the unused self-hosting path (CI SSH deploy job, `scripts/deploy.sh`, Caddy and Cloudflare Tunnel compose files), n8n, the PC sync script, WhatsApp leftovers and the in-app mock providers (cleanup branch, 2026-11-21) | —                 |
+| 8   | P2       | Automatic resume of runs stopped by Render's sleep (today: manual **Resume**)                                                                                                                                                    | ½ day             |
+| 9   | Blocked  | Direct Upwork API job source (needs an approved key; the placeholder was removed, see [upwork-access.md](upwork-access.md))                                                                                                      | days              |
+| 10  | P2       | Dev-only `npm audit` advisories (`eslint-config-next`, `drizzle-kit`); 0 in production dependencies                                                                                                                              | wait for upstream |
 
 ## Planning and system-design decisions (yours)
 
@@ -244,8 +237,6 @@ connector, searches Upwork and sends the jobs to LeadPilot's import API (`docs/u
 
 - **P1 · Claude:** update `docs/progress/PROGRESS.md` with the Render + Neon + Brevo work (2026-11-16/17) through the
   project tracker.
-- **P1 · Claude:** in `docs/deployment.md`, mark the server/Cloudflare-Tunnel CI deploy as an alternative and describe
-  the live Render deploy flow first (partly done).
 - **P2 · Claude:** `docs/upwork-sync.md` still shows `http://localhost` examples; add the live URL.
 
 ---

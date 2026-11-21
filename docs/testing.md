@@ -1,13 +1,14 @@
 # Testing
 
-Four suites, all run with mock providers unless stated otherwise. No suite calls a real job source, AI model or mail
-server without an explicit opt-in: the integration setup and the Playwright server force `AI_PROVIDER`,
-`EMAIL_PROVIDER` and `JOB_SOURCE_PROVIDER` to `mock` whatever `.env` says.
+Four suites. No suite calls a real job source, AI model or mail server without an explicit opt-in: they use the fakes
+in `tests/fakes` (a demo job feed with scripted scenarios, a deterministic AI and an e-mail recorder). The integration
+setup installs them for every test file; the Playwright server loads them with `E2E_FAKE_PROVIDERS=1`, which the app
+refuses unless `APP_BASE_URL` is a localhost address. The app itself has no fake option.
 
-| Suite       | Command                    | Runner                        | Needs                                | Count (2026-10-15)          |
+| Suite       | Command                    | Runner                        | Needs                                | Count (2026-11-21)          |
 | ----------- | -------------------------- | ----------------------------- | ------------------------------------ | --------------------------- |
-| Unit        | `npm run test:unit`        | Vitest, project `unit`        | nothing                              | 161 tests                   |
-| Integration | `npm run test:integration` | Vitest, project `integration` | Postgres and `TEST_DATABASE_URL`     | 74 tests                    |
+| Unit        | `npm run test:unit`        | Vitest, project `unit`        | nothing                              | 199 tests                   |
+| Integration | `npm run test:integration` | Vitest, project `integration` | Postgres and `TEST_DATABASE_URL`     | 91 tests                    |
 | End to end  | `npm run test:e2e`         | Playwright (Chromium)         | Postgres and `TEST_DATABASE_URL`     | 19 tests                    |
 | Live        | `npm run test:live`        | Vitest, project `live`        | `LIVE_TESTS=1` plus real credentials | 3 tests, skipped by default |
 
@@ -15,8 +16,8 @@ server without an explicit opt-in: the integration setup and the Playwright serv
 
 GitHub Actions ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) runs format check, lint, typecheck, unit,
 integration and e2e tests plus the production build on every pull request and push to `main`, each test suite with its
-own Postgres 16 service container and throwaway secrets. Live tests never run in CI. See
-[deployment.md, CI/CD](deployment.md#cicd).
+own Postgres 16 service container and throwaway secrets. Live tests never run in CI. Render deploys `main` only after
+these checks pass ([deployment.md](deployment.md)).
 
 ## Setup
 
@@ -33,34 +34,33 @@ Pure functions, no database or network:
   conditions, source and URL checks (`hard-filters.test.ts`).
 - Authoritative scoring, eligibility thresholds, AI output schema, ranking and profile validation
   (`scoring-eligibility.test.ts`).
-- Money, state machines, HMAC signing, CSV formula-injection protection, URL validation and error redaction
+- Money, state machines, CSV formula-injection protection, URL validation and error redaction
   (`primitives.test.ts`).
 - Lead and run-summary e-mail content: field order, hourly rates, one-line values (`lead-message.test.ts`); HTML
   escaping, safe links and SMTP outcome classification (`email.test.ts`).
 - The OpenAI adapter with an injected `fetch`: request shape (`store: false`, strict JSON schema), rate-limit /
   server-error / timeout classification and connection states (`openai-evaluator.test.ts`).
-- The n8n workflow file's structure and signing (`n8n-workflow.test.ts`), CSRF origin check, login redirects, list
-  parameters, audit and profile diffs.
+- The `E2E_FAKE_PROVIDERS` start-up guard (`instrumentation.ts`), environment settings (`env.test.ts`), CSRF origin
+  check, login redirects, list parameters, audit and profile diffs.
 
 ## Integration tests (`tests/integration`)
 
 `setup.ts` points the app at `TEST_DATABASE_URL`, applies the migrations and truncates every table once per file. Files
 run one at a time. Tests call the route handlers directly (`helpers.ts`: `call`, `createUser`) and drive runs with
-`runInProcess`. The real dispatcher is mocked because it needs a live request scope. A test can replace the job source
-with `setProvidersForTesting` (for example a scripted mock scenario from
-`src/modules/job-sources/mock-fixtures.ts`).
+`runInProcess`. The real dispatcher is mocked because it needs a live request scope. A test can replace a provider for
+itself with `setProvidersForTesting` (for example a scripted feed from `tests/fakes/mock-fixtures.ts`).
 
 Covered: authentication and sessions, password change, profiles (versions, optimistic locking, archive, duplicate),
-recipients, runs (idempotency, concurrent double submit, snapshot, cancel, end-to-end mock run), the run pipeline
+recipients, runs (idempotency, concurrent double submit, snapshot, cancel, end-to-end run with the fakes), the run pipeline
 (blocked source, deduplication), e-mail notifications (limits, reruns, concurrency, failures, uncertain sends, the run
-summary e-mail, refusal of WhatsApp recipients), integrations, dashboard, exports, audit log, the n8n internal endpoints, and the database's own immutability
-guards.
+summary e-mail, refusal of non-e-mail recipients), integrations, dashboard, exports, audit log, run leases, the Upwork
+import API, and the database's own immutability guards.
 
 ## End-to-end tests (`tests/e2e`)
 
 Playwright builds the app (`next build --webpack`, then `next start` on port 3100) against `TEST_DATABASE_URL`, which
-`global-setup.ts` migrates, truncates and seeds with an admin and an operator. Runs use the in-process executor and
-mock providers.
+`global-setup.ts` migrates, truncates and seeds with an admin and an operator. Runs use the test fakes
+(`E2E_FAKE_PROVIDERS=1`).
 
 Covered: sign-in and sign-out, profiles (create, budget edit with version history, weight validation, stale-save
 protection, unsaved-changes prompt, duplicate / archive / restore), running the agent and watching it finish, history,
@@ -124,6 +124,6 @@ behaviour.
 
 ## Not covered
 
-- Live OpenAI scoring and lead e-mails inside a real run; direct Upwork API discovery (intentionally blocked).
-- n8n crashing in the middle of a run and resuming (the lease logic is covered by integration tests only).
-- Production infrastructure (Let's Encrypt, a Linux host, reboots): see `docs/deployment.md`.
+- Live OpenAI scoring and lead e-mails inside an automated test (they are checked in production instead).
+- The server restarting in the middle of a run and resuming (the lease logic is covered by integration tests only).
+- Production infrastructure (Render, Neon): see `docs/deployment.md`.

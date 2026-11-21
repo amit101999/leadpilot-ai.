@@ -4,36 +4,20 @@
 > official MCP connector feeding LeadPilot's import API): see [upwork-sync.md](upwork-sync.md). This page is about
 > LeadPilot calling Upwork's API directly.
 
-**Status: direct Upwork API discovery is BLOCKED.** LeadPilot runs on a mock job source. The Upwork provider exists only as
-a configuration check and refuses to discover jobs. It never scrapes pages, reuses browser sessions or calls guessed
-endpoints.
+**Status: not built (future option).** LeadPilot does not call Upwork's API. Jobs come only from the Upwork sync.
+A placeholder adapter for the direct API was removed in the November 2026 cleanup because it could never discover
+jobs; this page keeps what would be needed to build a real one.
 
-## What the code does today
-
-`src/modules/job-sources/upwork-provider.ts` (`JOB_SOURCE_PROVIDER=upwork`):
-
-| Configuration                                              | `checkConnection()` result                                     | Run outcome      |
-| ---------------------------------------------------------- | -------------------------------------------------------------- | ---------------- |
-| `UPWORK_CLIENT_ID` or `UPWORK_CLIENT_SECRET` missing       | `NOT_CONFIGURED`                                               | `BLOCKED_SOURCE` |
-| Credentials set, `UPWORK_JOB_SEARCH_SCOPE_CONFIRMED=false` | `NOT_AUTHORIZED`                                               | `BLOCKED_SOURCE` |
-| Credentials set and scope confirmed                        | `NOT_AUTHORIZED` ("live adapter not implemented and verified") | `BLOCKED_SOURCE` |
-
-`discoverJobs()` always throws `SourceNotAuthorizedError`. The run stops at the source check, keeps its partial data,
-skips the later stages and shows the reason in the UI and on the Integrations page.
-
-## What would unblock it
+## What a direct API adapter would need
 
 1. **An approved Upwork API key** for this use case, requested from the Upwork account that will own the integration.
 2. **Job-search access on that key.** API keys are issued with selected scopes, and a key can only use the APIs its
    scopes allow.
 3. **A confirmed data contract.** The granted API must return what the qualification engine needs: title,
    description, canonical job URL, fixed/hourly type, budget or rate, currency, client payment verification, client
-   history (rating, hires, spend, country), skills, category and posting time. If payment verification or budget are
-   not available, the hard filters treat them as unknown, which rejects the job under the default profile.
-4. **A live adapter** that implements `discoverJobs` and `normalizeJob` against the documented API (OAuth 2.0), with
-   pagination, rate-limit handling and tests against recorded responses, then `npm run test:live` with real
-   credentials.
-5. Only then set `UPWORK_JOB_SEARCH_SCOPE_CONFIRMED=true` together with the new adapter.
+   history (rating, hires, spend, country), skills, category and posting time.
+4. **A new job source** implementing `JobSourceProvider` (`src/modules/job-sources/types.ts`) against the documented
+   API (OAuth 2.0), with pagination, rate-limit handling, tests against recorded responses and an opt-in live test.
 
 ## What Upwork's documentation says
 
