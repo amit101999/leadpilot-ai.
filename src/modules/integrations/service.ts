@@ -1,5 +1,4 @@
 import { sql } from "drizzle-orm";
-import { env } from "@/lib/configuration/env";
 import type { Database } from "@/lib/database/client";
 import { integrationStatus } from "@/lib/database/schema";
 import { sanitizeErrorMessage } from "@/lib/security/sanitize";
@@ -13,11 +12,10 @@ import type { IntegrationState } from "@/types/domain";
  * Only non-secret data is stored or returned.
  */
 
-export const INTEGRATIONS = ["database", "job_source", "ai", "email", "n8n"] as const;
+export const INTEGRATIONS = ["database", "job_source", "ai", "email"] as const;
 export type IntegrationName = (typeof INTEGRATIONS)[number];
 
 export const STALE_AFTER_MS = 60 * 60_000;
-const N8N_TIMEOUT_MS = 5000;
 
 interface CheckResult {
   state: IntegrationState;
@@ -27,7 +25,6 @@ interface CheckResult {
 
 /** Non-secret description of how each integration is configured right now. */
 function describe(name: IntegrationName, providers: Providers): Record<string, unknown> {
-  const config = env();
   switch (name) {
     case "database":
       return { kind: "postgresql" };
@@ -37,8 +34,6 @@ function describe(name: IntegrationName, providers: Providers): Record<string, u
       return { provider: providers.ai.id, model: providers.ai.model, isMock: providers.ai.isMock };
     case "email":
       return { provider: providers.email.id, isMock: providers.email.isMock };
-    case "n8n":
-      return { executor: config.RUN_EXECUTOR, configured: Boolean(config.N8N_BASE_URL) };
   }
 }
 
@@ -69,29 +64,6 @@ async function runCheck(db: Database, providers: Providers, name: IntegrationNam
         metadata: { ...metadata, missing: result.missing },
       };
     }
-    case "n8n":
-      return checkN8n(metadata);
-  }
-}
-
-async function checkN8n(metadata: Record<string, unknown>): Promise<CheckResult> {
-  const config = env();
-  if (!config.N8N_BASE_URL) {
-    const message =
-      config.RUN_EXECUTOR === "inprocess"
-        ? "n8n is not configured; runs use the in-process executor"
-        : "N8N_BASE_URL is not set";
-    return { state: "NOT_CONFIGURED", message, metadata };
-  }
-  // Fixed path on a host taken from server configuration only (no user input reaches the URL).
-  const url = new URL("/healthz", config.N8N_BASE_URL);
-  try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(N8N_TIMEOUT_MS) });
-    return response.ok
-      ? { state: "CONNECTED", message: "n8n is reachable", metadata }
-      : { state: "UNAVAILABLE", message: `n8n health check returned HTTP ${response.status}`, metadata };
-  } catch {
-    return { state: "UNAVAILABLE", message: "n8n could not be reached", metadata };
   }
 }
 

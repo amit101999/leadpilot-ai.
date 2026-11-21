@@ -127,16 +127,6 @@ export default async function IntegrationsPage() {
         </>
       ),
     },
-    n8n: {
-      title: "n8n workflows",
-      setup: (
-        <>
-          Optional. Set{" "}
-          <Vars names={["RUN_EXECUTOR", "N8N_BASE_URL", "N8N_WEBHOOK_SECRET", "INTERNAL_API_SECRET"]} /> to
-          let n8n drive runs. Without it, runs use the built-in in-process executor.
-        </>
-      ),
-    },
   };
 
   return (

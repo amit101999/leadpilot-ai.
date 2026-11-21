@@ -11,7 +11,7 @@ import { filterStep } from "./filtering";
 import { selectStep } from "./selection";
 
 export { failRun } from "./finalization";
-export { assertNoOtherLeaseHolder, STAGE_STEPS, type StageResponse, type StageStep } from "./context";
+export { STAGE_STEPS, type StageResponse, type StageStep } from "./context";
 
 const STEPS = {
   start: startStep,
@@ -43,9 +43,8 @@ const MAX_STEP_ATTEMPTS = 3;
 const MAX_STEPS = 10_000;
 
 /**
- * In-process executor: drives the same steps sequentially with bounded
- * per-step retries, then fails the run if a step keeps failing. Used in tests,
- * local development and as an explicit fallback (RUN_EXECUTOR=inprocess).
+ * The run executor: drives the steps sequentially with bounded per-step
+ * retries, then fails the run if a step keeps failing.
  */
 export async function runInProcess(
   db: Database,

@@ -4,8 +4,6 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/modules/runs/executor", () => ({ dispatchRun: vi.fn(async () => ({ ok: true })) }));
 
-process.env.INTERNAL_API_SECRET = "test-internal-secret-0123456789";
-
 import { GET as auditLogs } from "@/app/api/audit-logs/route";
 import { GET as dashboard } from "@/app/api/dashboard/route";
 import { GET as leadsCsv } from "@/app/api/exports/leads.csv/route";
@@ -13,8 +11,6 @@ import { GET as runsCsv } from "@/app/api/exports/runs.csv/route";
 import { POST as checkIntegration } from "@/app/api/integrations/[provider]/check/route";
 import { POST as testMessage } from "@/app/api/integrations/[provider]/test/route";
 import { GET as integrationStatus } from "@/app/api/integrations/status/route";
-import { POST as failStep } from "@/app/api/internal/runs/[id]/fail/route";
-import { POST as runStepRoute } from "@/app/api/internal/runs/[id]/steps/[step]/route";
 import { POST as createProfile } from "@/app/api/profiles/route";
 import { POST as createRecipient } from "@/app/api/recipients/route";
 import { GET as getRun } from "@/app/api/runs/[id]/route";
@@ -26,10 +22,9 @@ import {
   integrationStatus as integrationStatusTable,
   jobs,
 } from "@/lib/database/schema";
-import { signPayload, SIGNATURE_HEADER } from "@/lib/security/hmac";
 import { defaultProfileConfig } from "@/modules/profiles/config-schema";
 import { getProviders } from "@/modules/providers";
-import { runInProcess } from "@/modules/runs/engine";
+import { failRun, runInProcess, runStep } from "@/modules/runs/engine";
 import { call, createUser, type TestUser } from "./helpers";
 
 async function newRun(user: TestUser) {
@@ -47,17 +42,6 @@ async function newRun(user: TestUser) {
   return run.json.data.id as string;
 }
 
-function internalCall(handler: Parameters<typeof call>[0], params: Record<string, string>, body: unknown) {
-  const raw = JSON.stringify(body);
-  return call(handler, {
-    method: "POST",
-    origin: null,
-    params,
-    body,
-    headers: { [SIGNATURE_HEADER]: signPayload(process.env.INTERNAL_API_SECRET!, raw) },
-  });
-}
-
 describe("integrations", () => {
   it("returns stored status without calling anything, then stores a live check", async () => {
     const user = await createUser("OPERATOR");
@@ -67,7 +51,6 @@ describe("integrations", () => {
       "job_source",
       "ai",
       "email",
-      "n8n",
     ]);
     expect(
       before.json.data.every((s: { status: unknown; stale: boolean }) => s.status === null && s.stale),
@@ -78,7 +61,6 @@ describe("integrations", () => {
       job_source: "MOCK",
       ai: "MOCK",
       email: "MOCK",
-      n8n: "NOT_CONFIGURED",
     };
     for (const [name, state] of Object.entries(expected)) {
       const res = await call(checkIntegration, { method: "POST", user, params: { provider: name } });
@@ -188,7 +170,7 @@ describe("dashboard, exports and audit", () => {
     expect(mine.json.data.daily).toHaveLength(30);
     expect(mine.json.data.daily.at(-1).runs).toBe(1);
     expect(mine.json.data.daily[0].day).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect(mine.json.data.integrations).toHaveLength(5);
+    expect(mine.json.data.integrations).toHaveLength(4);
 
     const stranger = await createUser("OPERATOR");
     const theirs = await call(dashboard, { user: stranger });
@@ -242,91 +224,30 @@ describe("dashboard, exports and audit", () => {
   });
 });
 
-describe("internal n8n endpoints", () => {
-  it("rejects unsigned calls", async () => {
+describe("run leases (one execution drives a run at a time)", () => {
+  const step = (runId: string, executionId: string) =>
+    runStep(getDb(), getProviders(), runId, "start", executionId);
+  const fail = (runId: string, error: string, executionId?: string) =>
+    failRun(getDb(), getProviders(), runId, { error, executionId });
+
+  it("does not let a second execution take over a run while its lease is held, only after it expires", async () => {
     const user = await createUser("OPERATOR");
     const runId = await newRun(user);
-    const res = await call(runStepRoute, {
-      method: "POST",
-      origin: null,
-      params: { id: runId, step: "start" },
-      body: { executionId: "exec-1" },
-    });
-    expect(res.status).toBe(401);
-  });
-
-  it("drives a run to completion one signed step at a time", async () => {
-    const user = await createUser("OPERATOR");
-    const runId = await newRun(user);
-    let step = "start";
-    let last: { terminal: boolean; next: string | null; retryAfterMs?: number } | null = null;
-    for (let i = 0; i < 200 && step; i++) {
-      const res = await internalCall(runStepRoute, { id: runId, step }, { executionId: "exec-42" });
-      expect(res.status).toBe(200);
-      last = res.json.data;
-      if (last!.terminal || !last!.next) break;
-      step = last!.next;
-    }
-    expect(last?.terminal).toBe(true);
-    const run = await call(getRun, { user, params: { id: runId } });
-    expect(["COMPLETED", "COMPLETED_WITH_ERRORS"]).toContain(run.json.data.status);
-  });
-
-  it("does not let a duplicate execution fail a run another execution is driving", async () => {
-    const user = await createUser("OPERATOR");
-    const runId = await newRun(user);
-    const owner = await internalCall(runStepRoute, { id: runId, step: "start" }, { executionId: "exec-A" });
-    expect(owner.status).toBe(200);
-
-    const duplicate = await internalCall(
-      runStepRoute,
-      { id: runId, step: "start" },
-      { executionId: "exec-B" },
-    );
-    expect(duplicate.status).toBe(409);
-    expect(duplicate.json.error.code).toBe("LEASE_HELD");
-
-    for (const executionId of ["exec-B", undefined]) {
-      const res = await internalCall(failStep, { id: runId }, { error: "lease held", executionId });
-      expect(res.status).toBe(409);
-    }
-    const stillRunning = await call(getRun, { user, params: { id: runId } });
-    expect(stillRunning.json.data.status).not.toBe("FAILED");
-
-    const own = await internalCall(failStep, { id: runId }, { error: "own failure", executionId: "exec-A" });
-    expect(own.status).toBe(200);
-    expect(own.json.data.status).toBe("FAILED");
-  });
-
-  it("lets any execution fail a run once the previous lease has expired", async () => {
-    const user = await createUser("OPERATOR");
-    const runId = await newRun(user);
-    await internalCall(runStepRoute, { id: runId, step: "start" }, { executionId: "exec-A" });
+    await step(runId, "exec-A");
+    await expect(step(runId, "exec-B")).rejects.toMatchObject({ code: "LEASE_HELD" });
     await getDb()
       .update(agentRuns)
       .set({ leaseExpiresAt: new Date(Date.now() - 60_000) })
       .where(eq(agentRuns.id, runId));
-    const res = await internalCall(failStep, { id: runId }, { error: "crashed", executionId: "exec-B" });
-    expect(res.status).toBe(200);
-    expect(res.json.data.status).toBe("FAILED");
+    await expect(step(runId, "exec-B")).resolves.toBeDefined();
   });
 
-  it("marks a run FAILED from the error workflow and sanitises the message", async () => {
+  it("sanitises the failure message it stores", async () => {
     const user = await createUser("OPERATOR");
     const runId = await newRun(user);
-    const res = await internalCall(
-      failStep,
-      { id: runId },
-      {
-        stage: "DISCOVERY",
-        error: "Upstream failed: Bearer sk-live-abcdefghijklmnop",
-        executionId: "exec-7",
-      },
-    );
-    expect(res.status).toBe(200);
-    expect(res.json.data.status).toBe("FAILED");
+    await fail(runId, "Upstream failed: Bearer sk-live-abcdefghijklmnop", "exec-7");
     const run = await call(getRun, { user, params: { id: runId } });
-    expect(run.json.data.errorSummary.code).toBe("WORKFLOW_EXECUTION_FAILED");
+    expect(run.json.data.status).toBe("FAILED");
     expect(JSON.stringify(run.json.data.errorSummary)).not.toContain("sk-live-abcdefghijklmnop");
   });
 });

@@ -2,7 +2,7 @@
 #
 # One web service built from the Dockerfile (final `runner` stage). The database is Neon (free, external),
 # e-mail goes through Brevo's HTTPS API (Render's free plan blocks outbound SMTP ports), runs execute
-# in-process (no n8n), and migrations run at startup (MIGRATE_ON_START; the free plan has no pre-deploy step).
+# inside the app, and migrations run at startup (MIGRATE_ON_START; the free plan has no pre-deploy step).
 # Render deploys a commit on main only after its GitHub checks (.github/workflows/ci.yml) have passed.
 services:
   - type: web
@@ -22,8 +22,6 @@ services:
         value: https://leads.peepalx.com
       - key: MIGRATE_ON_START
         value: "true"
-      - key: RUN_EXECUTOR
-        value: inprocess
       - key: DATABASE_POOL_MAX
         value: "5"
       - key: LOG_LEVEL

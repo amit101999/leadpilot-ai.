@@ -18,7 +18,6 @@ process.env.LOG_LEVEL = "silent";
 process.env.AI_PROVIDER = "mock";
 process.env.EMAIL_PROVIDER = "mock";
 process.env.JOB_SOURCE_PROVIDER = "mock";
-process.env.RUN_EXECUTOR = "inprocess";
 
 beforeAll(async () => {
   const { drizzle } = await import("drizzle-orm/postgres-js");

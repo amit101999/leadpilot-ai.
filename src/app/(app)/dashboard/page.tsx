@@ -295,5 +295,4 @@ const INTEGRATION_NAMES: Record<string, string> = {
   job_source: "Job source",
   ai: "AI scoring",
   email: "E-mail",
-  n8n: "n8n workflows",
 };

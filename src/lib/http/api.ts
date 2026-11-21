@@ -7,7 +7,6 @@ import { resolveSession, SESSION_COOKIE, type SessionUser } from "@/lib/auth/ses
 import { env } from "@/lib/configuration/env";
 import { getDb, type Database } from "@/lib/database/client";
 import { childLogger } from "@/lib/logging/logger";
-import { SIGNATURE_HEADER, verifySignature } from "@/lib/security/hmac";
 import { isAllowedRequestOrigin } from "@/lib/security/origin";
 import { enforceRateLimit, RATE_LIMITS } from "@/lib/security/rate-limit";
 import { InvalidTransitionError } from "@/lib/state-machine";
@@ -28,9 +27,6 @@ interface BaseContext {
 export interface UserContext extends BaseContext {
   actor: Actor;
   user: SessionUser;
-}
-export interface InternalContext extends BaseContext {
-  rawBody: string;
 }
 
 type RouteContext = { params: Promise<Params> };
@@ -74,18 +70,6 @@ export function tokenRoute(minRole: UserRole, handler: Handler<UserContext & { t
     requireRole(actor, minRole);
     const user = { id: resolved.userId, email: "", name: null, role: resolved.role, sessionId: "" };
     return handler({ req, params, requestId, db, actor, user, tokenId: resolved.tokenId });
-  });
-}
-
-/** Server-to-server route signed with INTERNAL_API_SECRET (used by n8n). */
-export function internalRoute(handler: Handler<InternalContext>) {
-  return wrap(async (req, params, requestId, db) => {
-    const secret = env().INTERNAL_API_SECRET;
-    if (!secret) throw new AppError("INTEGRATION_NOT_CONFIGURED", "Internal API is not configured");
-    const rawBody = await readBody(req);
-    const check = verifySignature(secret, rawBody, req.headers.get(SIGNATURE_HEADER));
-    if (!check.ok) throw new AppError("INVALID_SIGNATURE", "Invalid request signature");
-    return handler({ req, params, requestId, db, rawBody });
   });
 }
 
@@ -144,7 +128,7 @@ export function errorResponse(error: unknown, requestId: string, req?: NextReque
 // Input helpers
 // ---------------------------------------------------------------------------
 
-export async function readBody(req: NextRequest): Promise<string> {
+async function readBody(req: NextRequest): Promise<string> {
   const length = Number(req.headers.get("content-length") ?? "0");
   if (length > MAX_BODY_BYTES) throw new AppError("VALIDATION_ERROR", "Request body too large");
   const text = await req.text();
@@ -156,7 +140,7 @@ export async function parseJson<S extends z.ZodType>(req: NextRequest, schema: S
   return parseJsonText(await readBody(req), schema);
 }
 
-export function parseJsonText<S extends z.ZodType>(text: string, schema: S): z.output<S> {
+function parseJsonText<S extends z.ZodType>(text: string, schema: S): z.output<S> {
   let value: unknown = {};
   if (text.trim().length > 0) {
     try {

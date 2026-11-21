@@ -74,7 +74,7 @@ export async function finalizeStep(ctx: RunContext): Promise<StageResponse> {
 }
 
 /**
- * Marks a run FAILED (from the n8n error workflow or the in-process runner).
+ * Marks a run FAILED (from the in-process runner).
  * All successfully processed jobs, qualifications and notifications are kept.
  */
 export async function failRun(

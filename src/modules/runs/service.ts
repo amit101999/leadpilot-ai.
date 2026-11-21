@@ -1,6 +1,5 @@
 import { and, asc, desc, eq, gte, inArray, lte, sql, type SQL } from "drizzle-orm";
 import { ownerFilter, requireRole, type Actor } from "@/lib/auth/authorization";
-import { env } from "@/lib/configuration/env";
 import type { Database } from "@/lib/database/client";
 import { agentRuns, runStages, searchProfiles } from "@/lib/database/schema";
 import { AppError, isUniqueViolation, notFound } from "@/lib/http/errors";
@@ -12,7 +11,7 @@ import { getCurrentVersion, getProfile } from "@/modules/profiles/service";
 import type { Providers } from "@/modules/providers";
 import { RUN_STAGES, type RunStatus } from "@/types/domain";
 import { computeRunCounters, transitionRun, type RunRow } from "./engine/context";
-import { dispatchRun, type ExecutorKind } from "./executor";
+import { dispatchRun } from "./executor";
 import { buildSnapshot } from "./snapshot";
 import { RUN_TRANSITIONS } from "./transitions";
 
@@ -38,7 +37,8 @@ export async function createRun(
   const existing = await findByIdempotencyKey(db, actor.id, input.idempotencyKey);
   if (existing) return reuse(existing, input.profileId);
 
-  const executor: ExecutorKind = env().RUN_EXECUTOR;
+  // Runs execute inside the app (see ./executor); recorded on each run for its history.
+  const executor = "inprocess";
   let run: RunRow;
   try {
     run = await db.transaction(async (tx) => {
@@ -86,7 +86,7 @@ export async function createRun(
     throw error;
   }
 
-  const dispatched = await dispatch(run.id, executor);
+  const dispatched = await dispatch(run.id);
   if (!dispatched.ok) {
     const failed = await transitionRun(db, run.id, "FAILED", {
       finishedAt: new Date(),
@@ -263,7 +263,7 @@ export async function resumeRun(db: Database, actor: Actor, id: string, requestI
   if (run.leaseExpiresAt && run.leaseExpiresAt.getTime() > Date.now()) {
     throw new AppError("LEASE_HELD", "The run is still being processed; try again after its lease expires");
   }
-  const dispatched = await dispatchRun(id, run.executor as ExecutorKind);
+  const dispatched = await dispatchRun(id);
   if (!dispatched.ok) throw new AppError("EXECUTOR_UNAVAILABLE", dispatched.error);
   await recordAudit(db, {
     actor: userActor(actor.id),

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { centsToString, convertCents, formatMoney, toCents } from "@/lib/money/decimal";
 import { escapeCsvCell, toCsv } from "@/lib/security/csv";
-import { signPayload, verifySignature } from "@/lib/security/hmac";
 import { sanitizeErrorMessage } from "@/lib/security/sanitize";
 import { isSafeLinkHref, validateJobUrl } from "@/lib/security/url";
 import { allowedFrom, assertTransition, canTransition } from "@/lib/state-machine";
@@ -44,19 +43,6 @@ describe("state machines", () => {
     expect(allowedFrom(NOTIFICATION_TRANSITIONS, "SENDING").sort()).toEqual(
       ["FAILED_RETRYABLE", "RESERVED", "UNCERTAIN"].sort(),
     );
-  });
-});
-
-describe("HMAC signing", () => {
-  const secret = "s".repeat(40);
-  it("verifies a fresh signature and rejects tampering, staleness and missing headers", () => {
-    const header = signPayload(secret, '{"a":1}', 1_000_000);
-    expect(verifySignature(secret, '{"a":1}', header, 1_000_010).ok).toBe(true);
-    expect(verifySignature(secret, '{"a":2}', header, 1_000_010).ok).toBe(false);
-    expect(verifySignature(secret, '{"a":1}', header, 1_000_000 + 301).ok).toBe(false);
-    expect(verifySignature("other".repeat(10), '{"a":1}', header, 1_000_010).ok).toBe(false);
-    expect(verifySignature(secret, "{}", null).ok).toBe(false);
-    expect(verifySignature(secret, "{}", "garbage").ok).toBe(false);
   });
 });
 

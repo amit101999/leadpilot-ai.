@@ -238,8 +238,6 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
               <dd>
                 Prompt {snapshot.data.promptVersion}, rubric {snapshot.data.rubricVersion}
               </dd>
-              <dt className="text-muted">Executor</dt>
-              <dd>{snapshot.data.executor === "n8n" ? "n8n workflow" : "In-process"}</dd>
             </dl>
           </>
         ) : (

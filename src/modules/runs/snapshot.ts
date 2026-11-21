@@ -28,7 +28,8 @@ export const runSnapshotSchema = z.object({
   }),
   promptVersion: z.string(),
   rubricVersion: z.string(),
-  executor: z.enum(["n8n", "inprocess"]),
+  /** "inprocess"; snapshots from before n8n was removed may say "n8n". */
+  executor: z.string(),
   createdAt: z.string(),
 });
 export type RunSnapshot = z.infer<typeof runSnapshotSchema>;

@@ -56,7 +56,6 @@ export default defineConfig({
       ALLOW_MOCK_PROVIDERS: "true",
       EMAIL_PROVIDER: "mock",
       JOB_SOURCE_PROVIDER: "mock",
-      RUN_EXECUTOR: "inprocess",
       LOG_LEVEL: "warn",
     },
   },

@@ -432,7 +432,7 @@ export async function commitJobs(
       runId = run.id;
       await db.update(importBatches).set({ runId }).where(eq(importBatches.id, batch.id));
       if (run.status === "FAILED") {
-        // The run could not start (e.g. n8n unreachable); the jobs stay queued for the next sync or run.
+        // The run could not start; the jobs stay queued for the next sync or run.
         status = "FAILED";
         error =
           (run.errorSummary as { message?: string } | null)?.message ?? "The import run could not start";

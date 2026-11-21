@@ -26,11 +26,6 @@ const envSchema = z.object({
   ADMIN_PASSWORD: optionalString.pipe(z.string().min(8, "must be at least 8 characters").max(256).optional()),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
 
-  RUN_EXECUTOR: z.enum(["n8n", "inprocess"]).default("inprocess"),
-  N8N_BASE_URL: optionalString,
-  N8N_WEBHOOK_PATH: z.string().default("/webhook/leadpilot-run"),
-  N8N_WEBHOOK_SECRET: optionalString,
-  INTERNAL_API_SECRET: optionalString,
   RUN_LEASE_SECONDS: z.coerce.number().int().min(30).max(3600).default(300),
   AI_BATCH_SIZE: z.coerce.number().int().min(1).max(50).default(5),
   AI_CONCURRENCY: z.coerce.number().int().min(1).max(10).default(2),
