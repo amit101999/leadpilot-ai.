@@ -61,6 +61,7 @@ export async function listJobs(db: Database, actor: Actor, f: JobListFilters) {
              join agent_runs r2 on r2.id = n.run_id
              join search_profiles p2 on p2.id = r2.profile_id
              where n.job_id = j.id and n.status = 'SENT' and ${scopeCondition(owner, "p2")}
+               ${f.profileId ? sql`and r2.profile_id = ${f.profileId}` : sql``}
            ) as notified
     from latest l
     join jobs j on j.id = l.job_id
@@ -123,7 +124,7 @@ export interface LeadListFilters {
   offset: number;
   pageSize: number;
   profileId?: string;
-  decision?: QualificationDecision[];
+  decision?: (QualificationDecision | "any")[];
   budgetMin?: string;
   budgetMax?: string;
   scoreMin?: number;
@@ -147,7 +148,10 @@ const LEAD_SORT: Record<NonNullable<LeadListFilters["sort"]>, string> = {
 
 export async function listLeads(db: Database, actor: Actor, f: LeadListFilters) {
   const owner = ownerFilter(actor);
-  const decisions = f.decision?.length ? f.decision : (["QUALIFIED"] as QualificationDecision[]);
+  // No decision filter means QUALIFIED (the Leads page's purpose); "any" lifts the filter.
+  const anyDecision = f.decision?.includes("any") ?? false;
+  const decisions = (f.decision ?? []).filter((d): d is QualificationDecision => d !== "any");
+  if (!anyDecision && decisions.length === 0) decisions.push("QUALIFIED");
   const notificationStatuses = (f.notificationStatus ?? []).filter((s) => s !== "NONE");
   const base = sql`
     with latest as (
@@ -170,14 +174,17 @@ export async function listLeads(db: Database, actor: Actor, f: LeadListFilters) 
       join agent_runs r3 on r3.id = n.run_id
       join search_profiles p3 on p3.id = r3.profile_id
       where n.job_id = j.id and ${scopeCondition(owner, "p3")}
+        ${f.profileId ? sql`and r3.profile_id = ${f.profileId}` : sql``}
       order by n.updated_at desc limit 1
     ) n on true`;
 
   const filters = whereAll([
-    sql`l.decision in (${sql.join(
-      decisions.map((d) => sql`${d}`),
-      sql`, `,
-    )})`,
+    anyDecision
+      ? undefined
+      : sql`l.decision in (${sql.join(
+          decisions.map((d) => sql`${d}`),
+          sql`, `,
+        )})`,
     f.budgetMin ? sql`j.budget_amount >= ${f.budgetMin}::numeric` : undefined,
     f.budgetMax ? sql`j.budget_amount <= ${f.budgetMax}::numeric` : undefined,
     f.scoreMin !== undefined ? sql`l.score >= ${f.scoreMin}` : undefined,

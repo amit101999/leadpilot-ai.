@@ -16,17 +16,9 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const { actor } = await requireUser();
   const db = getDb();
   const raw = await searchParams;
-  // No status filter means "qualified" (the page's purpose); "any" lifts the filter.
-  const anyDecision = raw.decision === "any";
-  const query = parseSearchParams(leadListQuery, anyDecision ? { ...raw, decision: undefined } : raw);
-  const filters = {
-    ...query,
-    decision: anyDecision
-      ? undefined
-      : query.decision?.length
-        ? query.decision
-        : (["QUALIFIED"] as const).slice(),
-  };
+  // No status filter means "qualified" (the page's purpose); "any" lifts it. The same value goes to the export.
+  const query = parseSearchParams(leadListQuery, raw);
+  const filters = { ...query, decision: query.decision?.length ? query.decision : ["QUALIFIED" as const] };
   const page = resolvePagination(query);
   const [{ items, total }, profiles] = await Promise.all([
     listLeads(db, actor, { ...filters, ...page }),

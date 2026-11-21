@@ -9,7 +9,8 @@ const amount = q.string(20).refine((v) => v === undefined || isDecimalString(v),
 export const leadListQuery = z.object({
   ...paginationQuery,
   profileId: q.uuid(),
-  decision: q.enumList(qualificationDecision.enumValues),
+  /** Default: QUALIFIED only. "any" lifts the filter. */
+  decision: q.enumList([...qualificationDecision.enumValues, "any"] as const),
   budgetMin: amount,
   budgetMax: amount,
   scoreMin: q.int(0, 100),

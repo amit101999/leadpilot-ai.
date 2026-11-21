@@ -26,6 +26,7 @@ import { defaultProfileConfig } from "@/modules/profiles/config-schema";
 import { getProviders } from "@/modules/providers";
 import { failRun, runInProcess, runStep } from "@/modules/runs/engine";
 import { call, createUser, type TestUser } from "./helpers";
+import { listLeads } from "@/modules/jobs/queries";
 
 async function newRun(user: TestUser) {
   const profile = await call(createProfile, {
@@ -185,6 +186,19 @@ describe("dashboard, exports and audit", () => {
     const theirs = await call(dashboard, { user: stranger });
     expect(theirs.json.data.totals.runs).toBe(0);
     expect(theirs.json.data.recentRuns).toHaveLength(0);
+  });
+
+  it("lists only qualified leads by default, and every decision with decision=any", async () => {
+    const user = await createUser("OPERATOR");
+    const runId = await newRun(user);
+    await runInProcess(getDb(), getProviders(), runId, { sleep: async () => {} });
+    const actor = { id: user.id, role: user.role };
+    const page = { offset: 0, pageSize: 100 };
+    const qualified = await listLeads(getDb(), actor, page);
+    const all = await listLeads(getDb(), actor, { ...page, decision: ["any"] });
+    expect(qualified.items.every((l) => l.decision === "QUALIFIED")).toBe(true);
+    expect(new Set(all.items.map((l) => l.decision)).size).toBeGreaterThan(1);
+    expect(all.total).toBeGreaterThan(qualified.total);
   });
 
   it("exports CSV with the same filters, a truncation flag and formula-injection protection", async () => {

@@ -229,10 +229,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               ],
               ["Client rating", job.clientRating ?? "Unknown"],
               ["Client hires", job.clientHires ?? "Unknown"],
-              [
-                "Client spend",
-                job.clientTotalSpent ? formatMoney(job.clientTotalSpent, job.currency) : "Unknown",
-              ],
+              ["Client spend", job.clientTotalSpent ? formatMoney(job.clientTotalSpent, "USD") : "Unknown"],
               ["Client country", job.clientCountry ?? "Unknown"],
               [
                 "Skills",
