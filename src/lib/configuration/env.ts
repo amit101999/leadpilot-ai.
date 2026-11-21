@@ -61,18 +61,9 @@ const envSchema = z.object({
 
   /**
    * Where runs get jobs: "import" = only jobs delivered by the Upwork sync (Claude + Upwork connector) through the
-   * import API; "upwork" = the official Upwork API (blocked until a key is approved); "mock" = demo jobs (dev/tests).
+   * import API; "mock" = demo jobs (dev/tests).
    */
-  JOB_SOURCE_PROVIDER: z.enum(["mock", "upwork", "import"]).default("mock"),
-  JOB_SOURCE_API_BASE_URL: optionalString,
-  JOB_SOURCE_API_KEY: optionalString,
-  UPWORK_CLIENT_ID: optionalString,
-  UPWORK_CLIENT_SECRET: optionalString,
-  /** Must be set explicitly once Upwork has granted job-search access. */
-  UPWORK_JOB_SEARCH_SCOPE_CONFIRMED: z
-    .enum(["true", "false"])
-    .default("false")
-    .transform((v) => v === "true"),
+  JOB_SOURCE_PROVIDER: z.enum(["mock", "import"]).default("mock"),
   MOCK_SOURCE_SCENARIO: z.string().default("default"),
 
   /** Lets a production build run with mock AI or e-mail (e2e tests, or a deliberate trial before keys exist). */

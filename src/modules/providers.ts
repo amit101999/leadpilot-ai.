@@ -5,7 +5,6 @@ import { OpenAiEvaluator } from "@/modules/ai/openai-evaluator";
 import { ImportJobSourceProvider } from "@/modules/job-sources/import-provider";
 import { MockJobSourceProvider } from "@/modules/job-sources/mock-provider";
 import type { JobSourceProvider } from "@/modules/job-sources/types";
-import { UpworkJobSourceProvider } from "@/modules/job-sources/upwork-provider";
 import type { EmailProvider } from "@/modules/notifications/email-provider";
 import { BrevoEmailProvider } from "@/modules/notifications/brevo-email";
 import { MockEmailProvider } from "@/modules/notifications/mock-email";
@@ -44,11 +43,6 @@ export function getProviders(): Providers {
 /** "import": every run (manual or started by an import) processes only the jobs the Upwork sync staged for it. */
 function createJobSource(config: ReturnType<typeof env>): JobSourceProvider {
   switch (config.JOB_SOURCE_PROVIDER) {
-    case "upwork":
-      return new UpworkJobSourceProvider(
-        { clientId: config.UPWORK_CLIENT_ID, clientSecret: config.UPWORK_CLIENT_SECRET },
-        config.UPWORK_JOB_SEARCH_SCOPE_CONFIRMED,
-      );
     case "import":
       return new ImportJobSourceProvider();
     default:

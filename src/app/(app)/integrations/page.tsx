@@ -15,9 +15,6 @@ import { getProviders } from "@/modules/providers";
 
 export const metadata: Metadata = { title: "Integrations" };
 
-const UPWORK_API_KEY_URL =
-  "https://support.upwork.com/hc/en-us/articles/115015857647-How-to-request-an-API-key-from-Upwork";
-
 function Vars({ names }: { names: string[] }) {
   return (
     <span className="inline-flex flex-wrap gap-1 align-middle">
@@ -68,29 +65,7 @@ export default async function IntegrationsPage() {
         </>
       ) : (
         <>
-          <p>
-            Live Upwork search is <strong>blocked</strong> until Upwork approves an API key with job-search
-            access and the adapter is verified against that access. LeadPilot never scrapes Upwork pages or
-            reuses browser sessions. Until then runs use the mock source.
-          </p>
-          <p className="mt-1">
-            Request a key on{" "}
-            <a
-              href={UPWORK_API_KEY_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-accent hover:underline"
-            >
-              Upwork&apos;s API key page
-            </a>
-            , then set <Vars names={["JOB_SOURCE_PROVIDER", "UPWORK_CLIENT_ID", "UPWORK_CLIENT_SECRET"]} />{" "}
-            and, only once job-search access is granted,{" "}
-            <Vars names={["UPWORK_JOB_SEARCH_SCOPE_CONFIRMED"]} />.
-          </p>
-          <p className="mt-1">
-            Meanwhile, the Upwork sync agent (Claude with Upwork&apos;s official connector) can import jobs
-            through an import token from Settings. See <code className="text-xs">docs/upwork-sync.md</code>.
-          </p>
+          <p>Demo jobs for development and tests (not used in production).</p>
         </>
       ),
     },

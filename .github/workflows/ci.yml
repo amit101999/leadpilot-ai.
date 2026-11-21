@@ -135,4 +135,3 @@ jobs:
           # Placeholder only: `config` checks syntax and required variables; nothing is started.
           POSTGRES_PASSWORD: placeholder
         run: docker compose -f docker-compose.yml config --quiet
-
