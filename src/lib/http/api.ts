@@ -73,7 +73,7 @@ export function tokenRoute(minRole: UserRole, handler: Handler<UserContext & { t
   });
 }
 
-/** Unauthenticated route (login, health, provider webhooks that verify their own signatures). */
+/** Unauthenticated route (login, logout, health). */
 export function publicRoute(handler: Handler<BaseContext>) {
   return wrap((req, params, requestId, db) => handler({ req, params, requestId, db }));
 }
@@ -131,9 +131,10 @@ export function errorResponse(error: unknown, requestId: string, req?: NextReque
 async function readBody(req: NextRequest): Promise<string> {
   const length = Number(req.headers.get("content-length") ?? "0");
   if (length > MAX_BODY_BYTES) throw new AppError("VALIDATION_ERROR", "Request body too large");
-  const text = await req.text();
-  if (text.length > MAX_BODY_BYTES) throw new AppError("VALIDATION_ERROR", "Request body too large");
-  return text;
+  // Content-Length may be missing (chunked upload), so the size is checked again in bytes after reading.
+  const bytes = await req.arrayBuffer();
+  if (bytes.byteLength > MAX_BODY_BYTES) throw new AppError("VALIDATION_ERROR", "Request body too large");
+  return new TextDecoder().decode(bytes);
 }
 
 export async function parseJson<S extends z.ZodType>(req: NextRequest, schema: S): Promise<z.output<S>> {

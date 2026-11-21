@@ -24,8 +24,7 @@ const STEPS = {
 } satisfies Record<StageStep, unknown>;
 
 /**
- * Executes one pipeline step for a run. This is the single entry point used
- * by both executors (n8n via the internal HTTP API, and the in-process runner).
+ * Executes one pipeline step for a run. The in-process runner calls it for each stage.
  */
 export async function runStep(
   db: Database,

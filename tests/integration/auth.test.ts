@@ -89,6 +89,12 @@ describe("auth API", () => {
     const res = await call(logout, { method: "POST", user });
     expect(res.status).toBe(200);
     expect((await call(me, { user })).status).toBe(401);
+    // The cookie is cleared with the attributes it was set with (a `__Host-` cookie needs them to be replaced).
+    const cleared = res.headers.get("set-cookie") ?? "";
+    expect(cleared).toMatch(/Max-Age=0/i);
+    expect(cleared).toMatch(/Path=\//i);
+    expect(cleared).toMatch(/HttpOnly/i);
+    expect(cleared).toMatch(/SameSite=lax/i);
   });
 
   it("purges expired sessions on the next successful login", async () => {
