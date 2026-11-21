@@ -171,6 +171,15 @@ describe("dashboard, exports and audit", () => {
     expect(mine.json.data.daily.at(-1).runs).toBe(1);
     expect(mine.json.data.daily[0].day).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(mine.json.data.integrations).toHaveLength(4);
+    // "Active" means the one profile synced from Upwork, not every profile that is not archived.
+    expect(mine.json.data.totals.activeProfiles).toBe(1);
+    const second = await call(createProfile, {
+      method: "POST",
+      user,
+      body: { name: "Second profile", configuration: defaultProfileConfig(null) },
+    });
+    expect(second.status).toBe(200);
+    expect((await call(dashboard, { user })).json.data.totals.activeProfiles).toBe(1);
 
     const stranger = await createUser("OPERATOR");
     const theirs = await call(dashboard, { user: stranger });

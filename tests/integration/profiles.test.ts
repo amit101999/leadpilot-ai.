@@ -51,6 +51,19 @@ describe("profiles API", () => {
     expect(history.json.data.map((v: { versionNumber: number }) => v.versionNumber).sort()).toEqual([1, 2]);
   });
 
+  it("does not create a version when nothing changed (the stored JSON has another key order)", async () => {
+    const user = await createUser("OPERATOR");
+    const profile = await newProfile(user);
+    for (const body of [
+      { expectedVersion: 1, configuration: defaultProfileConfig(null) },
+      { expectedVersion: 1, name: "Web & Zoho Development" },
+    ]) {
+      const res = await call(patchProfile, { method: "PATCH", user, params: { id: profile.id }, body });
+      expect(res.status).toBe(200);
+      expect(res.json.data.currentVersion).toBe(1);
+    }
+  });
+
   it("rejects a stale save with 409 VERSION_CONFLICT (optimistic locking)", async () => {
     const user = await createUser("OPERATOR");
     const profile = await newProfile(user);

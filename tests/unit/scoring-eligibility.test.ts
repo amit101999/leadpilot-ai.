@@ -157,6 +157,14 @@ describe("profile configuration validation", () => {
     expect(profileConfigSchema.safeParse(config).success).toBe(true);
   });
 
+  it("ignores the old per-profile sync switch when keywords are empty (nothing reads it any more)", () => {
+    const old = structuredClone(config);
+    old.search.keywords = [];
+    old.search.keywordCoveragePercent = null;
+    old.search.upworkSync.enabled = true;
+    expect(profileConfigSchema.safeParse(old).success).toBe(true);
+  });
+
   it("rejects weights not summing to 100, inverted budgets and include/exclude overlap", () => {
     const bad = structuredClone(config);
     bad.ai.weights.scopeFit = 26;

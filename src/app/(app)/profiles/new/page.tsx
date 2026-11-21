@@ -15,7 +15,8 @@ export const metadata: Metadata = { title: "New search profile" };
 export default async function NewProfilePage() {
   const { actor } = await requireUser();
   if (!hasRole(actor, "OPERATOR")) notFound();
-  const recipients = toRecipientOptions(await listRecipients(getDb(), actor));
+  // A new profile belongs to the actor, so only the actor's own recipients can be chosen (also for an ADMIN).
+  const recipients = toRecipientOptions(await listRecipients(getDb(), actor, false, actor.id));
   // Start from the initial business defaults (editable); e-mail alerts start off until a recipient is chosen.
   const configuration = defaultProfileConfig(null);
 

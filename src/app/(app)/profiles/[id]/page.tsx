@@ -34,7 +34,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
   }
   const [versionRows, recipientViews, syncOverviews] = await Promise.all([
     listVersionsWithAuthors(db, actor, profile.id),
-    listRecipients(db, actor, true),
+    listRecipients(db, actor, true, profile.ownerUserId),
     listSyncOverviews(db, actor, [profile.id]),
   ]);
   const syncOverview = syncOverviews.get(profile.id);

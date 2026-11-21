@@ -1,4 +1,5 @@
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { isDeepStrictEqual } from "node:util";
 import { ownerFilter, requireRole, type Actor } from "@/lib/auth/authorization";
 import type { Database, DbExecutor } from "@/lib/database/client";
 import { notificationRecipients, profileVersions, searchProfiles, users } from "@/lib/database/schema";
@@ -177,7 +178,8 @@ export async function updateProfile(
     const unchanged =
       next.name === current.name &&
       next.description === current.description &&
-      JSON.stringify(next.configuration) === JSON.stringify(current.configuration);
+      // Postgres JSONB reorders object keys, so compare the parsed values, not their JSON text.
+      isDeepStrictEqual(next.configuration, parseStoredConfig(current.configuration));
     if (unchanged) return current;
 
     const version = current.currentVersion + 1;
@@ -343,11 +345,18 @@ export async function getCurrentVersion(tx: DbExecutor, profile: ProfileRow): Pr
   return version;
 }
 
+/** Profiles that are synced from Upwork (the "active" flag; one per user). Archived profiles are never active. */
 export async function countActiveProfiles(db: Database, actor: Actor): Promise<number> {
   const owner = ownerFilter(actor);
   const [row] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(searchProfiles)
-    .where(and(isNull(searchProfiles.archivedAt), owner ? eq(searchProfiles.ownerUserId, owner) : undefined));
+    .where(
+      and(
+        eq(searchProfiles.active, true),
+        isNull(searchProfiles.archivedAt),
+        owner ? eq(searchProfiles.ownerUserId, owner) : undefined,
+      ),
+    );
   return row?.count ?? 0;
 }

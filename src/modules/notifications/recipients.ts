@@ -45,9 +45,17 @@ function scoped(actor: Actor, id: string) {
     : eq(notificationRecipients.id, id);
 }
 
-/** The actor's e-mail recipients. */
-export async function listRecipients(db: Database, actor: Actor, includeArchived = false) {
-  const owner = ownerFilter(actor);
+/**
+ * The actor's e-mail recipients (an ADMIN sees everyone's). `ownerUserId` narrows the list to one owner, e.g. the
+ * owner of a profile, whose recipients are the only ones that profile can use.
+ */
+export async function listRecipients(
+  db: Database,
+  actor: Actor,
+  includeArchived = false,
+  ownerUserId?: string,
+) {
+  const owner = ownerFilter(actor) ?? ownerUserId;
   const rows = await db
     .select()
     .from(notificationRecipients)

@@ -284,13 +284,6 @@ export const profileConfigSchema = z
           message: "Add keywords or turn the coverage rule off",
         });
       }
-      if (search.upworkSync.enabled) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["search", "keywords"],
-          message: "Add at least one keyword for the Upwork sync to search",
-        });
-      }
     }
   });
 

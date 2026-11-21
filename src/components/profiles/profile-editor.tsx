@@ -16,6 +16,7 @@ import { Tabs } from "@/components/ui/tabs";
 import { ApiError, apiFetch } from "@/lib/http/client";
 import { profileConfigSchema, type ProfileConfig } from "@/modules/profiles/config-schema";
 import { CombinationEditor, RatesEditor, SkillListEditor } from "./list-editors";
+import { withAvailableRecipient } from "./recipient-options";
 
 const editorSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters").max(120),
@@ -66,6 +67,10 @@ export function ProfileEditor({
   const [conflict, setConflict] = useState<number | null>(null);
   /** Set when the user chose to discard changes, so the unsaved-changes guard does not ask again. */
   const leavingRef = useRef(false);
+  const { configuration: startingConfiguration, recipientUnavailable } = withAvailableRecipient(
+    profile?.configuration ?? initialConfiguration,
+    recipients,
+  );
   const form = useForm<EditorInput, unknown, EditorOutput>({
     resolver: zodResolver(editorSchema),
     mode: "onChange",
@@ -73,7 +78,7 @@ export function ProfileEditor({
       name: profile?.name ?? "",
       description: profile?.description ?? "",
       changeNote: "",
-      configuration: profile?.configuration ?? initialConfiguration,
+      configuration: startingConfiguration,
     },
   });
   const {
@@ -775,9 +780,11 @@ export function ProfileEditor({
             id={id("emailRecipient")}
             label="E-mail recipient"
             hint={
-              emailOptions.length === 0
-                ? "No e-mail recipient with confirmed opt-in yet. Add one in Settings."
-                : "Only recipients who agreed to receive alert e-mails are listed."
+              recipientUnavailable
+                ? "The recipient saved on this profile was archived or its opt-in removed. Choose another one, or turn e-mail alerts off."
+                : emailOptions.length === 0
+                  ? "No e-mail recipient with confirmed opt-in yet. Add one in Settings."
+                  : "Only recipients who agreed to receive alert e-mails are listed."
             }
             error={err("notifications", "emailRecipientId")}
           >
