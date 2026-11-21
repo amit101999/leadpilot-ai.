@@ -140,7 +140,7 @@ describe("integrations", () => {
       body: { recipientId: ok.json.data.id },
     });
     expect(sent.status).toBe(200);
-    expect(sent.json.data).toMatchObject({ status: "ACCEPTED", isMock: true });
+    expect(sent.json.data).toMatchObject({ status: "ACCEPTED", provider: "mock" });
     const audit = await getDb().select().from(auditTable).where(eq(auditTable.entityId, ok.json.data.id));
     expect(audit.some((a) => a.action === "email.test_message")).toBe(true);
 

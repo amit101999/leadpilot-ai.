@@ -13,8 +13,8 @@ import { POST as createRun } from "@/app/api/runs/route";
 import { getDb } from "@/lib/database/client";
 import { agentRuns, notifications } from "@/lib/database/schema";
 import { defaultProfileConfig } from "@/modules/profiles/config-schema";
-import { MockJobSourceProvider } from "@/modules/job-sources/mock-provider";
-import type { MockEmailProvider } from "@/modules/notifications/mock-email";
+import { MockJobSourceProvider } from "../fakes/mock-job-source";
+import type { MockEmailProvider } from "../fakes/mock-email";
 import { getProviders, setProvidersForTesting } from "@/modules/providers";
 import { runInProcess } from "@/modules/runs/engine";
 import { call, createUser, type TestUser } from "./helpers";
@@ -47,7 +47,7 @@ async function addProfile(user: TestUser, recipientId: string, maxPerRun: number
   return profile.json.data.id as string;
 }
 
-/** Switches the job source to one of the scripted mock feeds (src/modules/job-sources/mock-fixtures.ts). */
+/** Switches the job source to one of the scripted mock feeds (tests/fakes/mock-fixtures.ts). */
 function useScenario(scenario: string) {
   setProvidersForTesting({ ...getProviders(), jobSource: new MockJobSourceProvider(scenario) });
 }

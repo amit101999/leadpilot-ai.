@@ -31,13 +31,12 @@ const envSchema = z.object({
   AI_CONCURRENCY: z.coerce.number().int().min(1).max(10).default(2),
   NOTIFY_BATCH_SIZE: z.coerce.number().int().min(1).max(50).default(5),
 
-  AI_PROVIDER: z.enum(["mock", "openai"]).default("mock"),
   OPENAI_API_KEY: optionalString,
   OPENAI_MODEL: optionalString,
   OPENAI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(30000),
 
   /** smtp = any mail server; brevo = Brevo HTTPS API (for hosts that block SMTP ports, e.g. Render free). */
-  EMAIL_PROVIDER: z.enum(["mock", "smtp", "brevo"]).default("mock"),
+  EMAIL_PROVIDER: z.enum(["smtp", "brevo"]).default("smtp"),
   SMTP_HOST: optionalString,
   SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
   /** "true" = TLS from the first byte (usually port 465); "false" = STARTTLS when the server offers it. */
@@ -58,25 +57,9 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((v) => v === "true"),
-
-  /**
-   * Where runs get jobs: "import" = only jobs delivered by the Upwork sync (Claude + Upwork connector) through the
-   * import API; "mock" = demo jobs (dev/tests).
-   */
-  JOB_SOURCE_PROVIDER: z.enum(["mock", "import"]).default("mock"),
-  MOCK_SOURCE_SCENARIO: z.string().default("default"),
-
-  /** Lets a production build run with mock AI or e-mail (e2e tests, or a deliberate trial before keys exist). */
-  ALLOW_MOCK_PROVIDERS: z
-    .enum(["true", "false"])
-    .default("false")
-    .transform((v) => v === "true"),
 });
 
-/**
- * Fails closed in production: a forgotten setting must not quietly turn into fake scores or e-mails that
- * are never sent. The app then fails its health check, so a deploy stops with this message in the logs.
- */
+/** Settings that are only valid together. A mistake fails the start-up, naming the settings. */
 const envSchemaWithGuards = envSchema.superRefine((config, ctx) => {
   if (Boolean(config.ADMIN_USERNAME) !== Boolean(config.ADMIN_PASSWORD)) {
     ctx.addIssue({
@@ -84,17 +67,6 @@ const envSchemaWithGuards = envSchema.superRefine((config, ctx) => {
       path: [config.ADMIN_USERNAME ? "ADMIN_PASSWORD" : "ADMIN_USERNAME"],
       message: "ADMIN_USERNAME and ADMIN_PASSWORD must be set together",
     });
-  }
-  if (config.NODE_ENV !== "production" || config.ALLOW_MOCK_PROVIDERS) return;
-  for (const name of ["AI_PROVIDER", "EMAIL_PROVIDER"] as const) {
-    if (config[name] === "mock") {
-      ctx.addIssue({
-        code: "custom",
-        path: [name],
-        message:
-          "is 'mock' in production; set the real provider, or ALLOW_MOCK_PROVIDERS=true to run with mocks",
-      });
-    }
   }
 });
 

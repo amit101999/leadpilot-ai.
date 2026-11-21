@@ -20,42 +20,15 @@ afterEach(() => {
   resetEnvCache();
 });
 
-describe("mock providers in production", () => {
-  it("refuses mock AI or e-mail in production", () => {
-    expect(() => load({ NODE_ENV: "production", AI_PROVIDER: "openai", EMAIL_PROVIDER: "mock" })).toThrow(
-      /EMAIL_PROVIDER: is 'mock' in production/,
-    );
-    expect(() => load({ NODE_ENV: "production", AI_PROVIDER: "mock", EMAIL_PROVIDER: "smtp" })).toThrow(
-      /AI_PROVIDER: is 'mock' in production/,
-    );
+describe("providers have no fake option", () => {
+  it("offers SMTP or Brevo for e-mail, never mock", () => {
+    expect(load({}).EMAIL_PROVIDER).toBe("smtp");
+    expect(load({ EMAIL_PROVIDER: "brevo" }).EMAIL_PROVIDER).toBe("brevo");
+    expect(() => load({ EMAIL_PROVIDER: "mock" })).toThrow(/EMAIL_PROVIDER/);
   });
 
-  it("refuses the defaults in production, naming both settings", () => {
-    expect(() => load({ NODE_ENV: "production" })).toThrow(/AI_PROVIDER.*EMAIL_PROVIDER/);
-  });
-
-  it("accepts mocks in production only with ALLOW_MOCK_PROVIDERS=true", () => {
-    const config = load({ NODE_ENV: "production", ALLOW_MOCK_PROVIDERS: "true" });
-    expect(config.AI_PROVIDER).toBe("mock");
-    expect(config.EMAIL_PROVIDER).toBe("mock");
-  });
-
-  it("accepts real providers in production", () => {
-    const config = load({ NODE_ENV: "production", AI_PROVIDER: "openai", EMAIL_PROVIDER: "smtp" });
-    expect(config.AI_PROVIDER).toBe("openai");
-  });
-
-  it("keeps mocks as the default outside production", () => {
-    expect(load({ NODE_ENV: "development" }).AI_PROVIDER).toBe("mock");
-    expect(load({ NODE_ENV: "test" }).EMAIL_PROVIDER).toBe("mock");
-  });
-});
-
-describe("job source", () => {
-  it("accepts the import-only mode used in production, and defaults to mock", () => {
-    expect(load({ JOB_SOURCE_PROVIDER: "import" }).JOB_SOURCE_PROVIDER).toBe("import");
-    expect(load({}).JOB_SOURCE_PROVIDER).toBe("mock");
-    expect(() => load({ JOB_SOURCE_PROVIDER: "scrape" })).toThrow(/JOB_SOURCE_PROVIDER/);
+  it("starts in production without any provider choice (unconfigured providers report it themselves)", () => {
+    expect(() => load({ NODE_ENV: "production" })).not.toThrow();
   });
 });
 

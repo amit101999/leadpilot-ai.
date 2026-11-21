@@ -21,15 +21,7 @@ interface ShellUser {
   role: UserRole;
 }
 
-export function AppShell({
-  user,
-  demoNotice,
-  children,
-}: {
-  user: ShellUser;
-  demoNotice: string | null;
-  children: ReactNode;
-}) {
+export function AppShell({ user, children }: { user: ShellUser; children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[232px_1fr]">
@@ -62,15 +54,6 @@ export function AppShell({
           </Dialog>
           <span className="text-sm font-semibold">LeadPilot AI</span>
         </div>
-
-        {demoNotice && (
-          <div
-            role="note"
-            className="border-b border-warning/30 bg-warning-soft px-4 py-2 text-[13px] text-warning lg:px-8"
-          >
-            <span className="font-semibold">Demo mode.</span> {demoNotice}
-          </div>
-        )}
 
         <main id="main" className="mx-auto w-full max-w-[1280px] flex-1 px-4 py-6 lg:px-8">
           {children}

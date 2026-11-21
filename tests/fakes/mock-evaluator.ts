@@ -1,6 +1,6 @@
-import type { AiOutput } from "./output-schema";
-import type { AiConnection, AiEvaluator, EvaluationInput } from "./evaluator";
-import { AiProviderError } from "./evaluator";
+import type { AiOutput } from "@/modules/ai/output-schema";
+import type { AiConnection, AiEvaluator, EvaluationInput } from "@/modules/ai/evaluator";
+import { AiProviderError } from "@/modules/ai/evaluator";
 
 /**
  * Deterministic evaluator for development and tests. Makes no network calls.

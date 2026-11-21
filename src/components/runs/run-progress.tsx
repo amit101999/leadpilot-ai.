@@ -110,7 +110,6 @@ export function RunProgress({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {run.sourceProvider === "mock" && <Badge tone="warning">Mock source</Badge>}
           <span aria-live="polite">
             <StatusBadge status={run.status} />
           </span>

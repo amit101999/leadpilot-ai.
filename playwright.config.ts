@@ -50,12 +50,9 @@ export default defineConfig({
       NEXT_DIST_DIR: ".next-e2e",
       DATABASE_URL: testDatabaseUrl,
       APP_BASE_URL: BASE_URL,
-      // Never call real services from tests, whatever .env says.
-      AI_PROVIDER: "mock",
-      // A production build refuses mock providers unless allowed (src/lib/configuration/env.ts).
-      ALLOW_MOCK_PROVIDERS: "true",
-      EMAIL_PROVIDER: "mock",
-      JOB_SOURCE_PROVIDER: "mock",
+      // Never call real services from tests, whatever .env says: the server uses the test fakes
+      // (allowed only because APP_BASE_URL is localhost; see src/instrumentation.ts).
+      E2E_FAKE_PROVIDERS: "1",
       LOG_LEVEL: "warn",
     },
   },

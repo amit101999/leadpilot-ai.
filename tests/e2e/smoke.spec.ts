@@ -36,10 +36,9 @@ test.describe("signed out", () => {
   });
 });
 
-test("starts a run and watches it finish (mock providers)", async ({ page }) => {
+test("starts a run and watches it finish (test fakes)", async ({ page }) => {
   await openApp(page);
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
-  await expect(page.getByRole("note")).toContainText("Demo mode");
 
   await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Run Agent" }).click();
   await expect(page.getByRole("heading", { name: "Run Agent" })).toBeVisible();
@@ -52,7 +51,6 @@ test("starts a run and watches it finish (mock providers)", async ({ page }) => 
 
   await expect(page).toHaveURL(/\/run\/[0-9a-f-]{36}$/);
   await expect(page.getByText("This run has finished")).toBeVisible({ timeout: 90_000 });
-  await expect(page.getByText("Mock source")).toBeVisible();
   const funnel = page.getByRole("list", { name: "Lead funnel" });
   await expect(funnel).toContainText("Discovered");
 

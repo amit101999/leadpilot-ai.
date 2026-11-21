@@ -55,7 +55,6 @@ const columns: ColumnDef<JobRow, unknown>[] = [
           <span>
             {row.original.source}, {row.original.sourceJobId}
           </span>
-          {row.original.source === "mock" && <Badge tone="warning">Mock source</Badge>}
         </div>
       </div>
     ),

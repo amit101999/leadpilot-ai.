@@ -221,5 +221,5 @@ export async function sendTestMessage(
     requestId,
   });
   // "ACCEPTED" means the provider took the request, not that the recipient received it.
-  return { ...result, channel: recipient.channel, provider: provider.id, isMock: provider.isMock };
+  return { ...result, channel: recipient.channel, provider: provider.id };
 }

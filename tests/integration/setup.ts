@@ -1,5 +1,7 @@
 import "dotenv/config";
 import { afterAll, beforeAll } from "vitest";
+import { installTestProviders } from "@/modules/providers";
+import { createFakeProviders } from "../fakes/providers";
 
 /**
  * Integration tests run against a real Postgres database named by
@@ -14,10 +16,9 @@ if (testUrl === process.env.DATABASE_URL) {
 process.env.DATABASE_URL = testUrl;
 process.env.APP_BASE_URL = "http://localhost:3000";
 process.env.LOG_LEVEL = "silent";
-// Never call real services from tests, whatever .env says (it may hold live SMTP or OpenAI settings).
-process.env.AI_PROVIDER = "mock";
-process.env.EMAIL_PROVIDER = "mock";
-process.env.JOB_SOURCE_PROVIDER = "mock";
+// Never call real services from tests, whatever .env says (it may hold live SMTP or OpenAI settings):
+// every test file runs with the fakes as its providers.
+installTestProviders(createFakeProviders());
 
 beforeAll(async () => {
   const { drizzle } = await import("drizzle-orm/postgres-js");

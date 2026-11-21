@@ -29,7 +29,7 @@ import {
   users,
 } from "@/lib/database/schema";
 import { ImportJobSourceProvider } from "@/modules/job-sources/import-provider";
-import type { MockEmailProvider } from "@/modules/notifications/mock-email";
+import type { MockEmailProvider } from "../fakes/mock-email";
 import { defaultProfileConfig, type ProfileConfig } from "@/modules/profiles/config-schema";
 import { getProviders, setProvidersForTesting } from "@/modules/providers";
 import { failRun, runInProcess, runStep } from "@/modules/runs/engine";

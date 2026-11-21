@@ -153,20 +153,13 @@ export default async function IntegrationsPage() {
                   </>
                 )}
                 <dt className="text-muted">Mode</dt>
-                <dd>
-                  {configuration.isMock === true
-                    ? "Mock (no external calls)"
-                    : String(configuration.provider ?? configuration.executor ?? configuration.kind ?? "–")}
-                </dd>
+                <dd>{String(configuration.provider ?? configuration.kind ?? "–")}</dd>
               </dl>
               <div className="flex flex-col gap-3 text-[13px] text-muted">
                 <div>{meta.setup}</div>
                 {status.name === "email" && canTest && (
                   <div className="flex flex-col items-start gap-1">
-                    <TestMessageButton
-                      recipients={toRecipientOptions(recipients)}
-                      isMock={providers.email.isMock}
-                    />
+                    <TestMessageButton recipients={toRecipientOptions(recipients)} />
                   </div>
                 )}
               </div>

@@ -25,7 +25,7 @@ export function TestConnectionButton({ name, label }: { name: string; label: str
             `/api/integrations/${name}/check`,
             { method: "POST" },
           );
-          const ok = result.status === "CONNECTED" || result.status === "MOCK";
+          const ok = result.status === "CONNECTED";
           (ok ? toast.success : toast.warning)(`${label}: ${result.message ?? result.status}`);
           router.refresh();
         } catch (error) {
@@ -44,10 +44,8 @@ export function TestConnectionButton({ name, label }: { name: string; label: str
 /** Sends a test e-mail to an opted-in recipient, after confirmation. */
 export function TestMessageButton({
   recipients,
-  isMock,
 }: {
   recipients: Array<{ id: string; label: string; address: string }>;
-  isMock: boolean;
 }) {
   const selectId = useId();
   const [open, setOpen] = useState(false);
@@ -57,15 +55,13 @@ export function TestMessageButton({
   async function send() {
     setBusy(true);
     try {
-      const result = await apiFetch<{ status: string; error: string | null; isMock: boolean }>(
+      const result = await apiFetch<{ status: string; error: string | null }>(
         "/api/integrations/email/test",
         { method: "POST", body: { recipientId } },
       );
       if (result.status === "ACCEPTED") {
         toast.success(
-          result.isMock
-            ? "Mock provider: the test e-mail was recorded, not sent."
-            : "The mail server accepted the test e-mail. Check the inbox (and spam folder) to confirm it arrived.",
+          "The mail server accepted the test e-mail. Check the inbox (and spam folder) to confirm it arrived.",
         );
         setOpen(false);
       } else {
@@ -90,11 +86,7 @@ export function TestMessageButton({
       <Dialog open={open} onOpenChange={(next) => !busy && setOpen(next)}>
         <DialogContent
           title="Send a test e-mail?"
-          description={
-            isMock
-              ? "E-mail is in mock mode, so nothing is actually sent; the attempt is recorded."
-              : "A short test e-mail will be sent to the recipient below. Limited to 3 per 10 minutes."
-          }
+          description="A short test e-mail will be sent to the recipient below. Limited to 3 per 10 minutes."
         >
           <div className="mb-4 flex flex-col gap-1.5">
             <Label htmlFor={selectId}>Recipient</Label>

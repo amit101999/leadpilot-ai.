@@ -11,7 +11,7 @@ import {
   SearchFilter,
   SelectFilter,
 } from "@/components/table/filters";
-import { Badge, StatusBadge, statusLabel } from "@/components/ui/badge";
+import { StatusBadge, statusLabel } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/panel";
 import { Time } from "@/components/ui/time";
 import { formatCount, formatDuration, shortId } from "@/lib/ui/format";
@@ -79,7 +79,6 @@ const columns: ColumnDef<RunRow, unknown>[] = [
     cell: ({ row }) => (
       <div className="flex flex-col items-start gap-1">
         <StatusBadge status={row.original.status} />
-        {row.original.sourceProvider === "mock" && <Badge tone="warning">Mock source</Badge>}
       </div>
     ),
   },

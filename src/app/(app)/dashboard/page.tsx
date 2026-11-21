@@ -6,7 +6,7 @@ import { MetricStrip } from "@/components/dashboard/metric-strip";
 import { FunnelRail } from "@/components/runs/funnel-rail";
 import { toLaunchable } from "@/components/runs/launchable";
 import { RunLauncher } from "@/components/runs/run-launcher";
-import { Badge, StatusBadge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/badge";
 import { EmptyState, Panel } from "@/components/ui/panel";
 import { Time } from "@/components/ui/time";
 import { hasRole } from "@/lib/auth/authorization";
@@ -86,7 +86,6 @@ export default async function DashboardPage() {
         actions={
           latest && (
             <>
-              {latest.sourceProvider === "mock" && <Badge tone="warning">Mock source</Badge>}
               <StatusBadge status={latest.status} />
               <Link
                 href={`/run/${latest.id}`}

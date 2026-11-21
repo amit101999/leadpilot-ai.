@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { RunJobsTabs, type RunJob } from "@/components/history/run-jobs-tabs";
 import { ProfileSummary } from "@/components/profiles/profile-summary";
 import { FunnelRail } from "@/components/runs/funnel-rail";
-import { Badge, StatusBadge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/badge";
 import { EmptyState, Panel } from "@/components/ui/panel";
 import { Time } from "@/components/ui/time";
 import { requireUser } from "@/lib/auth/current-user";
@@ -73,7 +73,6 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {run.sourceProvider === "mock" && <Badge tone="warning">Mock source</Badge>}
           <StatusBadge status={run.status} />
           {!finished && (
             <Link href={`/run/${run.id}`} className="text-[13px] font-medium text-accent hover:underline">
@@ -225,14 +224,10 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
             <ProfileSummary config={snapshot.data.configuration} detailed />
             <dl className="grid gap-x-8 gap-y-3 border-t border-line px-4 py-4 text-sm sm:grid-cols-[220px_1fr]">
               <dt className="text-muted">Job source</dt>
-              <dd>
-                {snapshot.data.providers.jobSource}
-                {snapshot.data.providers.jobSourceIsMock && " (mock)"}
-              </dd>
+              <dd>{snapshot.data.providers.jobSource}</dd>
               <dt className="text-muted">AI model</dt>
               <dd>
                 {snapshot.data.providers.ai}: {snapshot.data.providers.aiModel}
-                {snapshot.data.providers.aiIsMock && " (mock)"}
               </dd>
               <dt className="text-muted">Prompt and rubric</dt>
               <dd>

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import type { EmailProvider, OutboundEmail } from "./email-provider";
-import type { ProviderConnection, SendOutcome } from "./provider";
+import type { EmailProvider, OutboundEmail } from "@/modules/notifications/email-provider";
+import type { ProviderConnection, SendOutcome } from "@/modules/notifications/provider";
 
 export interface MockSentEmail {
   subject: string;

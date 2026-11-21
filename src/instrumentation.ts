@@ -5,9 +5,32 @@
  * migration step (Render's free plan has no pre-deploy command); locally, `npm run db:migrate` does the same.
  * A failed migration stops the server, so a deploy never serves a half-migrated
  * schema. Run only one instance with this on: migrations are not locked against concurrent runners.
+ *
+ * E2E_FAKE_PROVIDERS=1 is for the browser tests only: it replaces the job source, AI and e-mail with the
+ * test fakes. It is refused unless APP_BASE_URL is a localhost address, so it can never take effect on a
+ * deployed site.
  */
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
 export async function register(): Promise<void> {
-  if (process.env.NEXT_RUNTIME !== "nodejs" || process.env.MIGRATE_ON_START !== "true") return;
+  if (process.env.NEXT_RUNTIME !== "nodejs") return;
+  if (process.env.E2E_FAKE_PROVIDERS === "1") {
+    let host = "";
+    try {
+      host = new URL(process.env.APP_BASE_URL ?? "").hostname;
+    } catch {
+      // An invalid or missing APP_BASE_URL is not localhost.
+    }
+    if (!LOCAL_HOSTS.has(host)) {
+      throw new Error("E2E_FAKE_PROVIDERS=1 is only allowed when APP_BASE_URL is a localhost address");
+    }
+    const [{ installTestProviders }, { createFakeProviders }] = await Promise.all([
+      import("@/modules/providers"),
+      import("../tests/fakes/providers"),
+    ]);
+    installTestProviders(createFakeProviders());
+  }
+  if (process.env.MIGRATE_ON_START !== "true") return;
   const { runMigrations } = await import("@/lib/database/migrate-on-start");
   await runMigrations();
 }

@@ -7,8 +7,8 @@ import type {
   NormalizedJob,
   SourceCapabilities,
   SourceConnectionResult,
-} from "./types";
-import { EMPTY_POSTING, SourceNotAuthorizedError } from "./types";
+} from "@/modules/job-sources/types";
+import { EMPTY_POSTING, SourceNotAuthorizedError } from "@/modules/job-sources/types";
 
 const PAGE_SIZE = 8;
 

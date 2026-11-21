@@ -193,7 +193,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           <span>
             {job.source}, {job.sourceJobId}
           </span>
-          {job.source === "mock" && <Badge tone="warning">Mock source</Badge>}
+
           {latestRun && <StatusBadge status={latestRun.processingStatus} />}
           {isSafeLinkHref(job.jobUrl) ? (
             <>

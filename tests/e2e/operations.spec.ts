@@ -63,7 +63,7 @@ test("recipient opt-in, e-mail alerts on a profile, a run, and the alerts on the
   await page.getByRole("dialog").getByRole("button", { name: "Start run" }).click();
   await expect(page.getByText("This run has finished")).toBeVisible({ timeout: 90_000 });
 
-  // The alerts are listed and marked sent (mock provider).
+  // The alerts are listed and marked sent (fake e-mail).
   await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Notifications" }).click();
   const table = page.getByRole("table", { name: "Alerts" });
   await expect(table.getByText(label).first()).toBeVisible();
@@ -137,12 +137,12 @@ test("integrations: test the database connection and send a test e-mail", async 
   await expect(database.getByText("Connected")).toBeVisible();
 
   const upwork = page.locator("#integration-job_source");
-  await expect(upwork).toContainText("Live Upwork search is blocked");
+  await expect(upwork).toContainText("Demo jobs for development and tests");
 
   const email = page.locator("#integration-email");
   await email.getByRole("button", { name: "Send test message" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Send test message" }).click();
-  await expect(page.getByText("Mock provider: the test e-mail was recorded, not sent.")).toBeVisible();
+  await expect(page.getByText("The mail server accepted the test e-mail.", { exact: false })).toBeVisible();
 });
 
 test("audit log lists entries and filters them by action", async ({ page }) => {
