@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import type { DbExecutor } from "@/lib/database/client";
 import { stagedJobs } from "@/lib/database/schema";
 import type { ProfileConfig } from "@/modules/profiles/config-schema";
@@ -9,6 +9,7 @@ import type {
   SourceCapabilities,
   SourceConnectionResult,
 } from "./types";
+import { MAX_JOBS_PER_RUN } from "./types";
 import { parseStagedJob } from "./upwork-import/normalize";
 
 export const IMPORT_SOURCE_ID = "upwork-import";
@@ -16,8 +17,9 @@ const PAGE_SIZE = 50;
 
 /**
  * Job source for runs started by an import: reads the jobs an external agent (Claude + Upwork MCP)
- * staged for the run's profile. On the first page it claims every PENDING staged job for the profile
- * by marking it CONSUMED for this run; later pages, and a resumed discovery, re-read this run's own
+ * staged for the run's profile. On the first page it claims the profile's PENDING staged jobs, oldest first and
+ * at most MAX_JOBS_PER_RUN (what discovery links), by marking them CONSUMED for this run; the rest stay
+ * PENDING and get a follow-up run (imports/follow-up.ts); later pages, and a resumed discovery, re-read this run's own
  * claimed jobs, which the discovery stage deduplicates.
  */
 export class ImportJobSourceProvider implements JobSourceProvider {
@@ -59,10 +61,16 @@ export class ImportJobSourceProvider implements JobSourceProvider {
     if (!this.binding) throw new Error("Import job source is not bound to a run");
     const { db, profileId, runId } = this.binding;
     if (cursor === null) {
+      const oldest = db
+        .select({ id: stagedJobs.id })
+        .from(stagedJobs)
+        .where(and(eq(stagedJobs.profileId, profileId), eq(stagedJobs.status, "PENDING")))
+        .orderBy(asc(stagedJobs.createdAt), asc(stagedJobs.id))
+        .limit(MAX_JOBS_PER_RUN);
       await db
         .update(stagedJobs)
         .set({ status: "CONSUMED", consumedRunId: runId, updatedAt: new Date() })
-        .where(and(eq(stagedJobs.profileId, profileId), eq(stagedJobs.status, "PENDING")));
+        .where(and(inArray(stagedJobs.id, oldest), eq(stagedJobs.status, "PENDING")));
     }
     const offset = cursor ? Number.parseInt(cursor, 10) || 0 : 0;
     const rows = await db

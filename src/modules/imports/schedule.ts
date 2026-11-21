@@ -24,8 +24,11 @@ export type DueDecision = { due: true } | { due: false; reason: string };
 
 /** Re-scan this much before the previous window's end: Upwork lists a job a few minutes after its posting time. */
 export const WINDOW_OVERLAP_MS = 30 * 60_000;
-/** One sync never looks further back than this, however long syncs were failing. */
-export const MAX_WINDOW_MS = 24 * 3_600_000;
+/**
+ * One sync never looks further back than this, however long syncs were failing. Longer than the longest
+ * interval (24 h) plus the overlap and a missed hourly wake-up, so a daily sync keeps its overlap.
+ */
+export const MAX_WINDOW_MS = 26 * 3_600_000;
 
 export interface ScanWindow {
   from: Date;

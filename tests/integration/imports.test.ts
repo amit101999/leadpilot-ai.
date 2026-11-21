@@ -29,6 +29,7 @@ import {
   users,
 } from "@/lib/database/schema";
 import { ImportJobSourceProvider } from "@/modules/job-sources/import-provider";
+import { MAX_JOBS_PER_RUN } from "@/modules/job-sources/types";
 import type { MockEmailProvider } from "../fakes/mock-email";
 import { defaultProfileConfig, type ProfileConfig } from "@/modules/profiles/config-schema";
 import { getProviders, setProvidersForTesting } from "@/modules/providers";
@@ -683,6 +684,11 @@ describe("import robustness (code review fixes)", () => {
     const end = hoursAgo(1);
     expect((await report({ status: "OK", windowEnd: end.toISOString() })).status).toBe(200);
     expect((await windowOf()).from.getTime()).toBe(end.getTime() - 30 * 60_000);
+    // The sync counts from when it started (its window end), not from when its report arrived, so a sync
+    // that takes a few minutes does not slip past the next hourly wake-up.
+    const lastSynced = async () =>
+      (await getDb().select().from(syncState).where(eq(syncState.profileId, profileId)))[0]!.lastSyncedAt;
+    expect((await lastSynced())?.getTime()).toBe(end.getTime());
 
     // A failed sync records the attempt but leaves the window open for the next sync.
     expect(
@@ -690,9 +696,12 @@ describe("import robustness (code review fixes)", () => {
         .status,
     ).toBe(200);
     expect((await windowOf()).from.getTime()).toBe(end.getTime() - 30 * 60_000);
-    // An older report never moves it back; a future one is refused.
+    const afterError = await lastSynced();
+    expect(afterError!.getTime()).toBeGreaterThan(end.getTime());
+    // An older report never moves the window or the last sync back; a future one is refused.
     await report({ status: "OK", windowEnd: hoursAgo(3).toISOString() });
     expect((await windowOf()).from.getTime()).toBe(end.getTime() - 30 * 60_000);
+    expect((await lastSynced())?.getTime()).toBe(afterError!.getTime());
     expect(
       (await report({ status: "OK", windowEnd: new Date(Date.now() + 3_600_000).toISOString() })).status,
     ).toBe(400);
@@ -797,5 +806,39 @@ describe("sync schedule", () => {
     const [state] = await getDb().select().from(syncState).where(eq(syncState.profileId, profileId));
     expect(state!.lastStatus).toBe("ERROR");
     expect(state!.lastError).not.toContain("sk-abcdefghijklmnop");
+  });
+});
+
+describe("import run size limit", () => {
+  it("claims at most one run's worth of staged jobs and leaves the rest pending for a follow-up", async () => {
+    const user = await createUser("OPERATOR");
+    const profileId = await newProfile(user);
+    const token = await newToken(user);
+    const res = await commit(token.bearer, profileId, [upworkJob()]);
+    const runId = res.json.data.runId as string;
+    const [first] = await getDb().select().from(stagedJobs).where(eq(stagedJobs.profileId, profileId));
+    const extra = MAX_JOBS_PER_RUN + 5;
+    await getDb()
+      .insert(stagedJobs)
+      .values(
+        Array.from({ length: extra }, (_, i) => ({
+          batchId: first!.batchId,
+          profileId,
+          source: first!.source,
+          sourceJobId: `bulk-${i}`,
+          payload: first!.payload,
+        })),
+      );
+
+    const provider = new ImportJobSourceProvider({ db: getDb(), profileId, runId });
+    await provider.discoverJobs(defaultProfileConfig(null), null);
+    const rows = await getDb()
+      .select({ status: stagedJobs.status, sourceJobId: stagedJobs.sourceJobId })
+      .from(stagedJobs)
+      .where(eq(stagedJobs.profileId, profileId));
+    expect(rows.filter((r) => r.status === "CONSUMED")).toHaveLength(MAX_JOBS_PER_RUN);
+    expect(rows.filter((r) => r.status === "PENDING")).toHaveLength(extra + 1 - MAX_JOBS_PER_RUN);
+    // Oldest first: the job committed first is in this run.
+    expect(rows.find((r) => r.sourceJobId === first!.sourceJobId)?.status).toBe("CONSUMED");
   });
 });

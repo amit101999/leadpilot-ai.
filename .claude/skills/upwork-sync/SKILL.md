@@ -43,7 +43,9 @@ jobs yourself, and never change a job object you received from Upwork.
    - `limit`: `limits.resultsPerPage`; `include_full_details`: `false`
      Fetch the next page (same params plus `cursor`) only while `pageInfo.hasNextPage` is true, up to
      `limits.pagesPerSearch` pages, and stop early once a page holds a job whose `published_date` is
-     before `window.from` (results are newest first, so later pages are older still).
+     before `window.from` (results are newest first, so later pages are older still). If you stop because of
+     the page limit while `hasNextPage` is still true and the last page's oldest job is still inside the
+     window, note the keyword: older jobs in the window were not seen (report PARTIAL in step g).
 
    b. **Upwork's own feed.** Call `find_jobs` with `action: "smart_search"`, `mode: "most_recent"`,
    `from_date`: `window.from` and `to_date`: `window.to` (full timestamps, exactly as given), and the
@@ -57,7 +59,8 @@ jobs yourself, and never change a job object you received from Upwork.
    the new job ids that passed LeadPilot's basic rules (jobs already seen or outside the window are
    counted as `alreadySeen` / `outsideWindow` and never listed).
 
-   e. **Details.** For each id in `detailsWanted` (at most `limits.maxDetailCalls`), call `find_jobs`
+   e. **Details.** For each id in `detailsWanted` (at most `limits.maxDetailCalls`) that consists only of
+   letters, digits and `~` (skip any other id), call `find_jobs`
    with `action: "get"` and `params: { "id": "<id>" }`, and save the whole response as
    `.upwork-sync/<profileId>/details/<id>.json`. Stop fetching details for this sync as soon as a
    response has `error_code` `JOB_BROWSE_COOLDOWN` or two calls in a row fail; the jobs are still
@@ -68,8 +71,8 @@ jobs yourself, and never change a job object you received from Upwork.
    `error` when the run could not start (the jobs stay queued in LeadPilot).
 
    g. **Report.** Run `node scripts/leadpilot-import.mjs status <profileId> OK --window-end <window.to>`,
-   or `PARTIAL <reason> --window-end <window.to>` when details were cut short (`NOTHING_TO_IMPORT` is
-   OK). Run `ERROR <reason>` without `--window-end` when the profile could not be searched or the
+   or `PARTIAL <reason> --window-end <window.to>` when details were cut short or a keyword hit the page
+   limit in step a (name the keywords in the reason) (`NOTHING_TO_IMPORT` is OK). Run `ERROR <reason>` without `--window-end` when the profile could not be searched or the
    import printed `FAILED` (use its `error` as the reason): the window then stays open, and the next sync
    scans it again.
 

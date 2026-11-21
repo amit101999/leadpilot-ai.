@@ -66,6 +66,8 @@ async function api(method, path, body) {
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(60_000),
+      // Never follow a redirect: the request carries the import token.
+      redirect: "error",
     });
   } catch (error) {
     fail(`LeadPilot is not reachable at ${baseUrl} (${error.cause?.code ?? error.name})`);

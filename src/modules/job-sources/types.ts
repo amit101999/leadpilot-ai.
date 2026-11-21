@@ -170,3 +170,6 @@ export class SourceNotAuthorizedError extends Error {
     this.name = "SourceNotAuthorizedError";
   }
 }
+
+/** The most jobs one run's discovery links (a safety limit; the import source claims no more than this). */
+export const MAX_JOBS_PER_RUN = 500;

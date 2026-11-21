@@ -9,7 +9,7 @@ import {
 import { AppError } from "@/lib/http/errors";
 import { sanitizeErrorMessage } from "@/lib/security/sanitize";
 import { upsertJob } from "@/modules/jobs/repository";
-import { SourceNotAuthorizedError } from "@/modules/job-sources/types";
+import { MAX_JOBS_PER_RUN, SourceNotAuthorizedError } from "@/modules/job-sources/types";
 import {
   addWarning,
   beginStage,
@@ -24,7 +24,6 @@ import {
 import { gate, respond } from "./gating";
 
 const MAX_PAGES = 20;
-const MAX_JOBS = 500;
 
 /** SOURCE_CHECK: marks the run RUNNING, reconciles crashed sends, verifies source authorization. */
 export async function startStep(ctx: RunContext): Promise<StageResponse> {
@@ -115,7 +114,7 @@ export async function discoverStep(ctx: RunContext): Promise<StageResponse> {
       pages += 1;
       for (const record of page.records) {
         received += 1;
-        if (linked >= MAX_JOBS) {
+        if (linked >= MAX_JOBS_PER_RUN) {
           truncated = true;
           break;
         }
@@ -167,7 +166,7 @@ export async function discoverStep(ctx: RunContext): Promise<StageResponse> {
     await addWarning(db, run.id, {
       code: "DISCOVERY_LIMIT_REACHED",
       stage: "DISCOVERY",
-      message: `Discovery stopped at the safety limit (${MAX_PAGES} pages / ${MAX_JOBS} jobs)`,
+      message: `Discovery stopped at the safety limit (${MAX_PAGES} pages / ${MAX_JOBS_PER_RUN} jobs)`,
     });
   }
   await completeStage(db, run.id, "DISCOVERY", {

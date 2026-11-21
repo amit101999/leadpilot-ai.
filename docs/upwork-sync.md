@@ -59,7 +59,7 @@ archiving the active profile leaves none (the sync stops), and a restored profil
 
 **How the schedule works.** The agent (the cloud routine below) wakes **every hour**. On each wake-up
 LeadPilot answers whether the active profile is due (`syncDue`, `src/modules/imports/schedule.ts`): scheduler on,
-keywords set, inside the active hours, and the interval passed since the last sync attempt. The timing comes from the
+keywords set, inside the active hours, and the interval passed since the last sync attempt started (a successful sync counts from its window end, which the context set when the sync began). The timing comes from the
 user's **sync scheduler** (`sync_schedules`, **Settings → Sync scheduler**, `GET`/`PUT /api/sync-schedule`): every
 **1, 2, 3, 4, 6, 8, 12 or 24 hours**, never more often than hourly, active hours and time zone. It belongs to the user,
 not to a profile, so it stays as set until changed there, whichever profile is active. A user who never saved it gets
@@ -69,7 +69,7 @@ active profile's settings into the scheduler, and the old fields are no longer r
 
 **Scan window.** Each due profile gets a `window` in the context: from the end of its last _successful_ sync
 (`sync_state.window_end`) minus a 30-minute overlap (Upwork lists a job a few minutes after its posting time), or its
-interval back from now when it never synced, at most 24 hours back, up to now. The agent searches newest first and
+interval back from now when it never synced, at most 26 hours back (so a daily sync keeps its overlap), up to now. The agent searches newest first and
 stops paging at jobs older than `window.from`, asks Upwork's feed for exactly that window, and reports
 `status ... OK --window-end <window.to>`. Only `OK` and `PARTIAL` move the window; `ERROR` leaves it, so the next sync
 scans the missed period again.

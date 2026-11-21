@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { ownerFilter, requireRole, type Actor } from "@/lib/auth/authorization";
 import { env } from "@/lib/configuration/env";
@@ -470,6 +470,10 @@ export async function recordSyncStatus(db: Database, actor: Actor, input: z.infe
     .where(eq(syncState.profileId, input.profileId))
     .limit(1);
   let windowEnd = state?.windowEnd ?? null;
+  // When the sync started: its window ends where the context call put it. The status arrives when the sync
+  // finishes, minutes later; counting the interval from then would push an hourly sync past the next hourly
+  // wake-up, so "every hour" would become every two hours.
+  let startedAt = now;
   if (input.windowEnd && input.status !== "ERROR") {
     const reported = new Date(input.windowEnd);
     // A minute of slack for clock differences between the agent and the server.
@@ -480,20 +484,36 @@ export async function recordSyncStatus(db: Database, actor: Actor, input: z.infe
     }
     // A late report of an older window never moves the window backwards.
     if (!windowEnd || reported > windowEnd) windowEnd = reported;
+    if (reported < now) startedAt = reported;
   }
   const values = {
-    lastSyncedAt: now,
+    lastSyncedAt: startedAt,
     windowEnd,
     lastStatus: input.status,
     lastError:
       input.status === "OK" ? null : sanitizeErrorMessage(input.message ?? "Sync reported a problem"),
     updatedAt: now,
   };
-  await db
+  const [stored] = await db
     .insert(syncState)
     .values({ profileId: input.profileId, ...values })
-    .onConflictDoUpdate({ target: syncState.profileId, set: values });
-  return { profileId: input.profileId, ...values };
+    .onConflictDoUpdate({
+      target: syncState.profileId,
+      // Two reports at the same moment (or a late one) never move the window or the last sync backwards.
+      set: {
+        ...values,
+        lastSyncedAt: sql`greatest(${syncState.lastSyncedAt}, excluded.last_synced_at)`,
+        windowEnd: sql`greatest(${syncState.windowEnd}, excluded.window_end)`,
+      },
+    })
+    .returning({
+      lastSyncedAt: syncState.lastSyncedAt,
+      windowEnd: syncState.windowEnd,
+      lastStatus: syncState.lastStatus,
+      lastError: syncState.lastError,
+      updatedAt: syncState.updatedAt,
+    });
+  return { profileId: input.profileId, ...values, ...stored };
 }
 
 /**

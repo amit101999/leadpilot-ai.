@@ -344,11 +344,13 @@ describe("sync schedule", () => {
     expect(syncDue(search(), null, now)).toEqual({ due: true });
   });
 
-  it("scans from the last successful window end minus the overlap, at most 24 h back", () => {
+  it("scans from the last successful window end minus the overlap, at most 26 h back", () => {
     const now = at("2026-11-18T12:00:00Z");
     expect(scanWindow(null, 4, now)).toEqual({ from: at("2026-11-18T08:00:00Z"), to: now });
     expect(scanWindow(at("2026-11-18T08:18:00Z"), 4, now).from).toEqual(at("2026-11-18T07:48:00Z"));
-    expect(scanWindow(at("2026-11-10T00:00:00Z"), 4, now).from).toEqual(at("2026-11-17T12:00:00Z"));
+    expect(scanWindow(at("2026-11-10T00:00:00Z"), 4, now).from).toEqual(at("2026-11-17T10:00:00Z"));
+    // A daily sync that ran an hour late still re-scans the 30-minute overlap.
+    expect(scanWindow(at("2026-11-17T11:00:00Z"), 24, now).from).toEqual(at("2026-11-17T10:30:00Z"));
     // A window end later than now (clock skew) never yields a window starting in the future.
     expect(scanWindow(at("2026-11-18T12:40:00Z"), 4, now).from).toEqual(now);
   });
