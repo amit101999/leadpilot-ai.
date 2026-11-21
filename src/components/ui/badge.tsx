@@ -51,8 +51,6 @@ const STATUS: Record<string, { tone: BadgeTone; label: string }> = {
   RESERVED: { tone: "neutral", label: "Reserved" },
   SENDING: { tone: "accent", label: "Sending" },
   SENT: { tone: "success", label: "Sent" },
-  DELIVERED: { tone: "success", label: "Delivered" },
-  READ: { tone: "success", label: "Read" },
   FAILED_RETRYABLE: { tone: "warning", label: "Failed, will retry" },
   FAILED_PERMANENT: { tone: "danger", label: "Failed" },
   UNCERTAIN: { tone: "warning", label: "Delivery unknown" },

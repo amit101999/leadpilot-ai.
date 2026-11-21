@@ -38,8 +38,6 @@ const VIEW_COLUMNS = {
   reservedAt: notifications.reservedAt,
   lastAttemptAt: notifications.lastAttemptAt,
   sentAt: notifications.sentAt,
-  deliveredAt: notifications.deliveredAt,
-  readAt: notifications.readAt,
   lastError: notifications.lastError,
   createdAt: notifications.createdAt,
   updatedAt: notifications.updatedAt,

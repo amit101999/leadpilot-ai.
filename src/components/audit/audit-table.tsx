@@ -58,8 +58,8 @@ const ENTITY_TYPES = [
 const ACTOR_LABEL: Record<string, string> = {
   SYSTEM: "System",
   EXECUTOR: "Run executor",
-  // Older entries only: WhatsApp delivery updates, removed together with WhatsApp alerts.
-  WEBHOOK: "WhatsApp webhook",
+  // Older audit entries only (WhatsApp delivery receipts, removed); audit history is never rewritten.
+  WEBHOOK: "Webhook (old)",
 };
 
 function Changes({ before, after }: { before: unknown; after: unknown }) {

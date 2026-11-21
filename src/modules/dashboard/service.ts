@@ -36,7 +36,7 @@ export async function getDashboard(db: Database, actor: Actor, providers: Provid
   const [unique] = await db.execute(sql`
     select count(distinct rj.job_id)::int as jobs from run_jobs rj where rj.run_id in (select id from (${runs}) r)`);
   const [notes] = await db.execute(sql`
-    select count(*) filter (where n.status in ('SENT', 'DELIVERED', 'READ'))::int as sent,
+    select count(*) filter (where n.status = 'SENT')::int as sent,
            count(*) filter (where n.status in ('FAILED_PERMANENT', 'FAILED_RETRYABLE', 'UNCERTAIN'))::int as failed
     from notifications n where n.run_id in (select id from (${runs}) r)`);
   const recentFailures = await db.execute(sql`

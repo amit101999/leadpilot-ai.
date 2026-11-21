@@ -162,15 +162,7 @@ const columns: ColumnDef<LeadRow, unknown>[] = [
 ];
 
 const DECISIONS = ["NEEDS_REVIEW", "REJECTED", "AI_ERROR"];
-const ALERT_STATUSES = [
-  "NONE",
-  "SENT",
-  "DELIVERED",
-  "READ",
-  "FAILED_PERMANENT",
-  "FAILED_RETRYABLE",
-  "UNCERTAIN",
-];
+const ALERT_STATUSES = ["NONE", "SENT", "FAILED_PERMANENT", "FAILED_RETRYABLE", "UNCERTAIN"];
 
 export function LeadsTable({
   rows,

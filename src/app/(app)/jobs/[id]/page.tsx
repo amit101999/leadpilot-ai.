@@ -115,8 +115,6 @@ interface NotificationRow {
   attempts: number;
   messagePreview: string;
   sentAt: Date | null;
-  deliveredAt: Date | null;
-  readAt: Date | null;
   lastError: string | null;
   recipientLabel: string;
 }
@@ -493,16 +491,6 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                     {n.sentAt && (
                       <>
                         , sent <Time value={n.sentAt} />
-                      </>
-                    )}
-                    {n.deliveredAt && (
-                      <>
-                        , delivered <Time value={n.deliveredAt} />
-                      </>
-                    )}
-                    {n.readAt && (
-                      <>
-                        , read <Time value={n.readAt} />
                       </>
                     )}
                   </p>

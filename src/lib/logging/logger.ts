@@ -26,8 +26,6 @@ const REDACT_PATHS = [
   "*.secret",
   "phone",
   "*.phone",
-  "phoneE164",
-  "*.phoneE164",
 ];
 
 export const logger = pino({

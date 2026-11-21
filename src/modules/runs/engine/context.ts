@@ -257,7 +257,7 @@ export async function computeRunCounters(db: DbExecutor, runId: string): Promise
     .where(eq(qualifications.runId, runId));
   const [notes] = await db
     .select({
-      sent: sql<number>`count(*) filter (where ${notifications.status} in ('SENT', 'DELIVERED', 'READ'))::int`,
+      sent: sql<number>`count(*) filter (where ${notifications.status} = 'SENT')::int`,
       failed: sql<number>`count(*) filter (where ${notifications.status} in ('FAILED_PERMANENT', 'FAILED_RETRYABLE', 'UNCERTAIN'))::int`,
       pending: sql<number>`count(*) filter (where ${notifications.status} in ('RESERVED', 'SENDING', 'FAILED_RETRYABLE'))::int`,
       uncertain: sql<number>`count(*) filter (where ${notifications.status} = 'UNCERTAIN')::int`,

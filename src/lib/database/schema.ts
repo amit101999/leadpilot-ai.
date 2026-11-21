@@ -64,11 +64,8 @@ export const qualificationDecision = pgEnum("qualification_decision", [
   "AI_ERROR",
 ]);
 
-/**
- * Alerts are sent by e-mail only. "WHATSAPP" (and the WhatsApp phone column and column defaults below)
- * remain so records from before WhatsApp alerts were removed stay valid; the app never writes them.
- */
-export const notificationChannel = pgEnum("notification_channel", ["WHATSAPP", "EMAIL"]);
+/** Alerts are sent by e-mail. */
+export const notificationChannel = pgEnum("notification_channel", ["EMAIL"]);
 
 export const stagedJobStatus = pgEnum("staged_job_status", ["PENDING", "CONSUMED"]);
 
@@ -76,8 +73,6 @@ export const notificationStatus = pgEnum("notification_status", [
   "RESERVED",
   "SENDING",
   "SENT",
-  "DELIVERED",
-  "READ",
   "FAILED_RETRYABLE",
   "FAILED_PERMANENT",
   "UNCERTAIN",
@@ -146,26 +141,15 @@ export const notificationRecipients = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
     label: text("label").notNull(),
-    channel: notificationChannel("channel").notNull().default("WHATSAPP"),
-    /** E.164 phone number (WhatsApp recipients). Never copied into notifications or logs. */
-    phoneE164: text("phone_e164"),
-    /** E-mail address (EMAIL recipients). Never copied into notifications or logs. */
-    email: text("email"),
+    channel: notificationChannel("channel").notNull().default("EMAIL"),
+    /** E-mail address. Never copied into notifications or logs. */
+    email: text("email").notNull(),
     optInConfirmedAt: timestamp("opt_in_confirmed_at", { withTimezone: true }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [
-    uniqueIndex("recipients_owner_phone_uq").on(t.ownerUserId, t.channel, t.phoneE164),
-    uniqueIndex("recipients_owner_email_uq").on(t.ownerUserId, t.channel, sql`lower(${t.email})`),
-    // channel::text: a newly added enum value cannot be referenced in the migration that adds it.
-    check(
-      "recipients_address_chk",
-      sql`(${t.channel}::text = 'WHATSAPP' and ${t.phoneE164} ~ '^\\+[1-9][0-9]{6,14}$' and ${t.email} is null)
-        or (${t.channel}::text = 'EMAIL' and ${t.email} is not null and ${t.phoneE164} is null)`,
-    ),
-  ],
+  (t) => [uniqueIndex("recipients_owner_email_uq").on(t.ownerUserId, t.channel, sql`lower(${t.email})`)],
 );
 
 export const searchProfiles = pgTable(
@@ -478,11 +462,11 @@ export const notifications = pgTable(
     runId: uuid("run_id")
       .notNull()
       .references(() => agentRuns.id, { onDelete: "restrict" }),
-    /** recipient_ref: opaque recipient id; the phone number stays in notification_recipients. */
+    /** recipient_ref: opaque recipient id; the address stays in notification_recipients. */
     recipientId: uuid("recipient_id")
       .notNull()
       .references(() => notificationRecipients.id, { onDelete: "restrict" }),
-    channel: notificationChannel("channel").notNull().default("WHATSAPP"),
+    channel: notificationChannel("channel").notNull().default("EMAIL"),
     status: notificationStatus("status").notNull().default("RESERVED"),
     providerMessageId: text("provider_message_id"),
     attempts: integer("attempts").notNull().default(0),
@@ -493,8 +477,6 @@ export const notifications = pgTable(
     lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
     sentAt: timestamp("sent_at", { withTimezone: true }),
-    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
-    readAt: timestamp("read_at", { withTimezone: true }),
     lastError: text("last_error"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

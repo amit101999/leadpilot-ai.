@@ -216,8 +216,6 @@ async function reserveForChannel(
         lastError: null,
         providerMessageId: null,
         sentAt: null,
-        deliveredAt: null,
-        readAt: null,
         updatedAt: new Date(),
       };
       const claimed = await tx

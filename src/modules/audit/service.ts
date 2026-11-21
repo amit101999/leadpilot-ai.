@@ -3,8 +3,7 @@ import { requireRole, type Actor } from "@/lib/auth/authorization";
 import type { Database, DbExecutor } from "@/lib/database/client";
 import { auditLogs, users } from "@/lib/database/schema";
 
-export type AuditActor =
-  { type: "USER"; userId: string } | { type: "SYSTEM" | "EXECUTOR" | "WEBHOOK"; userId?: null };
+export type AuditActor = { type: "USER"; userId: string } | { type: "SYSTEM" | "EXECUTOR"; userId?: null };
 
 export interface AuditEntry {
   actor: AuditActor;

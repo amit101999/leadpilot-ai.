@@ -39,7 +39,7 @@ describe("state machines", () => {
 
   it("never auto-retries an uncertain notification into RESERVED", () => {
     expect(canTransition(NOTIFICATION_TRANSITIONS, "UNCERTAIN", "RESERVED")).toBe(false);
-    expect(canTransition(NOTIFICATION_TRANSITIONS, "READ", "DELIVERED")).toBe(false);
+    expect(canTransition(NOTIFICATION_TRANSITIONS, "SENT", "RESERVED")).toBe(false);
     expect(allowedFrom(NOTIFICATION_TRANSITIONS, "SENDING").sort()).toEqual(
       ["FAILED_RETRYABLE", "RESERVED", "UNCERTAIN"].sort(),
     );

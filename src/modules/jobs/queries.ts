@@ -60,7 +60,7 @@ export async function listJobs(db: Database, actor: Actor, f: JobListFilters) {
              select 1 from notifications n
              join agent_runs r2 on r2.id = n.run_id
              join search_profiles p2 on p2.id = r2.profile_id
-             where n.job_id = j.id and n.status in ('SENT', 'DELIVERED', 'READ') and ${scopeCondition(owner, "p2")}
+             where n.job_id = j.id and n.status = 'SENT' and ${scopeCondition(owner, "p2")}
            ) as notified
     from latest l
     join jobs j on j.id = l.job_id
@@ -265,7 +265,7 @@ export async function getJobDetail(db: Database, actor: Actor, jobId: string) {
     order by q.evaluated_at desc`);
   const notificationRows = await db.execute(sql`
     select n.id, n.run_id, n.status, n.channel, n.provider_message_id, n.attempts, n.message_preview,
-           n.reserved_at, n.sent_at, n.delivered_at, n.read_at, n.last_error, n.created_at, n.updated_at,
+           n.reserved_at, n.sent_at, n.last_error, n.created_at, n.updated_at,
            rc.label as recipient_label
     from notifications n join notification_recipients rc on rc.id = n.recipient_id
     where n.job_id = ${jobId} and n.run_id in (${visibleRuns})`);

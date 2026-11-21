@@ -22,8 +22,6 @@ export interface NotificationRow {
   messagePreview: string;
   lastAttemptAt: Date | string | null;
   sentAt: Date | string | null;
-  deliveredAt: Date | string | null;
-  readAt: Date | string | null;
   lastError: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
@@ -35,7 +33,7 @@ const STATUS_GROUPS = [
   { value: "UNCERTAIN", label: "Delivery unknown" },
   { value: "RESERVED", label: "Pending" },
   { value: "SENDING", label: "Sending" },
-  { value: "SENT,DELIVERED,READ", label: "Sent" },
+  { value: "SENT", label: "Sent" },
   { value: "CANCELLED", label: "Cancelled" },
 ];
 
@@ -65,10 +63,7 @@ function columns(canOperate: boolean): ColumnDef<NotificationRow, unknown>[] {
       cell: ({ row }) => (
         <div>
           {row.original.recipientLabel}
-          {/* Alerts are e-mail; WhatsApp rows can only be older records. */}
-          <div className="text-muted">
-            {row.original.channel === "EMAIL" ? "E-mail" : "WhatsApp (older alert)"}
-          </div>
+          <div className="text-muted">E-mail</div>
         </div>
       ),
     },
@@ -97,16 +92,6 @@ function columns(canOperate: boolean): ColumnDef<NotificationRow, unknown>[] {
             {n.sentAt && (
               <div>
                 Sent <Time value={n.sentAt} />
-              </div>
-            )}
-            {n.deliveredAt && (
-              <div>
-                Delivered <Time value={n.deliveredAt} />
-              </div>
-            )}
-            {n.readAt && (
-              <div>
-                Read <Time value={n.readAt} />
               </div>
             )}
           </div>

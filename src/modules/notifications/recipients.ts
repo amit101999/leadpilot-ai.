@@ -45,7 +45,7 @@ function scoped(actor: Actor, id: string) {
     : eq(notificationRecipients.id, id);
 }
 
-/** E-mail recipients only: WhatsApp recipients from before WhatsApp alerts were removed stay stored but hidden. */
+/** The actor's e-mail recipients. */
 export async function listRecipients(db: Database, actor: Actor, includeArchived = false) {
   const owner = ownerFilter(actor);
   const rows = await db
@@ -91,7 +91,6 @@ export async function createRecipient(
         ownerUserId: actor.id,
         label: input.label,
         channel: "EMAIL",
-        phoneE164: null,
         email: input.email,
         optInConfirmedAt: input.optInConfirmed ? new Date() : null,
       })
