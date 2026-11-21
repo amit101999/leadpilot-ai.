@@ -23,9 +23,8 @@ docs/progress/.activity-state.json
 # Playwright saved sessions (contain a session cookie)
 tests/e2e/.auth/
 
-# Upwork sync agent: working files (job data from Upwork) and logs
+# Upwork sync agent: working files (job data from Upwork)
 .upwork-sync/
-logs/
 
 # Production deploy state (scripts/deploy.sh)
 .deployed-sha
