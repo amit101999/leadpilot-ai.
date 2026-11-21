@@ -128,7 +128,15 @@ export function SyncSchedulerForm({ schedule, canEdit }: { schedule: Schedule; c
             Save scheduler
           </Button>
           {changed && (
-            <Button type="button" variant="secondary" disabled={busy} onClick={() => setValue(schedule)}>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={busy}
+              onClick={() => {
+                setValue(schedule);
+                setErrors({});
+              }}
+            >
               Discard changes
             </Button>
           )}

@@ -6,6 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
 import { Field, Input } from "@/components/ui/field";
 import { EmptyState } from "@/components/ui/panel";
 import { Time } from "@/components/ui/time";
@@ -28,6 +29,8 @@ export function ImportTokensManager({ tokens, canEdit }: { tokens: ImportTokenRo
   const [name, setName] = useState("Upwork sync");
   const [created, setCreated] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Revoking cannot be undone and stops the sync that uses the token, so it is confirmed first. */
+  const [confirming, setConfirming] = useState<ImportTokenRow | null>(null);
 
   async function create() {
     setBusy(true);
@@ -50,6 +53,7 @@ export function ImportTokensManager({ tokens, canEdit }: { tokens: ImportTokenRo
     try {
       await apiFetch(`/api/import-tokens/${token.id}/revoke`, { method: "POST" });
       toast.success(`${token.name} revoked. The agent can no longer import with it.`);
+      setConfirming(null);
       router.refresh();
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "The token could not be revoked.");
@@ -60,6 +64,25 @@ export function ImportTokensManager({ tokens, canEdit }: { tokens: ImportTokenRo
 
   return (
     <div>
+      <Dialog open={confirming !== null} onOpenChange={(open) => !open && !busy && setConfirming(null)}>
+        {confirming && (
+          <DialogContent
+            title={`Revoke "${confirming.name}"?`}
+            description="The Upwork sync that uses this token stops importing at once. This cannot be undone: the sync needs a new token afterwards."
+          >
+            <div className="flex justify-end gap-2">
+              <DialogClose asChild>
+                <Button variant="secondary" disabled={busy}>
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button variant="danger" disabled={busy} onClick={() => void revoke(confirming)}>
+                Revoke token
+              </Button>
+            </div>
+          </DialogContent>
+        )}
+      </Dialog>
       {created && (
         <div role="status" className="m-4 rounded-md border border-line bg-sunken p-3 text-sm">
           <p className="font-medium">Copy this token now. It will not be shown again.</p>
@@ -75,8 +98,13 @@ export function ImportTokensManager({ tokens, canEdit }: { tokens: ImportTokenRo
               size="sm"
               variant="secondary"
               onClick={async () => {
-                await navigator.clipboard.writeText(created);
-                toast.success("Token copied.");
+                // The token is shown only once: a silent copy failure would lose it.
+                try {
+                  await navigator.clipboard.writeText(created);
+                  toast.success("Token copied.");
+                } catch {
+                  toast.error("Copy failed. Select the token above and copy it manually.");
+                }
               }}
             >
               <Copy />
@@ -116,7 +144,7 @@ export function ImportTokensManager({ tokens, canEdit }: { tokens: ImportTokenRo
                 </p>
               </div>
               {canEdit && !t.revokedAt && (
-                <Button size="sm" variant="secondary" disabled={busy} onClick={() => revoke(t)}>
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => setConfirming(t)}>
                   Revoke
                 </Button>
               )}

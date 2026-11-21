@@ -41,9 +41,13 @@ export const AUDIT_ACTIONS = [
   "run.finish",
   "run.fail",
   "notification.retry",
+  "email.test_message",
+  "import.commit",
+  "import_token.create",
+  "import_token.revoke",
+  // Older entries only: WhatsApp delivery updates.
   "notification.reconciled",
   "notification.failed",
-  "email.test_message",
 ];
 
 const ENTITY_TYPES = [
@@ -52,6 +56,7 @@ const ENTITY_TYPES = [
   { value: "agent_run", label: "Run" },
   { value: "notification", label: "Notification" },
   { value: "notification_recipient", label: "Recipient" },
+  { value: "import_token", label: "Import token" },
   { value: "user", label: "User" },
 ];
 

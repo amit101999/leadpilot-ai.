@@ -10,7 +10,8 @@ const listQuery = z.object({
   entityId: q.string(100),
   userId: q.uuid(),
   from: q.date(),
-  to: q.date(),
+  // Same as the audit page: a date-only "to" includes that whole day.
+  to: q.endDate(),
 });
 
 export const GET = userRoute("ADMIN", async ({ req, db, actor }) => {

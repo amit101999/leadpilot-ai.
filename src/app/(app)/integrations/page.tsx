@@ -97,8 +97,8 @@ export default async function IntegrationsPage() {
       title: "AI scoring (OpenAI)",
       setup: (
         <>
-          Set <Vars names={["AI_PROVIDER", "OPENAI_API_KEY", "OPENAI_MODEL"]} />. Create a project-scoped key
-          on the OpenAI platform. The test retrieves the model, which is free and proves the key works.
+          Set <Vars names={["OPENAI_API_KEY", "OPENAI_MODEL"]} />. Create a project-scoped key on the OpenAI
+          platform. The test retrieves the model, which is free and proves the key works.
         </>
       ),
     },
