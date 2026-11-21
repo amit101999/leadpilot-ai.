@@ -133,9 +133,10 @@ signs everyone out and invalidates import tokens.
 ## Security notes
 
 - Session cookies are `Secure`; the app runs as a non-root user; no secret is in the image or in GitHub.
-- The app uses the first `X-Forwarded-For` entry as the client address for login rate limits and session records
-  (`clientIp` in `src/lib/http/api.ts`). Whether Render replaces or appends to a client-sent value is **not verified
-  yet** (see [security.md](security.md#known-risks-and-limitations)).
+- The client address for login rate limits and session records is the **last** `X-Forwarded-For` entry, the one
+  Render's proxy appends (`clientIp` in `src/lib/http/api.ts`; `TRUSTED_PROXY_HOPS`, default 1). Tested on
+  2026-11-21: Render passes a client-supplied first entry through unchanged, so the earlier code (first entry) let a
+  client pick its own rate-limit bucket.
 - No HSTS header yet: Render does not add one ([PENDING.md](PENDING.md)).
 - Anyone who can push to `main` deploys to production once the checks pass. Keep GitHub access small and use 2FA on
   GitHub, Render, Neon and Brevo.

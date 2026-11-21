@@ -163,12 +163,26 @@ export function parseQuery<S extends z.ZodType>(req: NextRequest, schema: S): z.
   return schema.parse(raw);
 }
 
+/**
+ * The client address for per-IP rate limits and session records. Proxies append the address they received the
+ * request from to X-Forwarded-For, so only the last `hops` entries were written by trusted proxies; anything
+ * before them is whatever the client sent. Verified on Render (2026-11-21): a client-supplied first entry is
+ * passed through unchanged, so reading it let anyone pick their own rate-limit bucket.
+ */
+export function pickClientIp(forwardedFor: string | null, realIp: string | null, hops: number): string {
+  const entries = (forwardedFor ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  const trusted = entries[entries.length - hops] ?? entries[0];
+  return trusted || realIp?.trim() || "unknown";
+}
+
 export function clientIp(req: NextRequest): string {
-  // Production runs behind Render's proxy. Whether Render replaces or appends to a client-supplied
-  // X-Forwarded-For is not verified yet (cleanup review, area 1): until it is, a client may be able to
-  // choose the address used for per-IP rate limits.
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown"
+  return pickClientIp(
+    req.headers.get("x-forwarded-for"),
+    req.headers.get("x-real-ip"),
+    env().TRUSTED_PROXY_HOPS,
   );
 }
 
