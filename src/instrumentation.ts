@@ -1,10 +1,10 @@
 /**
- * Runs once when the Next.js server starts, before it handles requests.
+ * Runs once per server process, before the first request is handled (Next.js loads it on that request).
  *
  * With MIGRATE_ON_START=true it applies pending database migrations first. That is for hosts without a separate
  * migration step (Render's free plan has no pre-deploy command); locally, `npm run db:migrate` does the same.
- * A failed migration stops the server, so a deploy never serves a half-migrated
- * schema. Run only one instance with this on: migrations are not locked against concurrent runners.
+ * If it throws (a failed migration, or the check below), Next.js answers every request with an error, including
+ * the /api/health check, so Render keeps the previous version live and a half-migrated schema is never served. Run only one instance with this on: migrations are not locked against concurrent runners.
  *
  * E2E_FAKE_PROVIDERS=1 is for the browser tests only: it replaces the job source, AI and e-mail with the
  * test fakes. It is refused unless APP_BASE_URL is a localhost address, so it can never take effect on a

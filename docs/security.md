@@ -58,7 +58,8 @@ What protects LeadPilot today, where it lives in the code, and the risks that re
 - Configuration comes from the environment and is validated at startup (`src/lib/configuration/env.ts`); errors name
   the variable, never its value. There is no fake-provider setting: the app always uses the import source, OpenAI and
   real e-mail, and an unconfigured one reports "not configured". The test fakes load only with
-  `E2E_FAKE_PROVIDERS=1`, which the server refuses at start-up unless `APP_BASE_URL` is a localhost address.
+  `E2E_FAKE_PROVIDERS=1`, which is refused unless `APP_BASE_URL` is a localhost address (every request, including the health check, then
+  fails; checked against the production image).
 - pino redacts passwords, tokens, access tokens, authorization headers and cookies by path. Provider errors are passed
   through `sanitizeErrorMessage` before storage, which removes tokens, e-mails and phone numbers.
 - Recipient e-mail addresses are never returned in full by the API (masked) and never logged.
