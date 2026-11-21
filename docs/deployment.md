@@ -40,11 +40,11 @@ GitHub push to main ─► CI (.github/workflows/ci.yml) ─ all checks green �
 
 Settings that matter on Render (all in `render.yaml`):
 
-| Setting                    | Why                                                                                                                                                                                                                                                               |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `MIGRATE_ON_START=true`    | The free plan has no pre-deploy command: the server applies migrations at startup ([`src/instrumentation.ts`](../src/instrumentation.ts)); after a failure every request, including the health check, answers with an error, so Render keeps the previous version |
-| `EMAIL_PROVIDER=brevo`     | Render's free plan blocks outbound SMTP ports 25, 465 and 587 ([`brevo-email.ts`](../src/modules/notifications/brevo-email.ts))                                                                                                                                   |
-| `DATABASE_URL` (Neon, TLS) | Render's free Postgres is deleted after 30 days; Neon's free plan does not expire                                                                                                                                                                                 |
+| Setting                    | Why                                                                                                                                                                                                                   |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MIGRATE_ON_START=true`    | The free plan has no pre-deploy command: the server applies migrations at startup ([`src/instrumentation.ts`](../src/instrumentation.ts)); a failed migration exits the process, so Render keeps the previous version |
+| `EMAIL_PROVIDER=brevo`     | Render's free plan blocks outbound SMTP ports 25, 465 and 587 ([`brevo-email.ts`](../src/modules/notifications/brevo-email.ts))                                                                                       |
+| `DATABASE_URL` (Neon, TLS) | Render's free Postgres is deleted after 30 days; Neon's free plan does not expire                                                                                                                                     |
 
 Render's own proxy terminates HTTPS. Runs execute inside the web service.
 
@@ -63,7 +63,8 @@ Render's own proxy terminates HTTPS. Runs execute inside the web service.
 ### One-time setup
 
 1. **Neon:** create project `leadpilot` in **AWS Europe Central (Frankfurt)** (same region as the Render service).
-   Copy the **direct** connection string (not the `-pooler` host) ending in `?sslmode=require`.
+   Copy the **direct** connection string (not the `-pooler` host) ending in `?sslmode=require` (the app upgrades this to `sslmode=verify-full`, so Neon's certificate is checked;
+   `src/lib/database/url.ts`).
 2. **Brevo:** create a free account, verify the sender address under **Senders**, create an API key under
    **SMTP & API → API keys**.
 3. **Render:** sign in with GitHub → **New → Blueprint** → pick this repository → Render reads `render.yaml` and asks

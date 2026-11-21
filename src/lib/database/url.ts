@@ -5,7 +5,17 @@
  */
 const UNSUPPORTED_PARAMS = ["channel_binding"];
 
-/** Returns the connection string without options postgres.js cannot pass on. Other parts are left untouched. */
+/**
+ * postgres.js turns these sslmode values into TLS without certificate checks (rejectUnauthorized: false), so the
+ * connection is encrypted but the server is not authenticated. Neon's default string says sslmode=require.
+ */
+const UNVERIFIED_SSL_MODES = new Set(["require", "prefer", "allow"]);
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/**
+ * Returns the connection string without options postgres.js cannot pass on, and with certificate verification
+ * (sslmode=verify-full) for a remote database. Other parts, and local connection strings, are left untouched.
+ */
 export function normalizeDatabaseUrl(url: string): string {
   let parsed: URL;
   try {
@@ -19,6 +29,11 @@ export function normalizeDatabaseUrl(url: string): string {
       parsed.searchParams.delete(name);
       changed = true;
     }
+  }
+  const sslmode = parsed.searchParams.get("sslmode");
+  if (sslmode && UNVERIFIED_SSL_MODES.has(sslmode) && !LOCAL_HOSTS.has(parsed.hostname)) {
+    parsed.searchParams.set("sslmode", "verify-full");
+    changed = true;
   }
   return changed ? parsed.toString() : url;
 }

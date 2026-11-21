@@ -19,7 +19,8 @@ ALTER TABLE "sync_schedules" ADD CONSTRAINT "sync_schedules_updated_by_users_id_
 INSERT INTO "sync_schedules" ("owner_user_id", "enabled", "every_hours", "active_from", "active_to", "timezone")
 SELECT
 	k."owner_user_id",
-	coalesce((k."configuration" #>> '{search,upworkSync,enabled}')::boolean, true),
+	CASE WHEN jsonb_typeof(k."configuration" #> '{search,upworkSync,enabled}') = 'boolean'
+		THEN (k."configuration" #>> '{search,upworkSync,enabled}')::boolean ELSE true END,
 	CASE
 		WHEN h IS NULL THEN 4
 		WHEN h <= 4 THEN greatest(h, 1)
