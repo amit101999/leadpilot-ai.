@@ -1,7 +1,6 @@
 # syntax=docker/dockerfile:1
-# LeadPilot web app. Targets:
-#   runner   (default) - production server from Next's standalone output, non-root
-#   migrator           - applies migrations / runs the seed (needs dev dependencies + sources)
+# LeadPilot web app, built by Render (render.yaml): the production server from Next's standalone output,
+# non-root. Migrations run at startup (MIGRATE_ON_START).
 
 ARG NODE_IMAGE=node:22.23.5-alpine3.24
 
@@ -15,12 +14,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY . .
 # Runtime configuration is parsed lazily (src/lib/configuration/env.ts), so no secrets are needed here.
 RUN npm run build
-
-FROM deps AS migrator
-ENV NODE_ENV=production
-COPY . .
-USER node
-CMD ["npm", "run", "db:migrate"]
 
 FROM ${NODE_IMAGE} AS runner
 WORKDIR /app

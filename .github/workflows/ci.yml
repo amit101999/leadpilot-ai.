@@ -1,10 +1,9 @@
-# CI/CD for LeadPilot. See docs/deployment.md, "CI/CD".
+# CI for LeadPilot. See docs/deployment.md.
 #
-#   pull request   -> quality, integration, e2e, build
-#   push to main   -> the same checks, then deploy (only when every check passed and DEPLOY_ENABLED is "true")
+#   pull request and push to main -> quality, integration, e2e, build
 #
-# Deploy runs scripts/deploy.sh on the server over SSH through a Cloudflare Tunnel protected by Cloudflare Access.
-# No application secret is stored in GitHub: they live only in the server's .env.
+# Render deploys a commit on main only after these checks pass (render.yaml: autoDeployTrigger: checksPass).
+# No application secret is stored in GitHub: they live in Render's environment settings.
 name: CI/CD
 
 on:
@@ -128,82 +127,12 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run build
-      - name: Build Docker images (not pushed)
-        # Same images the server builds on deploy, so a broken Dockerfile fails here instead of in production.
-        run: |
-          docker build --target runner --tag leadpilot-web:ci .
-          docker build --target migrator --tag leadpilot-migrator:ci .
-      - name: Validate Compose files
+      - name: Build the Docker image (not pushed)
+        # The same image Render builds on deploy, so a broken Dockerfile fails here instead of in production.
+        run: docker build --tag leadpilot-web:ci .
+      - name: Validate the Compose file (local Postgres)
         env:
-          # Placeholders only: `config` checks syntax, merging and required variables; nothing is started.
+          # Placeholder only: `config` checks syntax and required variables; nothing is started.
           POSTGRES_PASSWORD: placeholder
-          APP_DOMAIN: leads.example.com
-          ACME_EMAIL: ops@example.com
-          CLOUDFLARE_TUNNEL_TOKEN: placeholder
-        run: |
-          docker compose -f docker-compose.yml --profile stack config --quiet
-          docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile stack config --quiet
-          docker compose -f docker-compose.yml -f docker-compose.cloudflare.yml --profile stack config --quiet
+        run: docker compose -f docker-compose.yml config --quiet
 
-  deploy:
-    name: Deploy to production
-    needs: [quality, integration, e2e, build]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    concurrency:
-      # Never two deploys at once, and never cancel one half-way (migrations may be running).
-      group: production-deploy
-      cancel-in-progress: false
-    env:
-      CLOUDFLARED_VERSION: "2026.10.1"
-      CLOUDFLARED_SHA256: 3bfc539f45d2620c71debb7a86be0efa737ed5ccbad9eb85c787116900e5c586
-    steps:
-      - name: Install cloudflared
-        run: |
-          curl -fsSL -o cloudflared \
-            "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64"
-          echo "${CLOUDFLARED_SHA256}  cloudflared" | sha256sum --check --strict
-          sudo install -m 0755 cloudflared /usr/local/bin/cloudflared
-          rm cloudflared
-
-      - name: Configure SSH
-        env:
-          DEPLOY_SSH_HOST: ${{ vars.DEPLOY_SSH_HOST }}
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
-        run: |
-          for name in DEPLOY_SSH_HOST DEPLOY_SSH_KEY SSH_KNOWN_HOSTS; do
-            if [ -z "${!name}" ]; then echo "::error::$name is not set (see docs/deployment.md, CI/CD)"; exit 1; fi
-          done
-          install -d -m 700 ~/.ssh
-          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
-          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
-          # The Access service token reaches cloudflared through TUNNEL_SERVICE_TOKEN_ID/SECRET (set on the deploy
-          # step), so it never appears on a command line.
-          cat > ~/.ssh/config <<EOF
-          Host $DEPLOY_SSH_HOST
-            User deploy
-            IdentityFile ~/.ssh/deploy_key
-            IdentitiesOnly yes
-            StrictHostKeyChecking yes
-            UserKnownHostsFile ~/.ssh/known_hosts
-            ProxyCommand /usr/local/bin/cloudflared access ssh --hostname %h
-            ServerAliveInterval 30
-          EOF
-          chmod 600 ~/.ssh/config
-
-      - name: Run deploy script on the server
-        env:
-          DEPLOY_SSH_HOST: ${{ vars.DEPLOY_SSH_HOST }}
-          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
-        # The server's authorized_keys forces scripts/deploy.sh; the commit SHA is its only input.
-        run: |
-          # shellcheck disable=SC2029 # the SHA is meant to expand here, on the runner
-          ssh "$DEPLOY_SSH_HOST" "$GITHUB_SHA"
-
-      - name: Remove SSH material
-        if: always()
-        run: rm -rf ~/.ssh

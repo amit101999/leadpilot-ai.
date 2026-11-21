@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { publicRoute } from "@/lib/http/api";
 
-/** Liveness for Docker and the reverse proxy. Deliberately reveals nothing beyond up/down. */
+/** Liveness for Render's health check and the Docker image. Deliberately reveals nothing beyond up/down. */
 export const GET = publicRoute(async ({ db }) => {
   let database: "up" | "down" = "up";
   let timer: ReturnType<typeof setTimeout> | undefined;
