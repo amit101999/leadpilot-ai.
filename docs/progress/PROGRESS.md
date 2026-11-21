@@ -10,30 +10,31 @@ Last updated: 2026-11-21
 
 Plan: `C:\Users\ACER\.claude\plans\clever-noodling-finch.md`.
 
-| Phase                    | Scope                                                                     | Status                                                                                                      |
-| ------------------------ | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Baseline                 | Pre-existing backend core committed                                       | ✅ Done (`703761f`)                                                                                         |
-| A. Foundation            | Seed, `.env.example`, page auth proxy, CSRF check                         | ✅ Merged to `main` (`ab4b7e1`); seed verified during B1                                                    |
-| B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                     | ✅ Merged to `main` (`0bed021`); Turbopack build verified on main                                           |
-| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook      | ✅ Merged to `main` (`41e8d95`); Turbopack build verified on main                                           |
-| C1. UI (part 1)          | Design system, app shell, login, Dashboard, Run Agent                     | ✅ Merged to `main` (`71a0b50`); Turbopack build verified on main                                           |
-| C2. UI (part 2)          | Search History and run detail, Qualified Leads, All Jobs                  | ✅ Merged to `main` (`d742e0a`); Turbopack build verified on main                                           |
-| C3a. UI (part 3a)        | Search Profiles list, editor, version history                             | ✅ Merged to `main` (fast-forward, `e650286` + docs `a82ddab`)                                              |
-| C3b. UI (part 3b)        | Notifications, Integrations, Settings (incl. change password), Audit Logs | ✅ Merged to `main` (fast-forward `a82ddab` → `727c19b`, 2026-10-15); `d18e5f8` + docs `3730daf`            |
-| D. n8n                   | Run workflow calling the app's internal step API, lease-safe `/fail`      | ✅ Merged to `main` (same fast-forward); `9cf72ad`                                                          |
-| E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                                | ✅ Merged to `main` (same fast-forward); `62d69cc` + `7e34456`                                              |
-| F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                       | ✅ Merged to `main` (same fast-forward); `b806b52` + docs `727c19b`                                         |
-| G. Docs and final review | README, `docs/*.md`, full verification                                    | ✅ On `main` (`9b7b102` + PROGRESS `f492a9b`)                                                               |
-| H. Upwork sync           | Upwork sync via Claude + Upwork MCP, import API, e-mail alerts            | ✅ On `main` (`main` is at `fe3500c`, which contains `05b064a`); e2e 19/19 and build passed                 |
-| Cloudflare Tunnel        | `docker-compose.cloudflare.yml`, `deploy/Caddyfile.cloudflare`            | ✅ On `main` (`ae68cdf`, 2026-11-11); no real tunnel yet                                                    |
-| WhatsApp removal         | E-mail is the only alert channel                                          | ✅ On `main` (`7ad2c19`, 2026-11-14); all checks pass, e2e 19/19                                            |
-| CI/CD                    | GitHub Actions checks + auto-deploy over Cloudflare Tunnel                | 🟡 `a6f76ba` + review fixes `b3191c0` on `ci-cd` (2026-11-14), not pushed or merged; never run on GitHub    |
-| Production data          | First search profile created in production (no code change)               | ✅ 2026-11-17; hourly sync for it not yet verified                                                          |
-| Codebase cleanup         | Dead-code removal, worktree and branch housekeeping                       | 🟡 `0e7b6cd` on `chore/codebase-cleanup` (2026-11-17), not pushed or merged; all checks pass                |
-| Rich job data            | `clients` table, posting details, AI prompt v2, client card on job page   | 🟡 `bfaae80` on `feat/rich-job-data` (2026-11-17, from cleanup branch), not pushed or merged; e2e not run   |
-| Sync windows + schedule  | Per-profile scan windows, no re-scanning, 1/2/4 h schedule panel in UI    | 🟡 `6b8845b` on `feat/sync-schedule` (2026-11-19, from rich-data branch), not pushed or merged; e2e not run |
-| Scheduler + active       | App-wide sync scheduler, one active profile per user (replaces default)   | 🟡 `6e0f0d5` on `feat/scheduler-active-profile` (2026-11-21), not pushed or merged; e2e not run             |
-| Hunting checklist rules  | Competition and hire-rate hard rules, priority-country score bonus        | 🟡 `44d1079` on `feat/hunting-rules` (2026-11-21), not pushed or merged; e2e not run                        |
+| Phase                    | Scope                                                                         | Status                                                                                                       |
+| ------------------------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Baseline                 | Pre-existing backend core committed                                           | ✅ Done (`703761f`)                                                                                          |
+| A. Foundation            | Seed, `.env.example`, page auth proxy, CSRF check                             | ✅ Merged to `main` (`ab4b7e1`); seed verified during B1                                                     |
+| B1. API routes (part 1)  | Auth, health, profiles, recipients, runs, jobs, leads                         | ✅ Merged to `main` (`0bed021`); Turbopack build verified on main                                            |
+| B2. API routes (part 2)  | Notifications, integrations, dashboard, exports, audit, n8n, webhook          | ✅ Merged to `main` (`41e8d95`); Turbopack build verified on main                                            |
+| C1. UI (part 1)          | Design system, app shell, login, Dashboard, Run Agent                         | ✅ Merged to `main` (`71a0b50`); Turbopack build verified on main                                            |
+| C2. UI (part 2)          | Search History and run detail, Qualified Leads, All Jobs                      | ✅ Merged to `main` (`d742e0a`); Turbopack build verified on main                                            |
+| C3a. UI (part 3a)        | Search Profiles list, editor, version history                                 | ✅ Merged to `main` (fast-forward, `e650286` + docs `a82ddab`)                                               |
+| C3b. UI (part 3b)        | Notifications, Integrations, Settings (incl. change password), Audit Logs     | ✅ Merged to `main` (fast-forward `a82ddab` → `727c19b`, 2026-10-15); `d18e5f8` + docs `3730daf`             |
+| D. n8n                   | Run workflow calling the app's internal step API, lease-safe `/fail`          | ✅ Merged to `main` (same fast-forward); `9cf72ad`                                                           |
+| E. Infrastructure        | Dockerfile, docker-compose, Caddy, backups                                    | ✅ Merged to `main` (same fast-forward); `62d69cc` + `7e34456`                                               |
+| F. Tests                 | Integration and e2e suites, 17 acceptance scenarios                           | ✅ Merged to `main` (same fast-forward); `b806b52` + docs `727c19b`                                          |
+| G. Docs and final review | README, `docs/*.md`, full verification                                        | ✅ On `main` (`9b7b102` + PROGRESS `f492a9b`)                                                                |
+| H. Upwork sync           | Upwork sync via Claude + Upwork MCP, import API, e-mail alerts                | ✅ On `main` (`main` is at `fe3500c`, which contains `05b064a`); e2e 19/19 and build passed                  |
+| Cloudflare Tunnel        | `docker-compose.cloudflare.yml`, `deploy/Caddyfile.cloudflare`                | ✅ On `main` (`ae68cdf`, 2026-11-11); no real tunnel yet                                                     |
+| WhatsApp removal         | E-mail is the only alert channel                                              | ✅ On `main` (`7ad2c19`, 2026-11-14); all checks pass, e2e 19/19                                             |
+| CI/CD                    | GitHub Actions checks + auto-deploy over Cloudflare Tunnel                    | 🟡 `a6f76ba` + review fixes `b3191c0` on `ci-cd` (2026-11-14), not pushed or merged; never run on GitHub     |
+| Production data          | First search profile created in production (no code change)                   | ✅ 2026-11-17; hourly sync for it not yet verified                                                           |
+| Codebase cleanup         | Dead-code removal, worktree and branch housekeeping                           | 🟡 `0e7b6cd` on `chore/codebase-cleanup` (2026-11-17), not pushed or merged; all checks pass                 |
+| Rich job data            | `clients` table, posting details, AI prompt v2, client card on job page       | 🟡 `bfaae80` on `feat/rich-job-data` (2026-11-17, from cleanup branch), not pushed or merged; e2e not run    |
+| Sync windows + schedule  | Per-profile scan windows, no re-scanning, 1/2/4 h schedule panel in UI        | 🟡 `6b8845b` on `feat/sync-schedule` (2026-11-19, from rich-data branch), not pushed or merged; e2e not run  |
+| Scheduler + active       | App-wide sync scheduler, one active profile per user (replaces default)       | 🟡 `6e0f0d5` on `feat/scheduler-active-profile` (2026-11-21), not pushed or merged; e2e not run              |
+| Hunting checklist rules  | Competition and hire-rate hard rules, priority-country score bonus            | 🟡 `44d1079` on `feat/hunting-rules` (2026-11-21), not pushed or merged; e2e not run                         |
+| Cleanup Phase A          | Remove n8n, self-hosting, Upwork API stub, PC sync, WhatsApp; fakes test-only | 🟡 `bf21b44`..`6c96f4c` on `chore/cleanup-and-review` (2026-11-21, from hunting-rules), not pushed or merged |
 
 ## Baseline (pre-existing work, committed 2026-10-11 as `703761f`)
 
@@ -1446,6 +1447,67 @@ maxInvitesSent, rejectIfHired}`, `client.minHireRatePercent`, `client.preferredC
 - Enable the Claude cloud routine hourly, with developer confirmation.
 - Verify the first production runs.
 
+## Cleanup Phase A (`bf21b44`..`6c96f4c`, 2026-11-21, branch `chore/cleanup-and-review`, not pushed or merged)
+
+Branched from `feat/hunting-rules` (`8ada36c`). Chain: `chore/codebase-cleanup` -> `feat/rich-job-data` ->
+`feat/sync-schedule` -> `feat/scheduler-active-profile` -> `feat/hunting-rules` -> `chore/cleanup-and-review`; none is
+pushed, merged or deployed. Seven commits; reasons below are taken from the commit messages.
+
+### Implemented
+
+- `bf21b44` Remove n8n: runs always execute in-process (as in production). Removed the n8n executor option and webhook
+  dispatch, `RUN_EXECUTOR` / `N8N_*` / `INTERNAL_API_SECRET`, the signed `/api/internal/runs/*` routes and the
+  `internalRoute` wrapper (`src/lib/http/api.ts`), `src/lib/security/hmac.ts` (only n8n used it), the n8n integration
+  check and card, the `n8n/` folder (workflow and docs), the lease guard only those routes called, and their tests
+  (`tests/unit/n8n-workflow.test.ts` deleted; the engine lease test now calls the engine directly).
+  `agent_runs.executor` is still written (`"inprocess"`); snapshots read older values such as `"n8n"` tolerantly
+  (`src/modules/runs/snapshot.ts`).
+- `91c9789` Remove the self-hosting stack: Compose web/migrate/Caddy/n8n services, `docker-compose.prod.yml`,
+  `docker-compose.cloudflare.yml`, `deploy/Caddyfile*`, `scripts/deploy.sh`, `backup-db.sh`, `restore-db.sh`, the
+  Dockerfile migrator stage and the CI SSH deploy job. Kept: `Dockerfile` (Render builds it) and `docker-compose.yml`
+  with only the local Postgres; CI builds the image and validates the compose file. The client-IP comment no longer
+  claims Caddy protects `X-Forwarded-For`.
+- `c4ee6e3` Remove the unbuilt Upwork API job source (`src/modules/job-sources/upwork-provider.ts`, a placeholder that
+  always reported "not authorized"), `JOB_SOURCE_PROVIDER=upwork`, `UPWORK_CLIENT_ID` / `UPWORK_CLIENT_SECRET` /
+  `UPWORK_JOB_SEARCH_SCOPE_CONFIRMED`, the reserved `JOB_SOURCE_API_BASE_URL` / `JOB_SOURCE_API_KEY`, and the
+  Integrations text about an API key. `docs/upwork-access.md` is now a short future-option note.
+- `c59833b` Remove `scripts/upwork-sync.ps1` (PC / Task Scheduler sync) and its `logs/` ignore rule; the Claude cloud
+  routine is the only scheduler. `.upwork-sync/` stays (the routine uses it).
+- `f0339ad` Remove WhatsApp leftovers. Migration `database/migrations/0006_remove_whatsapp.sql`: deletes WhatsApp
+  notifications (and their attempts) and recipients, maps `DELIVERED`/`READ` to `SENT`, deletes the `whatsapp` and
+  `n8n` `integration_status` rows, recreates `notification_channel` as `EMAIL` only and `notification_status` without
+  `DELIVERED`/`READ`, drops `recipients_owner_phone_uq` and the address check, makes `email` NOT NULL, drops
+  `phone_e164`, `delivered_at`, `read_at`. Code (schema, recipients, notifications, transitions, dashboard, jobs and run
+  counters, UI) is e-mail only; three raw-SQL filters were updated so they do not fail once the enum values are gone.
+  Audit actor `WEBHOOK` kept for old entries, labelled "Webhook (old)" (`src/components/audit/audit-table.tsx:62`); new
+  code cannot write it.
+- `bb0494b` Fake providers are test-only: `AI_PROVIDER`, `JOB_SOURCE_PROVIDER`, `MOCK_SOURCE_SCENARIO`,
+  `ALLOW_MOCK_PROVIDERS` removed; `EMAIL_PROVIDER` is `smtp` (default) or `brevo` (`src/lib/configuration/env.ts:39`).
+  The app always uses the import source, OpenAI and real e-mail; an unconfigured one reports `NOT_CONFIGURED`. Fakes
+  moved to `tests/fakes/` (including the mock source the hunting-rules section mentions). Integration tests install
+  them in setup; e2e sets `E2E_FAKE_PROVIDERS=1`, which `src/instrumentation.ts` refuses unless `APP_BASE_URL` is a
+  localhost address (`tests/unit/instrumentation.test.ts`). Demo banner and "Mock source" / "(mock)" labels removed.
+- `d80d2ca` and `6c96f4c` Docs: README, architecture, API, database, security, testing, troubleshooting, Upwork sync,
+  `docs/PENDING.md` (also records that scheduled syncing was allowed on 2026-11-17); `docs/deployment.md` rewritten
+  around Render + Neon, local Postgres, CI and `pg_dump` backups. `6c96f4c` corrects the start-up failure description:
+  when the instrumentation hook throws (failed migration or the `E2E_FAKE_PROVIDERS` guard), the server stays up and
+  answers every request, including `/api/health`, with an error; still fail-closed (Render keeps the previous version).
+
+### Verification (reported by the implementing session, not re-run by the tracker)
+
+- Typecheck, lint, prettier clean. Unit 199/199; integration 91/91.
+- E2E (Playwright) 19/19, run before the final comment/test-only commits.
+- Production Docker image builds; `docker compose config` valid.
+- `E2E_FAKE_PROVIDERS` guard checked against the production image: every request, including `/api/health`, errors.
+
+### Open items
+
+- Before deploying `0006`: check the production database read-only for WhatsApp rows (not done yet).
+- Phase B (area reviews) and Phase C of the cleanup: not started.
+- Push, merge and deploy the branch chain (needs the developer's OK).
+- Re-enable the Claude cloud routine (needs the developer's OK).
+- Open from `91c9789`: whether Render protects `X-Forwarded-For` (for the client-IP rate limit), for the security review.
+
 ## Environment notes
 
 - Windows 11, Node 22.17.0, Next.js 16.4.0 (16.4.5 on the Phase H branch; 16.4.6 on `ci-cd` from `b3191c0`; Docker/CI use Node 22.23.5), PostgreSQL 16 via Docker (`127.0.0.1:55432`).
@@ -1454,7 +1516,7 @@ maxInvitesSent, rejectIfHired}`, `client.minHireRatePercent`, `client.preferredC
   pushed. `cloud-routine-sync` is pushed to origin (contains the `ci-cd` commits); the `ci-cd` branch itself is not pushed (2026-11-14).
 - Phase G: the Turbopack build passed in the worktree because it had its own `npm ci` `node_modules` (earlier worktrees
   used a junction outside the project root, which Turbopack rejects).
-- No OpenAI, SMTP or Upwork API credentials; those integrations run in mock mode. WhatsApp was removed on 2026-11-14. Phase H reaches Upwork only
+- Development PC: no OpenAI or SMTP credentials locally (production has OpenAI and Brevo on Render). Since 2026-11-21 the app has no mock mode; only the automated tests use fakes (tests/fakes). WhatsApp was removed on 2026-11-14. Phase H reaches Upwork only
   through Claude's Upwork connector (developer's Freelancer account).
 - Port 3000 on the developer's machine was in use by the developer's own `next` server (started from the main
   checkout on 2026-10-11 22:11) and was left running. C2 previews used port 3200 with `APP_BASE_URL` overridden to
