@@ -26,7 +26,6 @@ export async function createRun(
   actor: Actor,
   input: { profileId: string; idempotencyKey: string; jobSource?: "configured" | "import" },
   requestId?: string,
-  dispatch: typeof dispatchRun = dispatchRun,
 ): Promise<{ run: RunRow; created: boolean }> {
   requireRole(actor, "OPERATOR");
   // Import runs process staged jobs; the snapshot records that source so the run never switches.
@@ -86,14 +85,7 @@ export async function createRun(
     throw error;
   }
 
-  const dispatched = await dispatch(run.id);
-  if (!dispatched.ok) {
-    const failed = await transitionRun(db, run.id, "FAILED", {
-      finishedAt: new Date(),
-      errorSummary: { code: "EXECUTOR_UNAVAILABLE", message: dispatched.error, stage: null },
-    });
-    return { run: failed ?? run, created: true };
-  }
+  dispatchRun(run.id);
   return { run, created: true };
 }
 
@@ -263,8 +255,7 @@ export async function resumeRun(db: Database, actor: Actor, id: string, requestI
   if (run.leaseExpiresAt && run.leaseExpiresAt.getTime() > Date.now()) {
     throw new AppError("LEASE_HELD", "The run is still being processed; try again after its lease expires");
   }
-  const dispatched = await dispatchRun(id);
-  if (!dispatched.ok) throw new AppError("EXECUTOR_UNAVAILABLE", dispatched.error);
+  dispatchRun(id);
   await recordAudit(db, {
     actor: userActor(actor.id),
     action: "run.resume",

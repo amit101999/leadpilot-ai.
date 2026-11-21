@@ -71,6 +71,10 @@ describe("OpenAiEvaluator.evaluate", () => {
       "RATE_LIMIT",
     );
     expect((await evaluationError(respond(500, { error: { message: "boom" } }))).kind).toBe("PROVIDER");
+    // A revoked key or a bad request fails the same way every time: never retried.
+    for (const status of [400, 401, 403, 404]) {
+      expect((await evaluationError(respond(status, { error: { message: "no" } }))).kind).toBe("REJECTED");
+    }
 
     const hang = vi.fn(
       (_url: unknown, init?: RequestInit) =>

@@ -84,6 +84,22 @@ describe("hard filters — initial profile", () => {
     expect(rule(summary, "PAYMENT_VERIFIED").effect).toBe("REJECT");
   });
 
+  it("treats a client rating or spend it cannot read as unknown, never as 0", () => {
+    const summary = evaluateHardChecks(
+      makeJob({ clientTotalSpent: "10K+", clientRating: "excellent" }),
+      config((c) => {
+        c.client.minTotalSpent = "100.00";
+        c.client.minRating = 4;
+      }),
+      context,
+    );
+    expect(rule(summary, "CLIENT_SPEND")).toMatchObject({ outcome: "UNKNOWN", reasonCode: "SPEND_UNKNOWN" });
+    expect(rule(summary, "CLIENT_RATING")).toMatchObject({
+      outcome: "UNKNOWN",
+      reasonCode: "RATING_UNKNOWN",
+    });
+  });
+
   it("marks a missing budget as UNKNOWN and rejects under the default policy", () => {
     const summary = evaluateHardChecks(makeJob({ budgetAmount: null }), config(), context);
     expect(rule(summary, "BUDGET").outcome).toBe("UNKNOWN");

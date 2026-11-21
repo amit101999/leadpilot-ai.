@@ -265,6 +265,19 @@ describe("run leases (one execution drives a run at a time)", () => {
     await expect(step(runId, "exec-B")).resolves.toBeDefined();
   });
 
+  it("a runner that finds the lease held stops without failing the run the other runner is driving", async () => {
+    const user = await createUser("OPERATOR");
+    const runId = await newRun(user);
+    await step(runId, "exec-A");
+    const result = await runInProcess(getDb(), getProviders(), runId, {
+      sleep: async () => {},
+      executorId: "exec-B",
+    });
+    expect(result.terminal).toBe(false);
+    const run = await call(getRun, { user, params: { id: runId } });
+    expect(run.json.data.status).not.toBe("FAILED");
+  });
+
   it("sanitises the failure message it stores", async () => {
     const user = await createUser("OPERATOR");
     const runId = await newRun(user);

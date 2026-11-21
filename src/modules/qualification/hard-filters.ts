@@ -314,13 +314,14 @@ function checkClient(job: NormalizedJob, config: ProfileConfig): HardCheckResult
 
   if (client.minRating === null) {
     checks.push(notApplicable("CLIENT_RATING", "No minimum client rating"));
-  } else if (job.clientRating === null) {
+  } else if (job.clientRating === null || toCents(job.clientRating) === null) {
+    // A value that cannot be read is unknown, never 0 (which would reject the job).
     checks.push(
       result("CLIENT_RATING", "UNKNOWN", unknown, "RATING_UNKNOWN", "Client rating is unavailable"),
     );
   } else {
     // Ratings have 2 decimals; compare in hundredths to avoid float issues.
-    const observed = toCents(job.clientRating) ?? 0n;
+    const observed = toCents(job.clientRating)!;
     const ok = observed >= BigInt(Math.round(client.minRating * 100));
     checks.push(
       ok
@@ -358,12 +359,12 @@ function checkClient(job: NormalizedJob, config: ProfileConfig): HardCheckResult
 
   if (client.minTotalSpent === null) {
     checks.push(notApplicable("CLIENT_SPEND", "No minimum client spend"));
-  } else if (job.clientTotalSpent === null) {
+  } else if (job.clientTotalSpent === null || toCents(job.clientTotalSpent) === null) {
     checks.push(
       result("CLIENT_SPEND", "UNKNOWN", unknown, "SPEND_UNKNOWN", "Client total spend is unavailable"),
     );
   } else {
-    const ok = (toCents(job.clientTotalSpent) ?? 0n) >= (toCents(client.minTotalSpent) ?? 0n);
+    const ok = toCents(job.clientTotalSpent)! >= (toCents(client.minTotalSpent) ?? 0n);
     checks.push(
       ok
         ? pass("CLIENT_SPEND", "Client spend meets minimum")
@@ -413,7 +414,7 @@ function checkClient(job: NormalizedJob, config: ProfileConfig): HardCheckResult
       result("CLIENT_LOCATION", "UNKNOWN", unknown, "LOCATION_UNKNOWN", "Client location is unavailable"),
     );
   } else {
-    const country = job.clientCountry.toLowerCase();
+    const country = job.clientCountry.trim().toLowerCase();
     const ok = (allowed.length === 0 || allowed.includes(country)) && !blocked.includes(country);
     checks.push(
       ok

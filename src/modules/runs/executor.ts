@@ -4,13 +4,11 @@ import { logger } from "@/lib/logging/logger";
 import { getProviders } from "@/modules/providers";
 import { runInProcess } from "./engine";
 
-export type DispatchResult = { ok: true } | { ok: false; error: string };
-
 /**
  * Starts a queued run in this process, after the HTTP response is sent. Every step is idempotent and
  * lease-protected, so a run interrupted by a restart can be resumed.
  */
-export async function dispatchRun(runId: string): Promise<DispatchResult> {
+export function dispatchRun(runId: string): void {
   const work = async () => {
     try {
       await runInProcess(getDb(), getProviders(), runId);
@@ -24,5 +22,4 @@ export async function dispatchRun(runId: string): Promise<DispatchResult> {
     // No request scope (e.g. a follow-up run started by a finishing run): run in the background.
     void work();
   }
-  return { ok: true };
 }

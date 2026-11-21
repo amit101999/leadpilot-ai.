@@ -34,7 +34,6 @@ import type { MockEmailProvider } from "../fakes/mock-email";
 import { defaultProfileConfig, type ProfileConfig } from "@/modules/profiles/config-schema";
 import { getProviders, setProvidersForTesting } from "@/modules/providers";
 import { failRun, runInProcess, runStep } from "@/modules/runs/engine";
-import { dispatchRun } from "@/modules/runs/executor";
 import { call, createUser, type TestUser } from "./helpers";
 
 const email = () => getProviders().email as MockEmailProvider;
@@ -596,17 +595,6 @@ describe("import robustness (code review fixes)", () => {
 
     const runs = await runsOf(profileId);
     expect(runs.map((r) => r.status)).toEqual(["CANCELLED"]);
-    expect((await staged(profileId)).map((s) => s.status)).toEqual(["PENDING"]);
-  });
-
-  it("reports FAILED, not STARTED, when the import run cannot start", async () => {
-    const user = await createUser("OPERATOR");
-    const profileId = await newProfile(user);
-    const token = await newToken(user);
-    vi.mocked(dispatchRun).mockResolvedValueOnce({ ok: false, error: "n8n webhook could not be reached" });
-
-    const res = await commit(token.bearer, profileId, [upworkJob()]);
-    expect(res.json.data).toMatchObject({ status: "FAILED", error: "n8n webhook could not be reached" });
     expect((await staged(profileId)).map((s) => s.status)).toEqual(["PENDING"]);
   });
 

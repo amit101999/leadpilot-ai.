@@ -80,7 +80,13 @@ async function evaluateOne(ctx: RunContext, runJob: RunJobRow, jobRow: JobRow): 
       else lastError = validation.error;
     } catch (error) {
       lastError = sanitizeErrorMessage(error);
-      if (error instanceof AiProviderError && error.kind === "NOT_CONFIGURED") break;
+      // Retrying cannot fix a missing key or a refused request; it would only repeat the call for every job.
+      if (error instanceof AiProviderError && (error.kind === "NOT_CONFIGURED" || error.kind === "REJECTED"))
+        break;
+      // A rate limit needs a pause before the next attempt (2 s, then 4 s, at most 8 s).
+      if (error instanceof AiProviderError && error.kind === "RATE_LIMIT" && attempts < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, Math.min(2_000 * 2 ** (attempts - 1), 8_000)));
+      }
     }
   }
 

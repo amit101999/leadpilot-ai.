@@ -2,7 +2,15 @@ import { randomUUID } from "node:crypto";
 import type { Database } from "@/lib/database/client";
 import { logger } from "@/lib/logging/logger";
 import type { Providers } from "@/modules/providers";
-import { enterRun, STEP_TO_STAGE, terminalResponse, type StageResponse, type StageStep } from "./context";
+import { AppError } from "@/lib/http/errors";
+import {
+  enterRun,
+  loadRun,
+  STEP_TO_STAGE,
+  terminalResponse,
+  type StageResponse,
+  type StageStep,
+} from "./context";
 import { notifyStep } from "./delivery";
 import { discoverStep, startStep } from "./discovery";
 import { evaluateStep } from "./evaluation";
@@ -65,6 +73,13 @@ export async function runInProcess(
         last = await runStep(db, providers, runId, step, executorId);
         break;
       } catch (error) {
+        // Another runner holds the lease (a second Resume, or a step that outlived its lease): that runner
+        // drives the run. Stop here; failing the run would end work the other runner is still doing.
+        if (error instanceof AppError && error.code === "LEASE_HELD") {
+          log.info({ workflow_stage: STEP_TO_STAGE[step] }, "Run is driven by another executor; stopping");
+          const current = await loadRun(db, runId);
+          return { runId, step, runStatus: current.status, terminal: false, next: null };
+        }
         log.warn({ workflow_stage: STEP_TO_STAGE[step], attempt, err: error }, "Run step failed");
         if (attempt >= MAX_STEP_ATTEMPTS) {
           const failed = await failRun(db, providers, runId, { stage: STEP_TO_STAGE[step], error });

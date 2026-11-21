@@ -418,8 +418,9 @@ export async function commitJobs(
   });
 
   let runId: string | null = null;
-  let status: "STARTED" | "QUEUED" | "FAILED" | "NOTHING_TO_IMPORT" = "NOTHING_TO_IMPORT";
-  let error: string | null = null;
+  let status: "STARTED" | "QUEUED" | "NOTHING_TO_IMPORT" = "NOTHING_TO_IMPORT";
+  // Kept in the response for the import script; starting a run can no longer fail since n8n was removed.
+  const error: string | null = null;
   if (toStage.length > 0) {
     try {
       const { run } = await createRun(
@@ -431,14 +432,7 @@ export async function commitJobs(
       );
       runId = run.id;
       await db.update(importBatches).set({ runId }).where(eq(importBatches.id, batch.id));
-      if (run.status === "FAILED") {
-        // The run could not start; the jobs stay queued for the next sync or run.
-        status = "FAILED";
-        error =
-          (run.errorSummary as { message?: string } | null)?.message ?? "The import run could not start";
-      } else {
-        status = "STARTED";
-      }
+      status = "STARTED";
     } catch (caught) {
       if (!(caught instanceof AppError && caught.code === "RUN_ALREADY_ACTIVE")) throw caught;
       status = "QUEUED";

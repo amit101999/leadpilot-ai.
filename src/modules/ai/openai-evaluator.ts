@@ -85,6 +85,9 @@ export class OpenAiEvaluator implements AiEvaluator {
       }
       if (error instanceof OpenAI.RateLimitError)
         throw new AiProviderError("OpenAI rate limit", "RATE_LIMIT");
+      if (error instanceof OpenAI.APIError && [400, 401, 403, 404, 422].includes(error.status ?? 0)) {
+        throw new AiProviderError(`OpenAI refused the request (status ${error.status})`, "REJECTED");
+      }
       if (error instanceof OpenAI.APIError) {
         throw new AiProviderError(`OpenAI API error (status ${error.status ?? "n/a"})`, "PROVIDER");
       }

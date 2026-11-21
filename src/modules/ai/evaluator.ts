@@ -34,7 +34,8 @@ export interface AiConnection {
 export class AiProviderError extends Error {
   constructor(
     message: string,
-    readonly kind: "TIMEOUT" | "RATE_LIMIT" | "PROVIDER" | "NOT_CONFIGURED",
+    /** REJECTED: the request itself was refused (bad key, no access, bad request); retrying cannot help. */
+    readonly kind: "TIMEOUT" | "RATE_LIMIT" | "PROVIDER" | "REJECTED" | "NOT_CONFIGURED",
   ) {
     super(message);
     this.name = "AiProviderError";
