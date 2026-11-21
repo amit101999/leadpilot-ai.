@@ -7,8 +7,8 @@ refuses unless `APP_BASE_URL` is a localhost address. The app itself has no fake
 
 | Suite       | Command                    | Runner                        | Needs                                | Count (2026-11-21)          |
 | ----------- | -------------------------- | ----------------------------- | ------------------------------------ | --------------------------- |
-| Unit        | `npm run test:unit`        | Vitest, project `unit`        | nothing                              | 199 tests                   |
-| Integration | `npm run test:integration` | Vitest, project `integration` | Postgres and `TEST_DATABASE_URL`     | 91 tests                    |
+| Unit        | `npm run test:unit`        | Vitest, project `unit`        | nothing                              | 207 tests                   |
+| Integration | `npm run test:integration` | Vitest, project `integration` | Postgres and `TEST_DATABASE_URL`     | 95 tests                    |
 | End to end  | `npm run test:e2e`         | Playwright (Chromium)         | Postgres and `TEST_DATABASE_URL`     | 19 tests                    |
 | Live        | `npm run test:live`        | Vitest, project `live`        | `LIVE_TESTS=1` plus real credentials | 3 tests, skipped by default |
 

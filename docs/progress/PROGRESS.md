@@ -35,6 +35,7 @@ Plan: `C:\Users\ACER\.claude\plans\clever-noodling-finch.md`.
 | Scheduler + active       | App-wide sync scheduler, one active profile per user (replaces default)       | 🟡 `6e0f0d5` on `feat/scheduler-active-profile` (2026-11-21), not pushed or merged; e2e not run              |
 | Hunting checklist rules  | Competition and hire-rate hard rules, priority-country score bonus            | 🟡 `44d1079` on `feat/hunting-rules` (2026-11-21), not pushed or merged; e2e not run                         |
 | Cleanup Phase A          | Remove n8n, self-hosting, Upwork API stub, PC sync, WhatsApp; fakes test-only | 🟡 `bf21b44`..`6c96f4c` on `chore/cleanup-and-review` (2026-11-21, from hunting-rules), not pushed or merged |
+| Cleanup Phase B          | Area-by-area review fixes (areas 1-8)                                         | 🟡 `13da365`..`2d499af` on `chore/cleanup-and-review` (2026-11-21), not pushed or merged; all checks pass    |
 
 ## Baseline (pre-existing work, committed 2026-10-11 as `703761f`)
 
@@ -1503,10 +1504,93 @@ pushed, merged or deployed. Seven commits; reasons below are taken from the comm
 ### Open items
 
 - Before deploying `0006`: check the production database read-only for WhatsApp rows (not done yet).
-- Phase B (area reviews) and Phase C of the cleanup: not started.
+- Phase B (area reviews): done, see the next section. Phase C of the cleanup: not started.
 - Push, merge and deploy the branch chain (needs the developer's OK).
 - Re-enable the Claude cloud routine (needs the developer's OK).
 - Open from `91c9789`: whether Render protects `X-Forwarded-For` (for the client-IP rate limit), for the security review.
+
+## Cleanup Phase B (2026-11-21): area-by-area review (`13da365`..`2d499af`, branch `chore/cleanup-and-review`, not pushed or merged)
+
+Commits after `f452ac5`, one per review area, in commit order. Reasons are taken from the commit messages.
+
+### Implemented
+
+- `13da365` Area 1, auth: logout now clears the production `__Host-` session cookie with the attributes it was set with
+  (browsers ignored the old Set-Cookie without Secure/Path, so the stale cookie stayed; the server session was already
+  deleted). Request bodies are measured in bytes after reading, since Content-Length can be missing
+  (`src/lib/http/api.ts`). Stale webhook/n8n comments and the unused `INTEGRATION_NOT_CONFIGURED` code removed.
+- `ddedd9c` Area 2, profiles: an unchanged save no longer creates a new version (JSONB reorders keys, so the JSON-text
+  comparison never matched; parsed configurations are compared now). The old per-profile sync switch no longer blocks
+  saving a profile without keywords. A profile whose saved recipient was archived or lost opt-in can be saved again (the
+  editor starts from "No recipient" and explains why; `src/components/profiles/recipient-options.ts`). Admins are
+  offered only the profile owner's recipients (only those are accepted). The dashboard counts active (synced) profiles.
+- `5763889` Area 3, sync: a successful sync counts from its window end, not from when the status report arrived (that
+  turned "every hour" into every two). Concurrent status reports can no longer move the window or last-sync time
+  backwards. The window cap is 26 h (24 h removed the 30-minute overlap for daily syncs). An import run claims at most
+  500 staged jobs, oldest first (discovery links at most 500; the rest were marked consumed and never processed); the
+  rest go to the follow-up run. `upwork-sync` skill: a keyword that hits the page limit is reported PARTIAL instead of
+  a silent OK, and unsafe job ids are skipped before being used as file names. `scripts/leadpilot-import.mjs` refuses
+  redirects so the token is never forwarded.
+- `3c65301` Area 6, leads: "Any status" now really shows every decision (the page sent no filter and `listLeads`
+  defaulted to QUALIFIED); `any` is a real filter value for the page, `GET /api/leads` and the CSV export. With a
+  profile filter, alert status and the "notified" flag only consider that profile's alerts. Client spend on the job
+  page is shown in USD (Upwork reports it in USD).
+- `e8165ec` Area 4, runs: a runner that finds the lease held by another runner stops and leaves the run to it (it used
+  to retry and then mark the run FAILED while the other runner was working). OpenAI refusals (400/401/403/404/422) stop
+  after the first attempt (kind `REJECTED`) instead of being retried for every job; rate limits back off 2 s, 4 s (max
+  8 s). Unreadable client rating or spend counts as unknown (the profile's unknown-data policy applies) instead of 0;
+  client country is trimmed. Dead code from the n8n removal (`EXECUTOR_UNAVAILABLE` branches, FAILED import status
+  path, its test and error code) removed.
+- `e0e28a8` Area 5, notifications: a SENDING alert older than 10 minutes (process died during a manual retry) is
+  treated as "delivery unknown" and can be retried after the 15-minute wait with the "not received" confirmation. A
+  manual retry that gets a temporary refusal now ends FAILED_PERMANENT (FAILED_RETRYABLE on a finished run waited for an
+  automatic retry that never comes). Brevo 502/504 is treated as uncertain (never resent automatically); an accepted
+  send without a Brevo message id gets a unique fallback id (the column is unique). Recipient e-mail is trimmed before
+  the format check. Unreachable WhatsApp branch removed.
+- `f7e0649` Area 8, database: a remote database URL with `sslmode=require`/`prefer`/`allow` is upgraded to
+  `verify-full` (postgres.js turned `require` into `rejectUnauthorized: false`, so the certificate was not checked);
+  local URLs unchanged (`src/lib/database/url.ts`, tests in `tests/unit/database-url.test.ts`). Docs and comment
+  corrected: a failed migration exits the process; rollback past `0005`/`0006` needs a database restore. Migration
+  `0005` (not yet in production) no longer aborts on a non-boolean stored sync switch. This replaces the start-up
+  failure description recorded in Cleanup Phase A (`6c96f4c`).
+- `2d499af` Area 7, settings: the audit log can filter import commits and import-token creation/revocation (and the
+  "Import token" record type); `GET /api/audit-logs` treats a date-only "to" as the whole day, like the page. Revoking
+  an import token asks for confirmation (irreversible and stops the sync that uses it); a failed copy of a new token
+  shows an error (the token is shown only once). Sync scheduler "Discard changes" also clears old validation messages.
+  Integrations no longer asks for the removed `AI_PROVIDER`.
+
+### Verification (reported by the implementing session, not re-run by the tracker)
+
+- Typecheck and lint clean. Unit 207/207; integration 95/95.
+- E2E (Playwright) 19/19, run after the area 1-6 and 8 code; final run after all areas (incl. area 7):
+  19/19 (2026-11-21). Production Docker image builds. Area 9 (config, CI, Dockerfile, docs): every setting used,
+  no unknown settings configured, CI clean, `npm audit --omit=dev` 0 vulnerabilities.
+
+### Reported, not fixed (low)
+
+- Hourly leads show "Unknown" budget on Leads and in the CSV.
+- Restoring a profile version drops unsaved edits.
+- A job re-committed while its run is active can be processed twice.
+- Very short active hours may never sync.
+- The admin username can be locked out by failed logins.
+- The Integrations badge can look green after a provider switch.
+- Integrations does not show the names of missing variables.
+- Foreign-key columns without indexes: `notification_attempts.run_id`, `notifications.recipient_id`,
+  `staged_jobs.batch_id`.
+
+### Open decisions for the developer
+
+- Revoke import tokens on password change.
+- End env-admin sessions when `ADMIN_PASSWORD` changes.
+- Check `X-Forwarded-For` handling live after deploy.
+- Verify Neon accepts `sslmode=verify-full` on the first deploy.
+- Push, merge and deploy need the developer's OK.
+- Check production read-only for WhatsApp rows before `0006`.
+
+### Note
+
+- The Upwork connector is on a different Claude account (the cloud routine's); this development session is
+  intentionally not connected to it.
 
 ## Environment notes
 
