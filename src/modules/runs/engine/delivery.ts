@@ -133,7 +133,7 @@ export async function deliverNotification(
     }
   }
 
-  const { status, update } = applyOutcome(claimed, outcome);
+  const { status, update } = applyOutcome(claimed, outcome, options.manual);
   await db.transaction(async (tx) => {
     await tx
       .update(notifications)
@@ -161,15 +161,6 @@ async function sendOnChannel(
   claimed: NotificationRow,
   recipient: RecipientRow,
 ): Promise<SendOutcome> {
-  if (claimed.channel !== "EMAIL") {
-    // Records from before WhatsApp alerts were removed cannot be sent any more.
-    return {
-      kind: "rejected",
-      retryable: false,
-      httpStatus: null,
-      error: "WhatsApp alerts are no longer sent",
-    };
-  }
   const payload = claimed.payload as { email?: { subject: string; text: string; html: string } };
   if (!recipient.email || !payload.email) {
     return {
@@ -189,6 +180,7 @@ async function sendOnChannel(
 function applyOutcome(
   row: NotificationRow,
   outcome: SendOutcome,
+  manual: boolean,
 ): { status: NotificationStatus; update: Partial<NotificationRow> } {
   switch (outcome.kind) {
     case "accepted":
@@ -208,7 +200,9 @@ function applyOutcome(
       };
     case "rejected": {
       const error = sanitizeErrorMessage(outcome.error);
-      if (outcome.retryable && row.attempts < MAX_SEND_ATTEMPTS) {
+      // Automatic retries happen only inside a run; a manual retry that fails ends as FAILED_PERMANENT so it
+      // does not wait for a retry that never comes (the operator can retry it again).
+      if (!manual && outcome.retryable && row.attempts < MAX_SEND_ATTEMPTS) {
         const delay = Math.min(MAX_BACKOFF_MS, BASE_BACKOFF_MS * 2 ** (row.attempts - 1));
         return {
           status: "FAILED_RETRYABLE",

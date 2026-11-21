@@ -57,6 +57,19 @@ describe("Brevo outcome classification", () => {
     expect(classifyBrevoResponse(503, null)).toMatchObject({ kind: "rejected", retryable: true });
   });
 
+  it("treats a gateway error (502/504) as uncertain: Brevo may have taken the message", () => {
+    expect(classifyBrevoResponse(502, null).kind).toBe("uncertain");
+    expect(classifyBrevoResponse(504, null).kind).toBe("uncertain");
+  });
+
+  it("gives each accepted message without a Brevo id its own id (the column is unique)", () => {
+    const a = classifyBrevoResponse(201, {});
+    const b = classifyBrevoResponse(201, {});
+    expect(
+      a.kind === "accepted" && b.kind === "accepted" && a.providerMessageId !== b.providerMessageId,
+    ).toBe(true);
+  });
+
   it("retries only requests that never left; anything else is uncertain", () => {
     expect(classifyBrevoNetworkError({ cause: { code: "ENOTFOUND" } })).toMatchObject({
       kind: "rejected",

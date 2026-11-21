@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { sanitizeErrorMessage } from "@/lib/security/sanitize";
 import type { EmailProvider, OutboundEmail } from "./email-provider";
 import type { ProviderConnection, SendOutcome } from "./provider";
@@ -122,10 +123,13 @@ export function classifyBrevoResponse(
   body: { messageId?: unknown; message?: unknown } | null,
 ): SendOutcome {
   if (status >= 200 && status < 300) {
-    const id = typeof body?.messageId === "string" ? body.messageId : `brevo-${status}`;
+    // provider_message_id is unique, so a fallback id must be unique too.
+    const id = typeof body?.messageId === "string" ? body.messageId : `brevo-${status}-${randomUUID()}`;
     return { kind: "accepted", providerMessageId: id, httpStatus: status };
   }
   const detail = sanitizeErrorMessage(typeof body?.message === "string" ? body.message : `HTTP ${status}`);
+  // A gateway error (502/504) can come after Brevo took the message: never resend automatically.
+  if (status === 502 || status === 504) return { kind: "uncertain", error: `Brevo ${status}: ${detail}` };
   // Rate limited or a server-side failure: Brevo did not take the message, so it is safe to try again later.
   const retryable = status === 429 || status >= 500;
   return { kind: "rejected", retryable, httpStatus: status, error: `Brevo ${status}: ${detail}` };

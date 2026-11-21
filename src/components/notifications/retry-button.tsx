@@ -28,7 +28,7 @@ export function RetryButton({
   notification: { id: string; status: string; lastAttemptAt: Date | string | null; updatedAt: Date | string };
 }) {
   const router = useRouter();
-  const mode = retryModeFor(notification.status);
+  const mode = retryModeFor(notification.status, notification.lastAttemptAt);
   const eligibleAt = uncertainRetryEligibleAt(notification.lastAttemptAt, notification.updatedAt).getTime();
   const [now, setNow] = useState(() => Date.now());
   const [open, setOpen] = useState(false);

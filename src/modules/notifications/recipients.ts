@@ -11,7 +11,8 @@ import { recordAudit, userActor } from "@/modules/audit/service";
 export const createRecipientSchema = z.object({
   channel: z.literal("EMAIL").default("EMAIL"),
   label: z.string().trim().min(1).max(80),
-  email: z.email("Enter a valid e-mail address").trim().toLowerCase().max(254),
+  // Trim before the format check (Zod 4 checks first otherwise, so " a@b.com " was refused).
+  email: z.string().trim().toLowerCase().max(254).pipe(z.email("Enter a valid e-mail address")),
   /** The user confirms the recipient has opted in to receive alerts from this business. */
   optInConfirmed: z.boolean(),
 });

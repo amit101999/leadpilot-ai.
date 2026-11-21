@@ -18,7 +18,7 @@ import { deliverNotification } from "@/modules/runs/engine/delivery";
 import { escapeLike } from "@/modules/runs/service";
 import type { NotificationStatus } from "@/types/domain";
 import { getRecipient } from "./recipients";
-import { uncertainRetryEligibleAt } from "./retry-policy";
+import { isStaleSending, uncertainRetryEligibleAt } from "./retry-policy";
 
 export { UNCERTAIN_RETRY_WAIT_MS } from "./retry-policy";
 
@@ -105,7 +105,7 @@ export async function getNotification(db: Database, actor: Actor, id: string) {
  * cause was fixed. UNCERTAIN: only after UNCERTAIN_RETRY_WAIT_MS and with the
  * operator's explicit confirmation that the recipient did not receive it,
  * because the original may have been delivered.
- * Sent, delivered and read messages are never resent.
+ * SENDING is retryable only once stale (see retry-policy.ts). Sent messages are never resent.
  */
 export async function retryNotification(
   db: Database,
@@ -118,10 +118,26 @@ export async function retryNotification(
   requireRole(actor, "OPERATOR");
   const current = await getNotification(db, actor, id);
   let claimFrom: NotificationStatus;
+  let status = current.status;
 
-  if (current.status === "FAILED_RETRYABLE") {
+  if (isStaleSending(status, current.lastAttemptAt)) {
+    // The process that claimed it died mid-send: delivery is unknown, so the UNCERTAIN rules apply.
+    const [moved] = await db
+      .update(notifications)
+      .set({
+        status: "UNCERTAIN",
+        lastError: "The send was interrupted; the message may or may not have arrived",
+        updatedAt: new Date(),
+      })
+      .where(and(eq(notifications.id, id), eq(notifications.status, "SENDING")))
+      .returning({ id: notifications.id });
+    if (!moved) throw new AppError("CONFLICT", "The notification changed meanwhile. Reload and try again.");
+    status = "UNCERTAIN";
+  }
+
+  if (status === "FAILED_RETRYABLE") {
     claimFrom = "FAILED_RETRYABLE";
-  } else if (current.status === "UNCERTAIN") {
+  } else if (status === "UNCERTAIN") {
     const waitLeftMs =
       uncertainRetryEligibleAt(current.lastAttemptAt, current.updatedAt).getTime() - Date.now();
     if (waitLeftMs > 0) {
@@ -139,7 +155,7 @@ export async function retryNotification(
       );
     }
     claimFrom = "UNCERTAIN";
-  } else if (current.status === "FAILED_PERMANENT") {
+  } else if (status === "FAILED_PERMANENT") {
     const [reserved] = await db
       .update(notifications)
       .set({ status: "RESERVED", nextAttemptAt: null, updatedAt: new Date() })
@@ -149,7 +165,7 @@ export async function retryNotification(
       throw new AppError("CONFLICT", "The notification changed meanwhile. Reload and try again.");
     claimFrom = "RESERVED";
   } else {
-    throw new AppError("INVALID_STATE", `A ${current.status} notification cannot be retried`);
+    throw new AppError("INVALID_STATE", `A ${status} notification cannot be retried`);
   }
 
   await recordAudit(db, {
@@ -157,7 +173,7 @@ export async function retryNotification(
     action: "notification.retry",
     entityType: "notification",
     entityId: id,
-    before: { status: current.status },
+    before: { status },
     after: { confirmNotReceived: input.confirmNotReceived === true },
     requestId,
   });

@@ -210,6 +210,47 @@ describe("notifications", () => {
     expect(confirmed.json.data.status).toBe("SENT");
   });
 
+  it("lets an alert stuck in SENDING (the process died mid-send) be retried like an uncertain one", async () => {
+    const user = await createUser("OPERATOR");
+    const { profileId } = await setup(user, 1);
+    email().queueOutcome({
+      kind: "rejected",
+      retryable: false,
+      httpStatus: null,
+      error: "550 Mailbox unavailable",
+    });
+    const runId = await executeRun(user, profileId);
+    const [row] = (await call(runNotifications, { user, params: { id: runId } })).json.data;
+    // Simulate a manual retry whose process died after claiming the row, 5 minutes ago.
+    await getDb()
+      .update(notifications)
+      .set({ status: "SENDING", lastAttemptAt: new Date(Date.now() - 5 * 60_000) })
+      .where(eq(notifications.id, row.id));
+    const tooSoon = await call(retry, {
+      method: "POST",
+      user,
+      params: { id: row.id },
+      body: { confirmNotReceived: true },
+    });
+    expect(tooSoon.status).toBe(409);
+
+    // 20 minutes later it counts as delivery unknown: retried only with the confirmation.
+    await getDb()
+      .update(notifications)
+      .set({ lastAttemptAt: new Date(Date.now() - 20 * 60_000) })
+      .where(eq(notifications.id, row.id));
+    const unconfirmed = await call(retry, { method: "POST", user, params: { id: row.id }, body: {} });
+    expect(unconfirmed.status).toBe(400);
+    const confirmed = await call(retry, {
+      method: "POST",
+      user,
+      params: { id: row.id },
+      body: { confirmNotReceived: true },
+    });
+    expect(confirmed.status).toBe(200);
+    expect(confirmed.json.data.status).toBe("SENT");
+  });
+
   it("hides other users' notifications and blocks VIEWER retries", async () => {
     const owner = await createUser("OPERATOR");
     const other = await createUser("OPERATOR");

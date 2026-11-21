@@ -5,7 +5,7 @@ import { createRecipient, createRecipientSchema, listRecipients } from "@/module
 
 const listQuery = z.object({ includeArchived: q.bool() });
 
-/** Phone numbers are returned masked; the full number never leaves the server after creation. */
+/** E-mail addresses are returned masked; the full address never leaves the server after creation. */
 export const GET = userRoute("VIEWER", async ({ req, db, actor }) => {
   const { includeArchived } = parseQuery(req, listQuery);
   return listRecipients(db, actor, includeArchived ?? false);
