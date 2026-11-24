@@ -120,6 +120,20 @@ describe("priority-country bonus", () => {
     ).toBeNull();
   });
 
+  it("matches the other spellings Upwork uses for a country (seen live: USA)", () => {
+    const c = config();
+    expect(priorityCountryBonus("USA", c)?.points).toBe(5);
+    expect(priorityCountryBonus(" uk ", c)?.points).toBe(5);
+    expect(priorityCountryBonus("Czechia", c)?.points).toBe(5);
+    const blocked = config((x) => {
+      x.client.blockedCountries = ["United States"];
+    });
+    const job = makeJob({ clientCountry: "USA" });
+    expect(
+      evaluateHardChecks(job, blocked, context).results.find((r) => r.rule === "CLIENT_LOCATION")?.outcome,
+    ).toBe("FAIL");
+  });
+
   it("never lifts the score above 100", () => {
     expect(withBonus(72, { country: "Canada", points: 5 })).toBe(77);
     expect(withBonus(98, { country: "Canada", points: 5 })).toBe(100);

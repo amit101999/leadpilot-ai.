@@ -1,5 +1,6 @@
 import type { DimensionScores } from "@/modules/ai/output-schema";
 import type { ProfileConfig, ScoringWeights } from "@/modules/profiles/config-schema";
+import { canonicalCountry } from "./countries";
 
 export const RUBRIC_VERSION = "rubric-2026-10-v1";
 
@@ -71,8 +72,8 @@ export function priorityCountryBonus(
   config: Pick<ProfileConfig, "client" | "ai">,
 ): PriorityBonus | null {
   if (!clientCountry || config.ai.preferredCountryBonus === 0) return null;
-  const country = clientCountry.trim().toLowerCase();
-  const preferred = config.client.preferredCountries.some((c) => c.toLowerCase() === country);
+  const country = canonicalCountry(clientCountry);
+  const preferred = config.client.preferredCountries.some((c) => canonicalCountry(c) === country);
   return preferred ? { country: clientCountry, points: config.ai.preferredCountryBonus } : null;
 }
 

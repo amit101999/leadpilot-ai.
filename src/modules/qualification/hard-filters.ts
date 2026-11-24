@@ -10,6 +10,7 @@ import {
   type SearchableJob,
   type TermMatch,
 } from "./keyword-matching";
+import { canonicalCountry } from "./countries";
 
 export type CheckOutcome = "PASS" | "FAIL" | "UNKNOWN" | "NOT_APPLICABLE";
 /** What a check result means for the job: continue, reject outright, or park for manual review. */
@@ -405,8 +406,8 @@ function checkClient(job: NormalizedJob, config: ProfileConfig): HardCheckResult
     );
   }
 
-  const allowed = client.allowedCountries.map((c) => c.toLowerCase());
-  const blocked = client.blockedCountries.map((c) => c.toLowerCase());
+  const allowed = client.allowedCountries.map(canonicalCountry);
+  const blocked = client.blockedCountries.map(canonicalCountry);
   if (allowed.length === 0 && blocked.length === 0) {
     checks.push(notApplicable("CLIENT_LOCATION", "No location restrictions"));
   } else if (!job.clientCountry) {
@@ -414,7 +415,7 @@ function checkClient(job: NormalizedJob, config: ProfileConfig): HardCheckResult
       result("CLIENT_LOCATION", "UNKNOWN", unknown, "LOCATION_UNKNOWN", "Client location is unavailable"),
     );
   } else {
-    const country = job.clientCountry.trim().toLowerCase();
+    const country = canonicalCountry(job.clientCountry);
     const ok = (allowed.length === 0 || allowed.includes(country)) && !blocked.includes(country);
     checks.push(
       ok
