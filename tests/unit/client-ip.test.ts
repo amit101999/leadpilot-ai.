@@ -8,8 +8,10 @@ describe("client address behind a proxy", () => {
     expect(pickClientIp("198.51.100.7", null, 1)).toBe("198.51.100.7");
   });
 
-  it("can skip more trusted proxies when there are several", () => {
-    expect(pickClientIp("203.0.113.9, 198.51.100.7, 10.0.0.2", null, 2)).toBe("198.51.100.7");
+  it("skips Render's edge server (2 hops): the client is the entry before it", () => {
+    // Seen live: a spoofed first entry, the real client, then an edge server that changes per request.
+    expect(pickClientIp("203.0.113.9, 198.51.100.7, 104.16.0.1", null, 2)).toBe("198.51.100.7");
+    expect(pickClientIp("198.51.100.7, 104.16.0.2", null, 2)).toBe("198.51.100.7");
   });
 
   it("falls back to the first entry, X-Real-IP, then unknown", () => {

@@ -53,10 +53,11 @@ const envSchema = z.object({
   BREVO_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(15000),
 
   /**
-   * How many proxies in front of the app append to X-Forwarded-For (Render: 1). The client address is the entry
-   * that many places from the end; earlier entries are client-supplied and never trusted.
+   * How many proxies in front of the app append to X-Forwarded-For. The client address is the entry that many
+   * places from the end; earlier entries are client-supplied and never trusted. Render: 2 (tested live on
+   * 2026-11-24: the last entry rotates between edge servers, the one before it is the client).
    */
-  TRUSTED_PROXY_HOPS: z.coerce.number().int().min(1).max(5).default(1),
+  TRUSTED_PROXY_HOPS: z.coerce.number().int().min(1).max(5).default(2),
 
   /** Scheduled (unattended) Upwork syncs get no due profiles until this is "true"; manual syncs always work. */
   UPWORK_SYNC_SCHEDULED_ALLOWED: z
