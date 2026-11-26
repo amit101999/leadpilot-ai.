@@ -62,9 +62,12 @@ jobs yourself, and never change a job object you received from Upwork.
    e. **Details.** For each id in `detailsWanted` (at most `limits.maxDetailCalls`) that consists only of
    letters, digits and `~` (skip any other id), call `find_jobs`
    with `action: "get"` and `params: { "id": "<id>" }`, and save the whole response as
-   `.upwork-sync/<profileId>/details/<id>.json`. Stop fetching details for this sync as soon as a
-   response has `error_code` `JOB_BROWSE_COOLDOWN` or two calls in a row fail; the jobs are still
-   imported, just with less client data.
+   `.upwork-sync/<profileId>/details/<id>.json`. Make these calls **one at a time**, never in parallel
+   (parallel `get` calls returned `UPSTREAM` errors on 2026-11-26). If Upwork answers
+   `SENSITIVE_RATE_LIMIT_EXCEEDED`, wait the `retry_after_seconds` it gives and retry that id once; an
+   `UPSTREAM` error may also be retried once after 5 seconds. Stop fetching details for this sync as soon
+   as a response has `error_code` `JOB_BROWSE_COOLDOWN` or two ids in a row fail after their retry; the jobs
+   are still imported, just with less client data.
 
    f. **Import.** Run `node scripts/leadpilot-import.mjs commit <profileId>`. It prints the run that was
    started (`STARTED`) or queued (`QUEUED`), `NOTHING_TO_IMPORT` when no job is new, or `FAILED` with an
