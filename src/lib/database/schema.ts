@@ -64,6 +64,9 @@ export const qualificationDecision = pgEnum("qualification_decision", [
   "AI_ERROR",
 ]);
 
+/** Hot: alerted at once. Warm: kept as a lead, not alerted. Cold: scored below the Warm bar. */
+export const leadTier = pgEnum("lead_tier", ["HOT", "WARM", "COLD"]);
+
 /** Alerts are sent by e-mail. */
 export const notificationChannel = pgEnum("notification_channel", ["EMAIL"]);
 
@@ -419,8 +422,16 @@ export const qualifications = pgTable(
     jobId: uuid("job_id")
       .notNull()
       .references(() => jobs.id, { onDelete: "restrict" }),
-    /** Authoritative score computed by the backend; null when the AI output was invalid. */
+    /**
+     * Lead score computed by the backend (AI fit blended with Potential, plus any priority-country bonus); null when
+     * the AI output was invalid. Before 2026-11-26 it was the AI fit score alone.
+     */
     score: integer("score"),
+    /** The weighted AI fit score (0-100); null for rows from before lead grading. */
+    fitScore: integer("fit_score"),
+    /** The rule-based Potential score (0-100): competition, client, budget fit, long-term work. */
+    potentialScore: integer("potential_score"),
+    tier: leadTier("tier"),
     modelReportedScore: integer("model_reported_score"),
     dimensionScores: jsonb("dimension_scores"),
     decision: qualificationDecision("decision").notNull(),
@@ -448,6 +459,11 @@ export const qualifications = pgTable(
     uniqueIndex("qualifications_run_job_uq").on(t.runId, t.jobId),
     index("qualifications_job_idx").on(t.jobId),
     check("qualifications_score_range_chk", sql`${t.score} is null or (${t.score} between 0 and 100)`),
+    check("qualifications_fit_range_chk", sql`${t.fitScore} is null or (${t.fitScore} between 0 and 100)`),
+    check(
+      "qualifications_potential_range_chk",
+      sql`${t.potentialScore} is null or (${t.potentialScore} between 0 and 100)`,
+    ),
   ],
 );
 

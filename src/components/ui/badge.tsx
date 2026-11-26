@@ -43,6 +43,10 @@ const STATUS: Record<string, { tone: BadgeTone; label: string }> = {
   FILTERED_OUT: { tone: "danger", label: "Filtered out" },
   PENDING_AI: { tone: "neutral", label: "Pending AI" },
   QUALIFIED: { tone: "success", label: "Qualified" },
+  // lead tiers
+  HOT: { tone: "danger", label: "Hot lead" },
+  WARM: { tone: "warning", label: "Warm lead" },
+  COLD: { tone: "neutral", label: "Cold" },
   REJECTED: { tone: "danger", label: "Rejected" },
   NEEDS_REVIEW: { tone: "warning", label: "Needs review" },
   AI_ERROR: { tone: "danger", label: "AI error" },

@@ -71,6 +71,11 @@ Transitions are declared in `src/modules/runs/transitions.ts`; any other transit
    competition on the posting (default: Upwork proposal band "10 to 15" or fewer, at most 3 freelancers interviewing,
    at most 10 invites sent, nobody hired yet; unknown counts pass), URL host checks, and "already notified to this
    recipient". These follow the team's Upwork hunting checklist; each limit is editable per profile.
+   **Soft rules** (profile setting `leads.softRules`, on by default since 2026-11-26): the rules that judge a job's
+   chances rather than whether it is the right work (budget, payment verification, client rating/hires/spend/hire
+   rate, proposals, interviewing, invites) still record their result but no longer reject or park the job
+   (`SOFT_RULES` in `hard-filters.ts`); the Potential score reflects them instead. Job type, currency, skills,
+   keywords, category, location, "already hired" and "already notified" still reject.
    **Priority countries:** a client in one of the profile's preferred countries (default: USA, Canada, Australia, UK
    and European countries) is not required, but adds `ai.preferredCountryBonus` points (default 5) to the score,
    capped at 100. The bonus is stored in the qualification's evidence and shown on the job page and in the lead e-mail.
@@ -82,8 +87,15 @@ Transitions are declared in `src/modules/runs/transitions.ts`; any other transit
    otherwise recorded as `AI_ERROR`. The model's own total score is ignored. The app computes the weighted score from
    the five dimension scores (integer, round half up). The prompt version and a hash of the input are stored with each
    qualification.
-3. **Eligibility**: qualified only if hard filters passed, the output was valid, the score reaches the threshold
-   (default 75), and no disqualifying risk flag applies.
+3. **Potential score** (`potential.ts`, no AI): 0-100 from four signals of 25 points each: competition (proposal
+   band, interviews, invites, posted in the last 6 hours), client (payment verified, hire rate, total spend, rating),
+   budget fit (against the profile's minimum) and long-term work (duration, workload). Unknown data scores in the
+   middle. Its reasons ("Few proposals", "Client hires 80% of the time") are stored in the evidence.
+4. **Lead score and tier**: `round(fit × fitWeight% + potential × (100 − fitWeight)%)` (default 60/40), plus the
+   priority-country bonus, capped at 100. Hot: score ≥ `ai.minScore` (default 75), alerted. Warm: score ≥
+   `ai.minScore − leads.warmBelowHot` (default 20 below), kept as a qualified lead but not alerted. Cold: below that,
+   rejected. A disqualifying risk flag rejects; severe flags (per risk sensitivity) send the job to review.
+   `qualifications` stores `fit_score`, `potential_score` and `tier`; `score` is the lead score.
 
 ## Notifications and delivery guarantees
 

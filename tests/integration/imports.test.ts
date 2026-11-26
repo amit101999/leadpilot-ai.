@@ -130,6 +130,7 @@ async function newToken(user: TestUser) {
 async function newProfile(user: TestUser, mutate?: (c: ProfileConfig) => void) {
   const config = defaultProfileConfig(null);
   config.ai.minScore = 0; // relevance is not under test here; every job passing the rules qualifies
+  config.leads.softRules = false; // these tests cover the rules themselves; soft screening has its own test
   config.search.upworkSync.enabled = true;
   mutate?.(config);
   const res = await call(createProfile, {
@@ -489,6 +490,26 @@ describe("hunting checklist", () => {
       body: { profileId, origin: "upwork-mcp", jobs: [good, hired, crowded, interviewing] },
     });
     expect(res.json.data).toMatchObject({ rejected: 3, detailsWanted: [good.id] });
+  });
+
+  it("with soft rules (the default), screens crowded postings in for scoring; a filled one stays out", async () => {
+    const user = await createUser("OPERATOR");
+    const profileId = await newProfile(user, (c) => (c.leads.softRules = true));
+    const token = await newToken(user);
+    const hired = upworkJob({
+      job_activity: { invites_sent: 2, invited_to_interview: 1, total_offered: 1, total_hired: 1 },
+    });
+    const crowded = upworkJob({ proposals_tier: "20 to 50" });
+    const interviewing = upworkJob({
+      job_activity: { invites_sent: 2, invited_to_interview: 8, total_offered: 0, total_hired: 0 },
+    });
+    const res = await call(screenJobs, {
+      method: "POST",
+      headers: token.bearer,
+      body: { profileId, origin: "upwork-mcp", jobs: [hired, crowded, interviewing] },
+    });
+    expect(res.json.data.rejected).toBe(1);
+    expect([...res.json.data.detailsWanted].sort()).toEqual([crowded.id, interviewing.id].sort());
   });
 
   it("filters a client who rarely hires", async () => {

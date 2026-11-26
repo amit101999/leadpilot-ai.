@@ -26,6 +26,8 @@ export interface LeadMessageInput {
   };
   /** Competition on the posting when the job was imported. */
   competition?: { proposalsTier: string | null; interviewing: number | null; invitesSent: number | null };
+  /** The Potential score's reasons (e.g. "Few proposals", "Client hires 80% of the time"). */
+  promising?: string[];
 }
 
 /** "United States (priority country) · hires on 77% · spent USD 34,286". */
@@ -125,6 +127,11 @@ export function buildLeadEmail(input: LeadMessageInput, format: "STANDARD" | "CO
     ["Matched skills", oneLine(input.skills.length > 0 ? input.skills.join(", ") : "-")],
     ["AI match score", score],
     ["Reason", oneLine(format === "COMPACT" ? input.reason.slice(0, 80) : input.reason, 300)],
+    ...(input.promising && input.promising.length > 0
+      ? ([["Why it's promising", oneLine(input.promising.slice(0, 4).join(" · "), 200)]] as Array<
+          [string, string]
+        >)
+      : []),
   ];
   if (input.riskFlags.length > 0) {
     rows.push(["Risks", oneLine(input.riskFlags.map((r) => `${r.code} (${r.severity})`).join(", "))]);

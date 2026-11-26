@@ -17,6 +17,7 @@ import searchHourly from "../fixtures/upwork/search-hourly.json";
 const context = { sourceAuthorized: true, alreadyNotified: false };
 const config = (mutate?: (c: ProfileConfig) => void) => {
   const c = defaultProfileConfig(null);
+  c.leads.softRules = false; // strict mode; soft rules are covered in lead-grading.test.ts
   mutate?.(c);
   return c;
 };
@@ -187,6 +188,16 @@ describe("lead e-mail checklist facts", () => {
     jobUrl: "https://www.upwork.com/jobs/~01",
     dashboardUrl: null,
     ...overrides,
+  });
+
+  it("says why a lead is promising, escaped in the HTML body", () => {
+    const { text, html } = buildLeadEmail(
+      lead({ promising: ["Few proposals (Less than 5)", "Client hires <b>80%</b>"] }),
+      "STANDARD",
+    );
+    expect(text).toContain("Why it's promising: Few proposals (Less than 5) · Client hires <b>80%</b>");
+    expect(html).not.toContain("<b>80%</b>");
+    expect(buildLeadEmail(lead(), "STANDARD").text).not.toContain("Why it's promising");
   });
 
   it("shows the client and the competition, marking a priority country", () => {

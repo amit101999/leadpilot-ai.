@@ -81,3 +81,16 @@ export function priorityCountryBonus(
 export function withBonus(score: number, bonus: PriorityBonus | null): number {
   return Math.min(100, score + (bonus?.points ?? 0));
 }
+
+/**
+ * The lead score: the AI fit score and the rule-based Potential score, weighted by the profile's fitWeight (percent of
+ * fit). Integer, rounded half up like the fit score.
+ */
+export function blendLeadScore(
+  fitScore: number,
+  potentialScore: number,
+  config: Pick<ProfileConfig, "leads">,
+): number {
+  const fitWeight = config.leads.fitWeight;
+  return Math.floor((fitScore * fitWeight + potentialScore * (100 - fitWeight) + 50) / 100);
+}

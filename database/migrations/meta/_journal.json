@@ -50,6 +50,13 @@
       "when": 1795238595055,
       "tag": "0006_remove_whatsapp",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795712329996,
+      "tag": "0007_lead_tiers",
+      "breakpoints": true
     }
   ]
 }

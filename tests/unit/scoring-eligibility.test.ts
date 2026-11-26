@@ -9,6 +9,9 @@ import { makeAiOutput, makeJob } from "../fixtures/jobs";
 
 const RECIPIENT = "00000000-0000-4000-8000-000000000001";
 const config = defaultProfileConfig(RECIPIENT);
+// Strict mode without a Warm band: below the minimum score is rejected (tiers are covered in lead-grading.test.ts).
+config.leads.softRules = false;
+config.leads.warmBelowHot = 0;
 const passing = evaluateHardChecks(makeJob(), config, { sourceAuthorized: true, alreadyNotified: false });
 
 function decide(score: number, overrides: Parameters<typeof makeAiOutput>[1] = {}) {

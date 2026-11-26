@@ -81,7 +81,7 @@ test("search history, run detail, job detail, leads and all jobs (after a run)",
   const leads = page.getByRole("table", { name: "Qualified leads" });
   await expect(leads.getByRole("row")).not.toHaveCount(1);
   await leads.locator('a[href^="/jobs/"]').first().click();
-  await expect(page.getByText("AI assessment")).toBeVisible();
+  await expect(page.getByText("Lead assessment")).toBeVisible();
   await expect(page.getByText("Rule checks")).toBeVisible();
 
   await page.goto("/leads?decision=any");

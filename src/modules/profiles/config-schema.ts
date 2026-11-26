@@ -140,6 +140,20 @@ export const DEFAULT_PREFERRED_COUNTRIES = [
 ];
 
 export const DEFAULT_MIN_HIRE_RATE = 50;
+
+/**
+ * How leads are graded (2026-11-26). With soft rules on, the competition, budget and client rules no longer reject a
+ * job: they lower its Potential score instead, so borderline jobs are still scored. The lead score blends the AI's fit
+ * score with the Potential score; Hot (>= ai.minScore) is alerted, Warm (>= ai.minScore - warmBelowHot) is kept as a
+ * lead without an alert, anything lower is Cold (rejected).
+ */
+export const DEFAULT_LEAD_GRADING = {
+  softRules: true,
+  /** Share of the AI fit score in the lead score, in percent; the rest is the Potential score. */
+  fitWeight: 60,
+  /** Warm leads score at most this many points below the Hot threshold. */
+  warmBelowHot: 20,
+};
 export const DEFAULT_PREFERRED_COUNTRY_BONUS = 5;
 
 export const profileConfigSchema = z
@@ -206,6 +220,13 @@ export const profileConfigSchema = z
         rejectIfHired: z.boolean(),
       })
       .default(() => ({ ...DEFAULT_COMPETITION })),
+    leads: z
+      .object({
+        softRules: z.boolean(),
+        fitWeight: z.number().int().min(0).max(100),
+        warmBelowHot: z.number().int().min(0).max(50),
+      })
+      .default(() => ({ ...DEFAULT_LEAD_GRADING })),
     ai: z.object({
       minScore: z.number().int().min(0).max(100),
       weights: scoringWeightsSchema,
@@ -336,6 +357,7 @@ export function defaultProfileConfig(emailRecipientId: string | null = null): Pr
       unknownClientDataPolicy: "NEEDS_REVIEW",
     },
     competition: { ...DEFAULT_COMPETITION },
+    leads: { ...DEFAULT_LEAD_GRADING },
     ai: {
       minScore: 75,
       weights: {

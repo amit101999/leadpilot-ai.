@@ -8,7 +8,13 @@ import { getClient } from "@/modules/clients/repository";
 import { rowToNormalized, type JobRow } from "@/modules/jobs/repository";
 import { decideEligibility } from "@/modules/qualification/eligibility";
 import type { HardCheckResult } from "@/modules/qualification/hard-filters";
-import { computeAuthoritativeScore, priorityCountryBonus, withBonus } from "@/modules/qualification/scoring";
+import { computePotential } from "@/modules/qualification/potential";
+import {
+  blendLeadScore,
+  computeAuthoritativeScore,
+  priorityCountryBonus,
+  withBonus,
+} from "@/modules/qualification/scoring";
 import {
   beginStage,
   completeStage,
@@ -90,11 +96,13 @@ async function evaluateOne(ctx: RunContext, runJob: RunJobRow, jobRow: JobRow): 
     }
   }
 
-  // Weighted AI score, plus the priority-country bonus (the client record's country is the current one).
+  // Lead score: the weighted AI fit score blended with the rule-based Potential score, plus the priority-country
+  // bonus (the client record's country is the current one).
   const bonus = output ? priorityCountryBonus(client?.country ?? jobRow.clientCountry, config) : null;
-  const score = output
-    ? withBonus(computeAuthoritativeScore(output.dimension_scores, config.ai.weights), bonus)
-    : null;
+  const fitScore = output ? computeAuthoritativeScore(output.dimension_scores, config.ai.weights) : null;
+  const potential = computePotential(input.job, client, config);
+  const score =
+    fitScore === null ? null : withBonus(blendLeadScore(fitScore, potential.score, config), bonus);
   const notified = await alreadyNotifiedJobIds(db, config, [jobRow.id]);
   const decision = decideEligibility(
     {
@@ -115,6 +123,9 @@ async function evaluateOne(ctx: RunContext, runJob: RunJobRow, jobRow: JobRow): 
     runId: run.id,
     jobId: jobRow.id,
     score,
+    fitScore,
+    potentialScore: potential.score,
+    tier: decision.tier,
     modelReportedScore: output?.score ?? null,
     dimensionScores: output?.dimension_scores ?? null,
     decision: decision.decision,
@@ -131,8 +142,9 @@ async function evaluateOne(ctx: RunContext, runJob: RunJobRow, jobRow: JobRow): 
           positiveSignals: output.positive_signals,
           reasoningSummary: output.reasoning_summary,
           ...(bonus ? { priorityCountry: bonus.country, priorityBonus: bonus.points } : {}),
+          potential: { signals: potential.signals, reasons: potential.reasons },
         }
-      : {},
+      : { potential: { signals: potential.signals, reasons: potential.reasons } },
     riskFlags: output?.risk_flags ?? [],
     missingInformation: output?.missing_information ?? [],
     attempts,
@@ -156,7 +168,16 @@ async function evaluateOne(ctx: RunContext, runJob: RunJobRow, jobRow: JobRow): 
       .where(and(eq(runJobs.id, runJob.id), eq(runJobs.processingStatus, "PENDING_AI")));
   });
   ctx.log.info(
-    { job_id: jobRow.id, workflow_stage: "AI_EVALUATION", decision: decision.decision, score, attempts },
+    {
+      job_id: jobRow.id,
+      workflow_stage: "AI_EVALUATION",
+      decision: decision.decision,
+      tier: decision.tier,
+      score,
+      fit_score: fitScore,
+      potential_score: potential.score,
+      attempts,
+    },
     "Job evaluated",
   );
 }

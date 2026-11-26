@@ -155,14 +155,11 @@ describe("runs API", () => {
     });
     expect(leads.status).toBe(200);
     expect(leads.json.data.length).toBeGreaterThan(0);
-    for (const lead of leads.json.data as Array<{
-      score: number;
-      budgetType: string;
-      paymentVerified: boolean;
-    }>) {
-      expect(lead.score).toBeGreaterThanOrEqual(75);
+    // Qualified leads are Hot (score >= 75, alerted) or Warm (55-74, kept); job type is still a hard rule.
+    for (const lead of leads.json.data as Array<{ score: number; budgetType: string; tier: string }>) {
+      expect(lead.score).toBeGreaterThanOrEqual(55);
+      expect(lead.tier).toBe(lead.score >= 75 ? "HOT" : "WARM");
       expect(lead.budgetType).toBe("FIXED");
-      expect(lead.paymentVerified).toBe(true);
     }
 
     const perRun = await call(runJobs, { user, params: { id: runId } });
