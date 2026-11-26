@@ -14,10 +14,22 @@
  * Settings: LEADPILOT_URL (default http://localhost:3000; must be https:// unless localhost) and
  * LEADPILOT_IMPORT_TOKEN, from .env or the process environment (e.g. a Claude cloud routine).
  */
+import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { chunkJobs, slimJob } from "./lib/import-payload.mjs";
 import { resolveLeadPilotUrl } from "./lib/leadpilot-url.mjs";
+
+// Claude cloud routines reach the internet only through a proxy (HTTPS_PROXY), and Node's fetch ignores it unless
+// NODE_USE_ENV_PROXY=1 is set at start-up: the first scheduled run on 2026-11-26 failed with ENOTFOUND. Restart once
+// with it set; without a proxy (e.g. on a PC) nothing changes.
+if (!process.env.NODE_USE_ENV_PROXY && (process.env.HTTPS_PROXY || process.env.https_proxy)) {
+  const child = spawnSync(process.execPath, ["--disable-warning=UNDICI-EHPA", ...process.argv.slice(1)], {
+    stdio: "inherit",
+    env: { ...process.env, NODE_USE_ENV_PROXY: "1" },
+  });
+  process.exit(child.status ?? 1);
+}
 
 // Node's built-in loader (no npm install needed, e.g. in a Claude cloud routine); like dotenv it
 // never overrides variables already set in the environment.
