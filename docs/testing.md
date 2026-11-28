@@ -5,11 +5,11 @@ in `tests/fakes` (a demo job feed with scripted scenarios, a deterministic AI an
 setup installs them for every test file; the Playwright server loads them with `E2E_FAKE_PROVIDERS=1`, which the app
 refuses unless `APP_BASE_URL` is a localhost address. The app itself has no fake option.
 
-| Suite       | Command                    | Runner                        | Needs                                | Count (2026-11-21)          |
+| Suite       | Command                    | Runner                        | Needs                                | Count (2026-11-28)          |
 | ----------- | -------------------------- | ----------------------------- | ------------------------------------ | --------------------------- |
-| Unit        | `npm run test:unit`        | Vitest, project `unit`        | nothing                              | 221 tests                   |
-| Integration | `npm run test:integration` | Vitest, project `integration` | Postgres and `TEST_DATABASE_URL`     | 96 tests                    |
-| End to end  | `npm run test:e2e`         | Playwright (Chromium)         | Postgres and `TEST_DATABASE_URL`     | 19 tests                    |
+| Unit        | `npm run test:unit`        | Vitest, project `unit`        | nothing                              | 236 tests                   |
+| Integration | `npm run test:integration` | Vitest, project `integration` | Postgres and `TEST_DATABASE_URL`     | 99 tests                    |
+| End to end  | `npm run test:e2e`         | Playwright (Chromium)         | Postgres and `TEST_DATABASE_URL`     | 20 tests                    |
 | Live        | `npm run test:live`        | Vitest, project `live`        | `LIVE_TESTS=1` plus real credentials | 3 tests, skipped by default |
 
 `npm run test:all` runs every Vitest project (live tests stay skipped) and then Playwright.
@@ -39,7 +39,11 @@ Pure functions, no database or network:
 - Lead and run-summary e-mail content: field order, hourly rates, one-line values (`lead-message.test.ts`); HTML
   escaping, safe links and SMTP outcome classification (`email.test.ts`).
 - The OpenAI adapter with an injected `fetch`: request shape (`store: false`, strict JSON schema), rate-limit /
-  server-error / timeout classification and connection states (`openai-evaluator.test.ts`).
+  server-error / timeout classification and connection states (`openai-evaluator.test.ts`), plus mapping of the
+  response's token usage and HTTP status.
+- AI cost estimation: cached and uncached input, reasoning tokens not double-billed, rounding, dated snapshots, unknown
+  models return no price (`ai-pricing.test.ts`); the usage ledger never throws when its insert fails
+  (`usage-ledger.test.ts`); dollar formatting of micro-USD amounts (`format-micro-usd.test.ts`).
 - The `E2E_FAKE_PROVIDERS` start-up guard (`instrumentation.ts`), environment settings (`env.test.ts`), CSRF origin
   check, login redirects, list parameters, audit and profile diffs.
 
@@ -54,7 +58,9 @@ Covered: authentication and sessions, password change, profiles (versions, optim
 recipients, runs (idempotency, concurrent double submit, snapshot, cancel, end-to-end run with the fakes), the run pipeline
 (blocked source, deduplication), e-mail notifications (limits, reruns, concurrency, failures, uncertain sends, the run
 summary e-mail, refusal of non-e-mail recipients), integrations, dashboard, exports, audit log, run leases, the Upwork
-import API, and the database's own immutability guards.
+import API, the database's own immutability guards, and the AI usage ledger (one row per attempt through retries,
+timeouts and invalid output; totals, fake-provider exclusion, per-owner scoping and viewer denial in
+`ai-usage.test.ts`).
 
 ## End-to-end tests (`tests/e2e`)
 

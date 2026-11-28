@@ -1,5 +1,5 @@
 import type { AiOutput } from "@/modules/ai/output-schema";
-import type { AiConnection, AiEvaluator, EvaluationInput } from "@/modules/ai/evaluator";
+import type { AiConnection, AiEvaluation, AiEvaluator, EvaluationInput } from "@/modules/ai/evaluator";
 import { AiProviderError } from "@/modules/ai/evaluator";
 
 /**
@@ -23,14 +23,14 @@ export class MockAiEvaluator implements AiEvaluator {
   readonly isMock = true;
   private readonly calls = new Map<string, number>();
 
-  async evaluate(input: EvaluationInput): Promise<unknown> {
+  async evaluate(input: EvaluationInput): Promise<AiEvaluation> {
     const script = (input.job.sourceMetadata.mockAi ?? {}) as MockAiScript;
     const callCount = (this.calls.get(input.job.sourceJobId) ?? 0) + 1;
     this.calls.set(input.job.sourceJobId, callCount);
 
     if (script.behavior === "timeout") throw new AiProviderError("Mock evaluator timeout", "TIMEOUT");
     if (script.behavior === "invalid" || (script.behavior === "invalid-once" && callCount === 1)) {
-      return { score: "high", note: "not the expected schema" };
+      return { output: { score: "high", note: "not the expected schema" }, usage: null };
     }
 
     const heuristic = heuristicScore(input);
@@ -64,7 +64,7 @@ export class MockAiEvaluator implements AiEvaluator {
       missing_information: input.job.clientRating === null ? ["Client rating not provided"] : [],
       reasoning_summary: "Deterministic mock evaluation (no AI provider called).",
     };
-    return output;
+    return { output, usage: null };
   }
 
   checkConfiguration() {

@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   boolean,
   check,
   index,
@@ -66,6 +67,14 @@ export const qualificationDecision = pgEnum("qualification_decision", [
 
 /** Hot: alerted at once. Warm: kept as a lead, not alerted. Cold: scored below the Warm bar. */
 export const leadTier = pgEnum("lead_tier", ["HOT", "WARM", "COLD"]);
+
+export const aiCallStatus = pgEnum("ai_call_status", [
+  "SUCCESS",
+  "INVALID_OUTPUT",
+  "TIMEOUT",
+  "RATE_LIMIT",
+  "PROVIDER_ERROR",
+]);
 
 /** Alerts are sent by e-mail. */
 export const notificationChannel = pgEnum("notification_channel", ["EMAIL"]);
@@ -553,6 +562,43 @@ export const auditLogs = pgTable(
     index("audit_logs_created_idx").on(t.createdAt),
     index("audit_logs_entity_idx").on(t.entityType, t.entityId),
     index("audit_logs_user_idx").on(t.userId),
+  ],
+);
+
+/**
+ * One row per AI model call (each retry attempt is its own row), for usage and
+ * cost reporting. Insert-only. Stores no prompt or job text. Foreign keys are
+ * SET NULL so spend history survives if a run, job or profile is removed.
+ */
+export const aiCalls = pgTable(
+  "ai_calls",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    runId: uuid("run_id").references(() => agentRuns.id, { onDelete: "set null" }),
+    jobId: uuid("job_id").references(() => jobs.id, { onDelete: "set null" }),
+    profileId: uuid("profile_id").references(() => searchProfiles.id, { onDelete: "set null" }),
+    /** Evaluator id: "openai" or "mock". Reports exclude mock rows. */
+    provider: text("provider").notNull(),
+    /** Snapshot reported by the provider, or the configured model when the call failed. */
+    model: text("model").notNull(),
+    promptVersion: text("prompt_version").notNull(),
+    attempt: integer("attempt").notNull(),
+    status: aiCallStatus("status").notNull(),
+    httpStatus: integer("http_status"),
+    latencyMs: integer("latency_ms").notNull(),
+    inputTokens: integer("input_tokens"),
+    cachedInputTokens: integer("cached_input_tokens"),
+    outputTokens: integer("output_tokens"),
+    reasoningTokens: integer("reasoning_tokens"),
+    /** Estimated cost in millionths of a USD; null when the model has no known price or no usage was reported. */
+    costMicroUsd: bigint("cost_micro_usd", { mode: "bigint" }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("ai_calls_created_idx").on(t.createdAt),
+    index("ai_calls_run_idx").on(t.runId),
+    check("ai_calls_attempt_chk", sql`${t.attempt} >= 1`),
+    check("ai_calls_latency_chk", sql`${t.latencyMs} >= 0`),
   ],
 );
 

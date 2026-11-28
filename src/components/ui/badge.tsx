@@ -67,6 +67,12 @@ const STATUS: Record<string, { tone: BadgeTone; label: string }> = {
   NOT_AUTHORIZED: { tone: "danger", label: "Not authorized" },
   UNAVAILABLE: { tone: "danger", label: "Unavailable" },
   MOCK: { tone: "warning", label: "Mock" },
+  // AI calls
+  SUCCESS: { tone: "success", label: "Success" },
+  INVALID_OUTPUT: { tone: "warning", label: "Invalid output" },
+  TIMEOUT: { tone: "danger", label: "Timed out" },
+  RATE_LIMIT: { tone: "warning", label: "Rate limited" },
+  PROVIDER_ERROR: { tone: "danger", label: "Provider error" },
 };
 
 export function statusLabel(status: string): string {

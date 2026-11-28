@@ -4,6 +4,7 @@ import { jobs, qualifications, runJobs } from "@/lib/database/schema";
 import { sanitizeErrorMessage } from "@/lib/security/sanitize";
 import { AiProviderError, hashEvaluationInput, toEvaluationProfile } from "@/modules/ai/evaluator";
 import { validateAiOutput, type AiOutput } from "@/modules/ai/output-schema";
+import { recordAiCall, statusForError } from "@/modules/ai/usage-ledger";
 import { getClient } from "@/modules/clients/repository";
 import { rowToNormalized, type JobRow } from "@/modules/jobs/repository";
 import { decideEligibility } from "@/modules/qualification/eligibility";
@@ -74,23 +75,60 @@ async function evaluateOne(ctx: RunContext, runJob: RunJobRow, jobRow: JobRow): 
   const input = { job: rowToNormalized(jobRow, client), profile: toEvaluationProfile(config) };
   const maxAttempts = 1 + config.ai.maxRetries;
 
+  const callBase = {
+    runId: run.id,
+    jobId: jobRow.id,
+    profileId: run.profileId,
+    provider: evaluator.id,
+    configuredModel: evaluator.model,
+    promptVersion: snapshot.promptVersion,
+  };
+
   let output: AiOutput | null = null;
   let lastError: string | null = null;
   let attempts = 0;
   // Invalid output and transient provider errors are retried a bounded number of times.
   while (attempts < maxAttempts && !output) {
     attempts += 1;
+    const startedAt = performance.now();
     try {
-      const validation = validateAiOutput(await evaluator.evaluate(input));
+      const result = await evaluator.evaluate(input);
+      const validation = validateAiOutput(result.output);
       if (validation.ok) output = validation.value;
       else lastError = validation.error;
+      await recordAiCall(
+        db,
+        {
+          ...callBase,
+          attempt: attempts,
+          status: validation.ok ? "SUCCESS" : "INVALID_OUTPUT",
+          httpStatus: null,
+          latencyMs: performance.now() - startedAt,
+          usage: result.usage,
+        },
+        ctx.log,
+      );
     } catch (error) {
       lastError = sanitizeErrorMessage(error);
-      // Retrying cannot fix a missing key or a refused request; it would only repeat the call for every job.
-      if (error instanceof AiProviderError && (error.kind === "NOT_CONFIGURED" || error.kind === "REJECTED"))
-        break;
+      const kind = error instanceof AiProviderError ? error.kind : null;
+      // A NOT_CONFIGURED error never reached the provider, so it is not a model call and is not recorded.
+      if (kind === "NOT_CONFIGURED") break;
+      // Recorded before any rate-limit pause, so latency is the call's own.
+      await recordAiCall(
+        db,
+        {
+          ...callBase,
+          ...statusForError(error),
+          attempt: attempts,
+          latencyMs: performance.now() - startedAt,
+          usage: null,
+        },
+        ctx.log,
+      );
+      // Retrying cannot fix a refused request; it would only repeat the call for every job.
+      if (kind === "REJECTED") break;
       // A rate limit needs a pause before the next attempt (2 s, then 4 s, at most 8 s).
-      if (error instanceof AiProviderError && error.kind === "RATE_LIMIT" && attempts < maxAttempts) {
+      if (kind === "RATE_LIMIT" && attempts < maxAttempts) {
         await new Promise((resolve) => setTimeout(resolve, Math.min(2_000 * 2 ** (attempts - 1), 8_000)));
       }
     }

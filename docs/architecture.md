@@ -18,18 +18,18 @@ the automated tests substitute fakes from `tests/fakes`. Runs execute inside the
 
 ## Code layout
 
-| Path                       | Responsibility                                                                                                                                                                          |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/app/(app)/**`         | Signed-in pages (server components load data; client components handle interaction)                                                                                                     |
-| `src/app/login`            | Sign-in page                                                                                                                                                                            |
-| `src/app/api/**`           | Thin route handlers: parse and validate input, call a module, return JSON                                                                                                               |
-| `src/proxy.ts`             | Redirects signed-out page requests to `/login?next=…` (Next.js 16 "proxy", formerly middleware)                                                                                         |
-| `src/modules/*`            | Business logic per domain: `profiles`, `runs` (engine), `qualification`, `ai`, `notifications`, `job-sources`, `jobs`, `dashboard`, `exports`, `audit`, `integrations`, `auth`, `users` |
-| `src/modules/providers.ts` | Builds the real providers (import source, OpenAI, SMTP or Brevo); tests substitute fakes from `tests/fakes`                                                                             |
-| `src/lib/*`                | Shared infrastructure: env validation, database client and schema, auth, HTTP wrappers, security helpers, money, logging, UI helpers                                                    |
-| `src/components/**`        | React components per page area, plus `ui/` primitives                                                                                                                                   |
-| `database/`                | Migrations (`migrations/`), migrate runner, seed                                                                                                                                        |
-| `tests/fakes/`             | Fake job source (demo jobs), AI and e-mail used only by the automated tests                                                                                                             |
+| Path                       | Responsibility                                                                                                                                                                                      |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/app/(app)/**`         | Signed-in pages (server components load data; client components handle interaction)                                                                                                                 |
+| `src/app/login`            | Sign-in page                                                                                                                                                                                        |
+| `src/app/api/**`           | Thin route handlers: parse and validate input, call a module, return JSON                                                                                                                           |
+| `src/proxy.ts`             | Redirects signed-out page requests to `/login?next=…` (Next.js 16 "proxy", formerly middleware)                                                                                                     |
+| `src/modules/*`            | Business logic per domain: `profiles`, `runs` (engine), `qualification`, `ai`, `ai-usage`, `notifications`, `job-sources`, `jobs`, `dashboard`, `exports`, `audit`, `integrations`, `auth`, `users` |
+| `src/modules/providers.ts` | Builds the real providers (import source, OpenAI, SMTP or Brevo); tests substitute fakes from `tests/fakes`                                                                                         |
+| `src/lib/*`                | Shared infrastructure: env validation, database client and schema, auth, HTTP wrappers, security helpers, money, logging, UI helpers                                                                |
+| `src/components/**`        | React components per page area, plus `ui/` primitives                                                                                                                                               |
+| `database/`                | Migrations (`migrations/`), migrate runner, seed                                                                                                                                                    |
+| `tests/fakes/`             | Fake job source (demo jobs), AI and e-mail used only by the automated tests                                                                                                                         |
 
 Route handlers use one of the wrappers from `src/lib/http/api.ts`: `userRoute(minRole, …)` (session cookie, role
 check, same-origin check on state-changing methods) and `publicRoute` (login, logout, health); the import API uses `tokenRoute` (Bearer import token). The wrappers also attach a request id and turn
@@ -96,6 +96,38 @@ Transitions are declared in `src/modules/runs/transitions.ts`; any other transit
    `ai.minScore − leads.warmBelowHot` (default 20 below), kept as a qualified lead but not alerted. Cold: below that,
    rejected. A disqualifying risk flag rejects; severe flags (per risk sensitivity) send the job to review.
    `qualifications` stores `fit_score`, `potential_score` and `tier`; `score` is the lead score.
+
+## AI usage and cost tracking
+
+Every model call made while scoring a job is written to the `ai_calls` table, one row per attempt (a job retried
+twice gives three rows):
+
+```
+evaluateOne() (src/modules/runs/engine/evaluation.ts)
+  └─ per attempt: time it, call evaluator.evaluate() → { output, usage }
+       └─ recordAiCall() (src/modules/ai/usage-ledger.ts)
+            ├─ status: SUCCESS | INVALID_OUTPUT | TIMEOUT | RATE_LIMIT | PROVIDER_ERROR (+ HTTP status)
+            ├─ tokens from OpenAI's usage block (input, cached input, output, reasoning)
+            └─ cost = estimateCostMicroUsd() (src/modules/ai/pricing.ts), stored as bigint micro-USD
+/ai-usage page ── getAiUsage() (src/modules/ai-usage/service.ts) ── SQL aggregates over ai_calls
+```
+
+- **Cost is an estimate**, computed when the call is made from token counts and the list prices in
+  `src/modules/ai/pricing.ts` (standard tier, checked 2026-11-28). The OpenAI invoice is the source of truth. A model
+  missing from the table gets a `NULL` cost, and the page shows "No price" and a warning instead of $0. When prices
+  change, edit the table: stored rows keep the cost they were computed with.
+- Cost follows OpenAI's accounting: `input_tokens` already includes the cached subset (billed at the cached rate)
+  and `output_tokens` already includes reasoning tokens, so neither is counted twice.
+- **Best-effort recording**: a failed insert is logged as a warning and never changes the evaluation's outcome.
+- `NOT_CONFIGURED` failures are not recorded (no request was sent). A `REJECTED` call (400/401/403/404/422) is
+  recorded as `PROVIDER_ERROR` with its HTTP status, and the loop stops. A rate-limit row is written before the
+  back-off pause, so its latency is the call's own.
+- The test fake (`tests/fakes/mock-evaluator.ts`) reports no usage; its rows carry `provider = 'mock'` and every
+  report excludes them.
+- The page (`/ai-usage`, OPERATOR and ADMIN only) shows 7/30/90-day totals, cost per scored job and per qualified
+  lead, p50/p95 latency, a daily cost chart, breakdowns by model and by profile, and the 25 latest calls. The
+  dashboard header shows the 30-day spend. Non-admins see only calls for profiles they own.
+- Calls made before this feature existed were never recorded and cannot be backfilled.
 
 ## Notifications and delivery guarantees
 

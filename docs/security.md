@@ -5,14 +5,14 @@ What protects LeadPilot today, where it lives in the code, and the risks that re
 
 ## Trust boundaries
 
-| Boundary                            | Who is on the other side                               | Control                                                                                                                                                                                                                     |
-| ----------------------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Browser → app                       | Signed-in users (and anyone online)                    | Session cookie, roles, per-user ownership checks, same-origin check, rate limits                                                                                                                                            |
-| App → OpenAI / SMTP server          | External APIs                                          | Fixed hosts from configuration, never from user input; timeouts; sanitized errors                                                                                                                                           |
-| Job source data → app               | Untrusted job text, client reviews and contract titles | Normalized and validated; length- and count-capped; shown via React (escaped); job text sent to the AI as data only; client reviews and contract titles never sent to the AI; signed attachment links dropped before upload |
-| Upwork sync agent → `/api/import/*` | A Claude cloud routine (or Claude Code run by hand)    | Per-user import token (HMAC-stored, revocable, rate limited); acts with that user's role and ownership; every job re-validated with zod; links restricted to `https://www.upwork.com`                                       |
-| Upwork job text → agent             | Strangers writing job posts                            | Agent instructions (the upwork-sync skill) forbid following instructions in job text; the routine is limited to read-only Upwork calls, the import script and `.upwork-sync/`                                               |
-| App → SMTP server                   | Your mail provider                                     | Server, sender and login from configuration only; timeouts; errors sanitized; job text HTML-escaped in alerts                                                                                                               |
+| Boundary                            | Who is on the other side                               | Control                                                                                                                                                                                                                                                   |
+| ----------------------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Browser → app                       | Signed-in users (and anyone online)                    | Session cookie, roles, per-user ownership checks, same-origin check, rate limits                                                                                                                                                                          |
+| App → OpenAI / SMTP server          | External APIs                                          | Fixed hosts from configuration, never from user input; timeouts; sanitized errors                                                                                                                                                                         |
+| Job source data → app               | Untrusted job text, client reviews and contract titles | Normalized and validated; length- and count-capped; shown via React (escaped); job text sent to the AI as data only; client reviews and contract titles never sent to the AI; signed attachment links dropped before upload                               |
+| Upwork sync agent → `/api/import/*` | A Claude cloud routine (or Claude Code run by hand)    | Per-user import token (HMAC-stored, revocable, rate limited); acts as that user with at most OPERATOR rights, so only that user's own profiles (an admin's token included); every job re-validated with zod; links restricted to `https://www.upwork.com` |
+| Upwork job text → agent             | Strangers writing job posts                            | Agent instructions (the upwork-sync skill) forbid following instructions in job text; the routine is limited to read-only Upwork calls, the import script and `.upwork-sync/`                                                                             |
+| App → SMTP server                   | Your mail provider                                     | Server, sender and login from configuration only; timeouts; errors sanitized; job text HTML-escaped in alerts                                                                                                                                             |
 
 ## Controls
 
@@ -69,6 +69,10 @@ What protects LeadPilot today, where it lives in the code, and the risks that re
   checked on every request together with the user's status.
 - OpenAI requests use `store: false`. The model receives only the job and a minimal profile slice: skill names,
   category and risk sensitivity.
+- The AI usage ledger (`ai_calls`) stores token counts, latency, status and estimated cost, never prompt or job text.
+  Spend figures are shown only to OPERATOR and ADMIN users (`/ai-usage` returns not-found to viewers), and
+  non-admins see only calls for profiles they own. Usage is read from each response the app already receives, so no
+  OpenAI Admin key is needed or stored.
 
 **Abuse and side effects**
 

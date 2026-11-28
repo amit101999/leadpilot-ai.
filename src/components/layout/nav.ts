@@ -3,6 +3,7 @@ import {
   Bell,
   Briefcase,
   ClipboardList,
+  Coins,
   History,
   LayoutDashboard,
   Play,
@@ -29,6 +30,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/profiles", label: "Search Profiles", icon: SlidersHorizontal },
   { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/integrations", label: "Integrations", icon: Plug },
+  { href: "/ai-usage", label: "AI Usage", icon: Coins, minRole: "OPERATOR" },
   { href: "/settings", label: "Settings", icon: Settings },
   { href: "/audit", label: "Audit Logs", icon: ClipboardList, minRole: "ADMIN" },
 ];
