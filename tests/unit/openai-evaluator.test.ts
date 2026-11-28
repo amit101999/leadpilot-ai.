@@ -52,7 +52,8 @@ describe("OpenAiEvaluator.evaluate", () => {
     const text = JSON.stringify(makeAiOutput(88));
     const fetchMock = respond(200, responseBody(text));
     const result = await new OpenAiEvaluator(KEY, MODEL, 1000, fetchMock).evaluate(input);
-    expect(result).toBe(text);
+    expect(result.output).toBe(text);
+    expect(result.usage).toBeNull(); // this response body carries no usage block
 
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(String(url)).toBe("https://api.openai.com/v1/responses");
@@ -66,14 +67,37 @@ describe("OpenAiEvaluator.evaluate", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1); // SDK retries are off; the caller counts attempts
   });
 
-  it("classifies rate limits, server errors and timeouts", async () => {
-    expect((await evaluationError(respond(429, { error: { message: "slow down" } }))).kind).toBe(
-      "RATE_LIMIT",
-    );
-    expect((await evaluationError(respond(500, { error: { message: "boom" } }))).kind).toBe("PROVIDER");
+  it("reports token usage and the model snapshot the API actually used", async () => {
+    const body = {
+      ...responseBody(JSON.stringify(makeAiOutput(70))),
+      model: "test-model-2026-01-01",
+      usage: {
+        input_tokens: 1200,
+        input_tokens_details: { cached_tokens: 200 },
+        output_tokens: 300,
+        output_tokens_details: { reasoning_tokens: 40 },
+        total_tokens: 1500,
+      },
+    };
+    const result = await new OpenAiEvaluator(KEY, MODEL, 1000, respond(200, body)).evaluate(input);
+    expect(result.usage).toEqual({
+      model: "test-model-2026-01-01",
+      inputTokens: 1200,
+      cachedInputTokens: 200,
+      outputTokens: 300,
+      reasoningTokens: 40,
+    });
+  });
+
+  it("classifies rate limits, server errors and timeouts, keeping the HTTP status", async () => {
+    const rateLimited = await evaluationError(respond(429, { error: { message: "slow down" } }));
+    expect(rateLimited).toMatchObject({ kind: "RATE_LIMIT", httpStatus: 429 });
+    const serverError = await evaluationError(respond(500, { error: { message: "boom" } }));
+    expect(serverError).toMatchObject({ kind: "PROVIDER", httpStatus: 500 });
     // A revoked key or a bad request fails the same way every time: never retried.
     for (const status of [400, 401, 403, 404]) {
-      expect((await evaluationError(respond(status, { error: { message: "no" } }))).kind).toBe("REJECTED");
+      const refused = await evaluationError(respond(status, { error: { message: "no" } }));
+      expect(refused).toMatchObject({ kind: "REJECTED", httpStatus: status });
     }
 
     const hang = vi.fn(

@@ -81,7 +81,7 @@ test("search history, run detail, job detail, leads and all jobs (after a run)",
   const leads = page.getByRole("table", { name: "Qualified leads" });
   await expect(leads.getByRole("row")).not.toHaveCount(1);
   await leads.locator('a[href^="/jobs/"]').first().click();
-  await expect(page.getByText("AI assessment")).toBeVisible();
+  await expect(page.getByText("Lead assessment")).toBeVisible();
   await expect(page.getByText("Rule checks")).toBeVisible();
 
   await page.goto("/leads?decision=any");
@@ -91,6 +91,15 @@ test("search history, run detail, job detail, leads and all jobs (after a run)",
   await expect(
     page.getByRole("table", { name: "All discovered jobs" }).getByText("Filtered out").first(),
   ).toBeVisible();
+});
+
+test("AI usage page shows estimated spend and switches time range", async ({ page }) => {
+  await page.goto("/ai-usage");
+  await expect(page.getByRole("heading", { name: "AI Usage" })).toBeVisible();
+  await expect(page.getByText("Estimated cost", { exact: true }).first()).toBeVisible();
+  await page.getByRole("link", { name: "7 days" }).click();
+  await expect(page).toHaveURL(/days=7/);
+  await expect(page.getByRole("link", { name: "7 days" })).toHaveAttribute("aria-current", "page");
 });
 
 test("list pages have no horizontal page scroll on a phone", async ({ page }) => {
@@ -104,6 +113,7 @@ test("list pages have no horizontal page scroll on a phone", async ({ page }) =>
     "/integrations",
     "/settings",
     "/audit",
+    "/ai-usage",
   ]) {
     await page.goto(path);
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);

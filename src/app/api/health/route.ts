@@ -1,27 +1,13 @@
-import { sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { publicRoute } from "@/lib/http/api";
 
-/** Liveness for Render's health check and the Docker image. Deliberately reveals nothing beyond up/down. */
-export const GET = publicRoute(async ({ db }) => {
-  let database: "up" | "down" = "up";
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    await Promise.race([
-      db.execute(sql`select 1`),
-      new Promise((_, reject) => {
-        // 5 s: a serverless database (Neon) can take a few seconds to wake from idle.
-        timer = setTimeout(() => reject(new Error("timeout")), 5000);
-      }),
-    ]);
-  } catch {
-    database = "down";
-  } finally {
-    clearTimeout(timer);
-  }
-  const status = database === "up" ? "ok" : "degraded";
-  return NextResponse.json(
-    { status, database },
-    { status: database === "up" ? 200 : 503, headers: { "cache-control": "no-store" } },
-  );
-});
+/**
+ * Liveness for Render's health check, the Docker image and the browser tests: the process is up and its
+ * configuration is valid (publicRoute validates the environment, so a missing setting still fails a deploy).
+ * It does not query the database, so a slow or waking Neon database never makes the host restart a healthy app;
+ * /api/ready reports the database. Startup migrations (MIGRATE_ON_START) still fail a deploy whose database is
+ * unreachable. Deliberately reveals nothing beyond "ok".
+ */
+export const GET = publicRoute(async () =>
+  NextResponse.json({ status: "ok" }, { headers: { "cache-control": "no-store" } }),
+);

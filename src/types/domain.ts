@@ -1,4 +1,5 @@
 import type {
+  aiCallStatus,
   budgetType,
   integrationState,
   jobProcessingStatus,
@@ -17,6 +18,7 @@ export type BudgetType = (typeof budgetType.enumValues)[number];
 export type QualificationDecision = (typeof qualificationDecision.enumValues)[number];
 export type NotificationStatus = (typeof notificationStatus.enumValues)[number];
 export type IntegrationState = (typeof integrationState.enumValues)[number];
+export type AiCallStatus = (typeof aiCallStatus.enumValues)[number];
 
 export const RUN_STAGES: readonly RunStage[] = [
   "SOURCE_CHECK",

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { env } from "@/lib/configuration/env";
 import { jobs, notifications, qualifications, runJobs } from "@/lib/database/schema";
 import type { RiskFlag } from "@/modules/ai/output-schema";
@@ -52,7 +52,14 @@ export async function selectStep(ctx: RunContext): Promise<StageResponse> {
       qualifications,
       and(eq(qualifications.runId, runJobs.runId), eq(qualifications.jobId, runJobs.jobId)),
     )
-    .where(and(eq(runJobs.runId, run.id), eq(runJobs.processingStatus, "QUALIFIED")));
+    .where(
+      and(
+        eq(runJobs.runId, run.id),
+        eq(runJobs.processingStatus, "QUALIFIED"),
+        // Only Hot leads are alerted; Warm ones stay in the app. Rows from before lead tiers have no tier.
+        or(isNull(qualifications.tier), eq(qualifications.tier, "HOT")),
+      ),
+    );
 
   const ranked = rankCandidates(qualified.map((q) => ({ ...q, id: q.runJobId, score: q.score ?? 0 })));
   for (const [index, candidate] of ranked.entries()) {
@@ -181,6 +188,9 @@ async function reserveForChannel(
           (candidate.qualification.evidence as { reasoningSummary?: string }).reasoningSummary ??
           "Meets all requirements",
         riskFlags: (candidate.qualification.riskFlags as RiskFlag[]) ?? [],
+        promising:
+          (candidate.qualification.evidence as { potential?: { reasons?: string[] } }).potential?.reasons ??
+          [],
         jobUrl: candidate.job.jobUrl ?? "",
         dashboardUrl: `${baseUrl}/jobs/${candidate.jobId}`,
         client: {

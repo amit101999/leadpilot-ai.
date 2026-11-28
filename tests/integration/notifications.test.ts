@@ -74,7 +74,8 @@ afterEach(() => setProvidersForTesting(undefined));
 describe("notifications", () => {
   it("sends qualified leads once, never to the same recipient again on a rerun (acceptance #7)", async () => {
     const user = await createUser("OPERATOR");
-    const { profileId } = await setup(user);
+    // A limit above the number of Hot leads, so the first run sends them all.
+    const { profileId } = await setup(user, 50);
     const firstRun = await executeRun(user, profileId);
     const first = await call(runNotifications, { user, params: { id: firstRun } });
     expect(first.status).toBe(200);

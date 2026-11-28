@@ -202,6 +202,9 @@ connector, searches Upwork and sends the jobs to LeadPilot's import API (`docs/u
 | 8   | P2       | Automatic resume of runs stopped by Render's sleep (today: manual **Resume**)                                                                                                                                                    | ½ day             |
 | 9   | Blocked  | Direct Upwork API job source (needs an approved key; the placeholder was removed, see [upwork-access.md](upwork-access.md))                                                                                                      | days              |
 | 10  | P2       | Dev-only `npm audit` advisories (`eslint-config-next`, `drizzle-kit`); 0 in production dependencies                                                                                                                              | wait for upstream |
+| 11  | P1       | Lead grading step 2: the sync reads the freelancer's Upwork profile (read-only, weekly) and the AI judges fit against it                                                                                                         | 1 day             |
+| 12  | P1       | Lead grading step 3: daily digest e-mail of Warm leads                                                                                                                                                                           | ½ day             |
+| 13  | P2       | "Sync now" button on the profile page: fires the cloud routine through its API trigger (token stored as a Render secret)                                                                                                         | ½ day             |
 
 ## Planning and system-design decisions (yours)
 

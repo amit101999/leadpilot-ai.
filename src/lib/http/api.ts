@@ -11,6 +11,7 @@ import { isAllowedRequestOrigin } from "@/lib/security/origin";
 import { enforceRateLimit, RATE_LIMITS } from "@/lib/security/rate-limit";
 import { InvalidTransitionError } from "@/lib/state-machine";
 import type { UserRole } from "@/types/domain";
+import { readLimitedText } from "./body";
 import { AppError, isUniqueViolation } from "./errors";
 
 const MAX_BODY_BYTES = 256 * 1024;
@@ -57,7 +58,8 @@ export function assertSameOrigin(req: NextRequest): void {
 /**
  * Route for external agents (the Upwork sync) authenticated with a per-user import token
  * (`Authorization: Bearer lpi_...`). No cookie, so no CSRF exposure; rate limited per token.
- * The handler acts as the token's user, so ownership and role checks apply unchanged.
+ * The handler acts as the token's user with at most OPERATOR rights, so it only ever reaches that user's own
+ * profiles (an ADMIN's token included).
  */
 export function tokenRoute(minRole: UserRole, handler: Handler<UserContext & { tokenId: string }>) {
   return wrap(async (req, params, requestId, db) => {
@@ -66,9 +68,12 @@ export function tokenRoute(minRole: UserRole, handler: Handler<UserContext & { t
     const resolved = await resolveImportToken(db, token);
     if (!resolved) throw new AppError("UNAUTHENTICATED", "Missing, invalid or revoked import token");
     await enforceRateLimit(db, RATE_LIMITS.importApi, `token:${resolved.tokenId}`);
-    const actor: Actor = { id: resolved.userId, role: resolved.role };
+    // A token never acts with more than OPERATOR rights, even an admin's. ownerFilter then always limits it to
+    // the token owner's own profiles, so a leaked admin token cannot read or write other users' data.
+    const role: UserRole = resolved.role === "ADMIN" ? "OPERATOR" : resolved.role;
+    const actor: Actor = { id: resolved.userId, role };
     requireRole(actor, minRole);
-    const user = { id: resolved.userId, email: "", name: null, role: resolved.role, sessionId: "" };
+    const user = { id: resolved.userId, email: "", name: null, role, sessionId: "" };
     return handler({ req, params, requestId, db, actor, user, tokenId: resolved.tokenId });
   });
 }
@@ -131,10 +136,8 @@ export function errorResponse(error: unknown, requestId: string, req?: NextReque
 async function readBody(req: NextRequest): Promise<string> {
   const length = Number(req.headers.get("content-length") ?? "0");
   if (length > MAX_BODY_BYTES) throw new AppError("VALIDATION_ERROR", "Request body too large");
-  // Content-Length may be missing (chunked upload), so the size is checked again in bytes after reading.
-  const bytes = await req.arrayBuffer();
-  if (bytes.byteLength > MAX_BODY_BYTES) throw new AppError("VALIDATION_ERROR", "Request body too large");
-  return new TextDecoder().decode(bytes);
+  // Content-Length may be missing or wrong (chunked upload), so the stream itself is capped while reading.
+  return readLimitedText(req.body, MAX_BODY_BYTES);
 }
 
 export async function parseJson<S extends z.ZodType>(req: NextRequest, schema: S): Promise<z.output<S>> {

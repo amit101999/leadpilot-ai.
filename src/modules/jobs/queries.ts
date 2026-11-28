@@ -165,6 +165,7 @@ export async function listLeads(db: Database, actor: Actor, f: LeadListFilters) 
     select j.id, j.source, j.source_job_id, j.title, j.job_url, j.budget_type, j.budget_amount, j.budget_max,
            j.currency, j.payment_verified, j.skills, j.first_seen_at,
            l.run_id, l.profile_id, l.profile_name, l.score, l.decision, l.evaluated_at, l.risk_flags,
+           l.tier, l.fit_score, l.potential_score, l.evidence -> 'potential' -> 'reasons' as potential_reasons,
            l.evidence -> 'skillMatches' as skill_matches,
            n.status as notification_status, n.id as notification_id, n.sent_at as notification_sent_at
     from latest l
@@ -242,6 +243,11 @@ function mapLeadRow(row: Record<string, unknown>) {
     profileName: row.profile_name as string,
     score: row.score === null ? null : Number(row.score),
     decision: row.decision as QualificationDecision,
+    tier: (row.tier as "HOT" | "WARM" | "COLD" | null) ?? null,
+    fitScore: row.fit_score === null || row.fit_score === undefined ? null : Number(row.fit_score),
+    potentialScore:
+      row.potential_score === null || row.potential_score === undefined ? null : Number(row.potential_score),
+    potentialReasons: (row.potential_reasons as string[] | null) ?? [],
     evaluatedAt: toDate(row.evaluated_at),
     riskFlags: (row.risk_flags as Array<{ code: string; severity: string }>) ?? [],
     notificationStatus: (row.notification_status as NotificationStatus | null) ?? null,
@@ -304,7 +310,8 @@ export async function listRunJobs(db: Database, actor: Actor, runId: string) {
            rj.rank, rj.notification_note, rj.ai_attempts,
            j.id, j.source, j.source_job_id, j.title, j.job_url, j.budget_type, j.budget_amount, j.budget_max,
            j.hourly_min, j.currency, j.payment_verified, j.skills,
-           q.score, q.decision, q.dimension_scores, q.risk_flags, q.decision_reasons, q.error as ai_error,
+           q.score, q.decision, q.tier, q.fit_score, q.potential_score,
+           q.dimension_scores, q.risk_flags, q.decision_reasons, q.error as ai_error,
            q.evidence -> 'reasoningSummary' as reasoning_summary
     from run_jobs rj
     join agent_runs r on r.id = rj.run_id

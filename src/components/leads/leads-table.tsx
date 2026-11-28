@@ -34,6 +34,10 @@ export interface LeadRow {
   runId: string;
   profileName: string;
   score: number | null;
+  tier: "HOT" | "WARM" | "COLD" | null;
+  fitScore: number | null;
+  potentialScore: number | null;
+  potentialReasons: string[];
   decision: string;
   notificationStatus: string | null;
 }
@@ -122,19 +126,35 @@ const columns: ColumnDef<LeadRow, unknown>[] = [
   },
   {
     id: "score",
-    header: "AI score",
+    header: "Lead score",
     meta: { sortKey: "score", align: "right" },
     cell: ({ row }) => (
-      <span className="tabular font-semibold">
-        {row.original.score ?? "–"}
-        <span className="font-normal text-muted">/100</span>
-      </span>
+      <div className="flex flex-col items-end">
+        <span className="tabular font-semibold">
+          {row.original.score ?? "–"}
+          <span className="font-normal text-muted">/100</span>
+        </span>
+        {row.original.fitScore !== null && row.original.potentialScore !== null && (
+          <span className="tabular text-[12px] text-muted">
+            fit {row.original.fitScore} · potential {row.original.potentialScore}
+          </span>
+        )}
+      </div>
     ),
   },
   {
     id: "decision",
     header: "Status",
-    cell: ({ row }) => <StatusBadge status={row.original.decision} />,
+    cell: ({ row }) => (
+      <div className="flex flex-col items-start gap-1">
+        <StatusBadge status={row.original.tier ?? row.original.decision} />
+        {row.original.potentialReasons.length > 0 && (
+          <span className="text-[12px] text-muted">
+            {row.original.potentialReasons.slice(0, 2).join(" · ")}
+          </span>
+        )}
+      </div>
+    ),
   },
   {
     id: "found",

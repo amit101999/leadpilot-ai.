@@ -1,9 +1,10 @@
 import { eq } from "drizzle-orm";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { POST as login } from "@/app/api/auth/login/route";
 import { POST as logout } from "@/app/api/auth/logout/route";
 import { GET as me } from "@/app/api/auth/me/route";
 import { GET as health } from "@/app/api/health/route";
+import { GET as ready } from "@/app/api/ready/route";
 import { SESSION_COOKIE } from "@/lib/auth/session";
 import { getDb } from "@/lib/database/client";
 import { sessions } from "@/lib/database/schema";
@@ -118,9 +119,26 @@ describe("auth API", () => {
 });
 
 describe("health API", () => {
-  it("reports ok and reveals nothing else", async () => {
+  it("liveness reports ok without touching the database, and reveals nothing else", async () => {
+    const execute = vi.spyOn(getDb(), "execute");
     const res = await call(health);
     expect(res.status).toBe(200);
+    expect(res.json).toEqual({ status: "ok" });
+    expect(execute).not.toHaveBeenCalled(); // a slow database must not make the host restart a healthy app
+    execute.mockRestore();
+  });
+
+  it("readiness checks the database", async () => {
+    const res = await call(ready);
+    expect(res.status).toBe(200);
     expect(res.json).toEqual({ status: "ok", database: "up" });
+  });
+
+  it("readiness answers 503 when the database is down", async () => {
+    const execute = vi.spyOn(getDb(), "execute").mockRejectedValueOnce(new Error("connection refused"));
+    const res = await call(ready);
+    expect(res.status).toBe(503);
+    expect(res.json).toEqual({ status: "degraded", database: "down" });
+    execute.mockRestore();
   });
 });

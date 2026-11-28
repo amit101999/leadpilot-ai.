@@ -22,7 +22,7 @@ describe.skipIf(!live || !env.OPENAI_API_KEY || !env.OPENAI_MODEL)("OpenAI (live
   });
 
   it("returns output that passes the strict schema for a sample job", async () => {
-    const raw = await evaluator.evaluate({
+    const { output, usage } = await evaluator.evaluate({
       job: makeJob(),
       profile: {
         requiredSkills: ["React", "Node.js"],
@@ -31,7 +31,10 @@ describe.skipIf(!live || !env.OPENAI_API_KEY || !env.OPENAI_MODEL)("OpenAI (live
         riskSensitivity: "MEDIUM",
       },
     });
-    const result = validateAiOutput(raw);
+    const result = validateAiOutput(output);
     expect(result.ok, result.ok ? "" : result.error).toBe(true);
+    // The live API must report usage, or the AI usage dashboard would show nothing.
+    expect(usage?.inputTokens).toBeGreaterThan(0);
+    expect(usage?.outputTokens).toBeGreaterThan(0);
   });
 });

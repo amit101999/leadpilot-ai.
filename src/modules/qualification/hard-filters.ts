@@ -50,6 +50,8 @@ export interface HardCheckResult {
   message: string;
   observed?: unknown;
   expected?: unknown;
+  /** Soft rule (profile setting): the result lowers the Potential score instead of rejecting the job. */
+  soft?: boolean;
 }
 
 export interface HardCheckContext {
@@ -65,6 +67,22 @@ export interface HardCheckSummary {
   rejectionReasons: string[];
   skillMatches: TermMatch[];
 }
+
+/**
+ * Rules that judge a job's chances (competition, budget, client quality) rather than whether it is the right kind of
+ * work. With the profile's soft rules on, they never reject or park a job; the Potential score reflects them instead.
+ */
+export const SOFT_RULES: ReadonlySet<HardRule> = new Set<HardRule>([
+  "BUDGET",
+  "PAYMENT_VERIFIED",
+  "CLIENT_RATING",
+  "CLIENT_HIRES",
+  "CLIENT_SPEND",
+  "CLIENT_HIRE_RATE",
+  "PROPOSALS",
+  "INTERVIEWING",
+  "INVITES",
+]);
 
 const MIN_DESCRIPTION_LENGTH = 50;
 const STABLE_ID_RE = /^[A-Za-z0-9._:~-]{1,200}$/;
@@ -94,7 +112,11 @@ export function evaluateHardChecks(
     checkRequiredCombinations(searchable, config),
     checkKeywordCoverage(searchable, config),
     checkNotPreviouslyNotified(config, context),
-  ];
+  ].map((r) =>
+    config.leads.softRules && SOFT_RULES.has(r.rule) && r.effect !== "CONTINUE"
+      ? { ...r, effect: "CONTINUE" as const, soft: true }
+      : r,
+  );
 
   const rejected = results.filter((r) => r.effect === "REJECT");
   const review = results.filter((r) => r.effect === "REVIEW");

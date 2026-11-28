@@ -49,7 +49,8 @@ parses and validates input with zod, calls a module in `src/modules`, and return
 | POST   | `/api/auth/logout`   | public | Deletes the session                                                                                                                                                                                               |
 | GET    | `/api/auth/me`       | VIEWER | The signed-in user                                                                                                                                                                                                |
 | POST   | `/api/auth/password` | VIEWER | Change own password; ends the user's other sessions. Rate limited                                                                                                                                                 |
-| GET    | `/api/health`        | public | `{ status: "ok" }` and nothing else (used by Docker health checks)                                                                                                                                                |
+| GET    | `/api/health`        | public | Liveness: `{ status: "ok" }` when the process is up and its configuration is valid; never queries the database (Render, Docker and Playwright health checks)                                                      |
+| GET    | `/api/ready`         | public | Readiness: `{ status: "ok", database: "up" }`, or 503 `{ status: "degraded", database: "down" }` (point uptime monitors here)                                                                                     |
 
 ### Search profiles
 
@@ -117,7 +118,8 @@ parses and validates input with zod, calls a module in `src/modules`, and return
 ### Job import (Upwork sync agent)
 
 Authenticated with `Authorization: Bearer lpi_…` (an import token); no cookie, so no CSRF check. The request acts as
-the token's user (OPERATOR or higher), with the same ownership rules. See [upwork-sync.md](upwork-sync.md).
+the token's user (OPERATOR or higher), capped at OPERATOR rights: it only ever reaches that user's own profiles,
+even when the user is an ADMIN. See [upwork-sync.md](upwork-sync.md).
 
 | Method | Path                      | Purpose                                                                                                                                                                                                                                                                                     |
 | ------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

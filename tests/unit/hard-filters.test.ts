@@ -8,6 +8,8 @@ const context = { sourceAuthorized: true, alreadyNotified: false };
 
 function config(mutate?: (c: ProfileConfig) => void): ProfileConfig {
   const c = defaultProfileConfig(RECIPIENT);
+  // These tests cover strict mode, where every rule can reject; soft rules have their own tests (lead-grading).
+  c.leads.softRules = false;
   mutate?.(c);
   return c;
 }

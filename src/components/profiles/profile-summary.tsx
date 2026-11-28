@@ -42,7 +42,10 @@ export function ProfileSummary({ config, detailed = false }: { config: ProfileCo
       budget.fixedMin ? `${formatMoney(budget.fixedMin, budget.currency)} (fixed-price)` : "No minimum",
     ],
     ["Payment verification", client.paymentVerificationRequired ? "Required" : "Not required"],
-    ["Minimum AI score", `${ai.minScore}/100`],
+    [
+      "Lead grading",
+      `Hot from ${ai.minScore}, Warm from ${Math.max(0, ai.minScore - config.leads.warmBelowHot)}; ${config.leads.fitWeight}% AI fit, ${100 - config.leads.fitWeight}% potential; soft rules ${config.leads.softRules ? "on" : "off"}`,
+    ],
     [
       "Required skills",
       skills.required.length ? (

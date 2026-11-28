@@ -87,6 +87,9 @@ interface DimensionDetail {
 interface Qualification {
   runId: string;
   score: number | null;
+  tier: "HOT" | "WARM" | "COLD" | null;
+  fitScore: number | null;
+  potentialScore: number | null;
   dimensionScores: Record<string, number> | null;
   decision: string;
   decisionReasons: string[];
@@ -94,6 +97,10 @@ interface Qualification {
   rubricVersion: string;
   modelIdentifier: string;
   evidence: {
+    potential?: {
+      signals: { competition: number; client: number; budget: number; longTerm: number };
+      reasons: string[];
+    };
     dimensionDetails?: Record<string, DimensionDetail>;
     skillMatches?: string[];
     scopeSummary?: string;
@@ -312,10 +319,10 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
       <Panel
         id="assessment"
-        title="AI assessment"
+        title="Lead assessment"
         description={
           latest
-            ? `From the latest evaluation. The final score is calculated by LeadPilot from the dimension scores and the profile's weights.`
+            ? "From the latest evaluation. The lead score blends the AI fit score (from the dimension scores and the profile's weights) with the rule-based Potential score."
             : undefined
         }
         actions={
@@ -325,7 +332,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                 {latest.score ?? "–"}
                 <span className="text-sm font-normal text-muted">/100</span>
               </span>
-              <StatusBadge status={latest.decision} />
+              <StatusBadge status={latest.tier ?? latest.decision} />
             </>
           )
         }
@@ -338,6 +345,30 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           <div className="flex flex-col gap-4 px-4 py-4 text-sm">
             {latest.error && <p className="text-danger">AI error: {latest.error}</p>}
             {latest.evidence.reasoningSummary && <p>{latest.evidence.reasoningSummary}</p>}
+            {latest.fitScore !== null && latest.potentialScore !== null && (
+              <div>
+                <h3 className="font-medium">Score</h3>
+                <p className="tabular text-muted">
+                  AI fit {latest.fitScore}/100 · Potential {latest.potentialScore}/100
+                  {latest.evidence.potential && (
+                    <>
+                      {" "}
+                      (competition {latest.evidence.potential.signals.competition}/25, client{" "}
+                      {latest.evidence.potential.signals.client}/25, budget fit{" "}
+                      {latest.evidence.potential.signals.budget}/25, long-term{" "}
+                      {latest.evidence.potential.signals.longTerm}/25)
+                    </>
+                  )}
+                </p>
+                {latest.evidence.potential && latest.evidence.potential.reasons.length > 0 && (
+                  <ul className="mt-1 list-disc pl-5 text-muted">
+                    {latest.evidence.potential.reasons.map((r) => (
+                      <li key={r}>{r}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
             {latest.evidence.priorityBonus ? (
               <p className="text-muted">
                 The score includes a +{latest.evidence.priorityBonus} priority-country bonus (

@@ -130,6 +130,7 @@ async function newToken(user: TestUser) {
 async function newProfile(user: TestUser, mutate?: (c: ProfileConfig) => void) {
   const config = defaultProfileConfig(null);
   config.ai.minScore = 0; // relevance is not under test here; every job passing the rules qualifies
+  config.leads.softRules = false; // these tests cover the rules themselves; soft screening has its own test
   config.search.upworkSync.enabled = true;
   mutate?.(config);
   const res = await call(createProfile, {
@@ -321,6 +322,22 @@ describe("import flow", () => {
     expect((await commit(token.bearer, second, [upworkJob()])).json.data.status).toBe("STARTED");
   });
 
+  it("scopes an admin's import token to the admin's own profiles", async () => {
+    const admin = await createUser("ADMIN");
+    const operator = await createUser("OPERATOR");
+    const adminProfile = await newProfile(admin);
+    const operatorProfile = await newProfile(operator);
+    const token = await newToken(admin);
+
+    const context = await call(importContext, { headers: token.bearer, path: "/api/import/context" });
+    expect(context.status).toBe(200);
+    expect((context.json.data.profiles as { id: string }[]).map((p) => p.id)).toEqual([adminProfile]);
+
+    // Another user's profile is invisible to the token: same answer as a profile that does not exist.
+    const foreign = await commit(token.bearer, operatorProfile, [upworkJob()]);
+    expect(foreign.status).toBe(404);
+  });
+
   it("links every job of the same client to one client row that later imports refresh", async () => {
     const user = await createUser("OPERATOR");
     const profileId = await newProfile(user);
@@ -489,6 +506,26 @@ describe("hunting checklist", () => {
       body: { profileId, origin: "upwork-mcp", jobs: [good, hired, crowded, interviewing] },
     });
     expect(res.json.data).toMatchObject({ rejected: 3, detailsWanted: [good.id] });
+  });
+
+  it("with soft rules (the default), screens crowded postings in for scoring; a filled one stays out", async () => {
+    const user = await createUser("OPERATOR");
+    const profileId = await newProfile(user, (c) => (c.leads.softRules = true));
+    const token = await newToken(user);
+    const hired = upworkJob({
+      job_activity: { invites_sent: 2, invited_to_interview: 1, total_offered: 1, total_hired: 1 },
+    });
+    const crowded = upworkJob({ proposals_tier: "20 to 50" });
+    const interviewing = upworkJob({
+      job_activity: { invites_sent: 2, invited_to_interview: 8, total_offered: 0, total_hired: 0 },
+    });
+    const res = await call(screenJobs, {
+      method: "POST",
+      headers: token.bearer,
+      body: { profileId, origin: "upwork-mcp", jobs: [hired, crowded, interviewing] },
+    });
+    expect(res.json.data.rejected).toBe(1);
+    expect([...res.json.data.detailsWanted].sort()).toEqual([crowded.id, interviewing.id].sort());
   });
 
   it("filters a client who rarely hires", async () => {
@@ -741,27 +778,30 @@ describe("import robustness (code review fixes)", () => {
     expect(row!.detailsFetchedAt).toEqual(row!.lastSeenAt);
   });
 
-  it("starts the follow-up as an importing user who can still run", async () => {
+  it("starts no follow-up when no importing user can still run, and keeps the jobs pending", async () => {
+    // Only a profile's owner can import into it (tokens are owner-scoped), so a demoted owner leaves nobody.
     const owner = await createUser("OPERATOR");
-    const admin = await createUser("ADMIN");
     const profileId = await newProfile(owner);
     const ownerToken = await newToken(owner);
-    const adminToken = await newToken(admin);
     const manual = await call(createRun, {
       method: "POST",
       user: owner,
       body: { profileId },
       headers: { "idempotency-key": randomUUID() },
     });
-    await commit(ownerToken.bearer, profileId, [upworkJob()]);
+    expect((await commit(ownerToken.bearer, profileId, [upworkJob()])).json.data.status).toBe("QUEUED");
     await getDb().update(users).set({ role: "VIEWER" }).where(eq(users.id, owner.id));
-    await commit(adminToken.bearer, profileId, [upworkJob()]);
 
     await execute(manual.json.data.id);
     const followUp = (await runsOf(profileId)).find(
       (r) => r.idempotencyKey === `follow-up:${manual.json.data.id}`,
     );
-    expect(followUp).toMatchObject({ requestedBy: admin.id, status: "QUEUED" });
+    expect(followUp).toBeUndefined();
+    const waiting = await getDb()
+      .select({ status: stagedJobs.status })
+      .from(stagedJobs)
+      .where(eq(stagedJobs.profileId, profileId));
+    expect(waiting.map((s) => s.status)).toContain("PENDING");
   });
 });
 

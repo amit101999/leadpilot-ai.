@@ -610,8 +610,8 @@ export function ProfileEditor({
         <>
           <Field
             id={id("minScore")}
-            label="Minimum AI score to qualify"
-            hint="0 to 100. Jobs below it are rejected; the threshold is never lowered to fill the alert limit."
+            label="Hot lead score (alert threshold)"
+            hint="0 to 100. Leads scoring at least this are Hot and e-mailed. The threshold is never lowered to fill the alert limit."
             error={err("ai", "minScore")}
           >
             <Input
@@ -623,6 +623,46 @@ export function ProfileEditor({
               {...register("configuration.ai.minScore", { valueAsNumber: true })}
             />
           </Field>
+          <fieldset className="flex flex-col gap-3 rounded-control border border-line p-3">
+            <legend className="px-1 text-[13px] font-medium">Lead grading</legend>
+            <Checkbox
+              label="Soft rules: competition, budget and client rules lower the score instead of rejecting"
+              hint="Proposals, interviews, invites, budget, payment verification, client rating, hires, spend and hire rate. Job type, keywords, skills, blocked countries and filled postings still reject."
+              {...register("configuration.leads.softRules")}
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                id={id("fitWeight")}
+                label="AI fit share of the lead score (%)"
+                hint="The rest is the Potential score: competition, client, budget fit and long-term work. 60 means 60% fit, 40% potential."
+                error={err("leads", "fitWeight")}
+              >
+                <Input
+                  id={id("fitWeight")}
+                  type="number"
+                  min={0}
+                  max={100}
+                  className="w-24"
+                  {...register("configuration.leads.fitWeight", { valueAsNumber: true })}
+                />
+              </Field>
+              <Field
+                id={id("warmBelowHot")}
+                label="Warm band (points below Hot)"
+                hint={`Leads up to this many points below the Hot score are Warm: kept and shown, not e-mailed. Warm from ${Math.max(0, (config.ai.minScore || 0) - (config.leads?.warmBelowHot ?? 0))}.`}
+                error={err("leads", "warmBelowHot")}
+              >
+                <Input
+                  id={id("warmBelowHot")}
+                  type="number"
+                  min={0}
+                  max={50}
+                  className="w-24"
+                  {...register("configuration.leads.warmBelowHot", { valueAsNumber: true })}
+                />
+              </Field>
+            </div>
+          </fieldset>
           <fieldset className="flex flex-col gap-3">
             <legend className="text-[13px] font-medium">Score weights</legend>
             <div className="grid gap-3 sm:grid-cols-5">

@@ -13,7 +13,8 @@ import { hasRole } from "@/lib/auth/authorization";
 import { requireUser } from "@/lib/auth/current-user";
 import { getDb } from "@/lib/database/client";
 import { isSafeLinkHref } from "@/lib/security/url";
-import { formatCount, formatMoney, shortId } from "@/lib/ui/format";
+import { formatCount, formatMicroUsd, formatMoney, shortId } from "@/lib/ui/format";
+import { getAiSpendSummary } from "@/modules/ai-usage/service";
 import { getDashboard } from "@/modules/dashboard/service";
 import { listProfiles } from "@/modules/profiles/service";
 import { getProviders } from "@/modules/providers";
@@ -23,9 +24,10 @@ export const metadata: Metadata = { title: "Dashboard" };
 export default async function DashboardPage() {
   const { actor } = await requireUser();
   const db = getDb();
-  const [data, profiles] = await Promise.all([
+  const [data, profiles, aiSpend] = await Promise.all([
     getDashboard(db, actor, getProviders()),
     listProfiles(db, actor),
+    getAiSpendSummary(db, actor, "30"),
   ]);
   const launchable = toLaunchable(profiles);
   const defaultProfile = launchable.find((p) => p.active) ?? launchable[0];
@@ -45,6 +47,17 @@ export default async function DashboardPage() {
               </>
             ) : (
               "No successful run yet."
+            )}
+            {aiSpend && (
+              <>
+                {" "}
+                AI spend last 30 days:{" "}
+                <Link href="/ai-usage" className="tabular font-medium text-accent hover:underline">
+                  {formatMicroUsd(aiSpend.costMicroUsd)} estimated, {formatCount(aiSpend.calls)}{" "}
+                  {aiSpend.calls === 1 ? "call" : "calls"}
+                </Link>
+                .
+              </>
             )}
           </p>
         </div>

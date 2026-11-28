@@ -4,11 +4,18 @@ import { jobs, qualifications, runJobs } from "@/lib/database/schema";
 import { sanitizeErrorMessage } from "@/lib/security/sanitize";
 import { AiProviderError, hashEvaluationInput, toEvaluationProfile } from "@/modules/ai/evaluator";
 import { validateAiOutput, type AiOutput } from "@/modules/ai/output-schema";
+import { recordAiCall, statusForError } from "@/modules/ai/usage-ledger";
 import { getClient } from "@/modules/clients/repository";
 import { rowToNormalized, type JobRow } from "@/modules/jobs/repository";
 import { decideEligibility } from "@/modules/qualification/eligibility";
 import type { HardCheckResult } from "@/modules/qualification/hard-filters";
-import { computeAuthoritativeScore, priorityCountryBonus, withBonus } from "@/modules/qualification/scoring";
+import { computePotential } from "@/modules/qualification/potential";
+import {
+  blendLeadScore,
+  computeAuthoritativeScore,
+  priorityCountryBonus,
+  withBonus,
+} from "@/modules/qualification/scoring";
 import {
   beginStage,
   completeStage,
@@ -68,33 +75,72 @@ async function evaluateOne(ctx: RunContext, runJob: RunJobRow, jobRow: JobRow): 
   const input = { job: rowToNormalized(jobRow, client), profile: toEvaluationProfile(config) };
   const maxAttempts = 1 + config.ai.maxRetries;
 
+  const callBase = {
+    runId: run.id,
+    jobId: jobRow.id,
+    profileId: run.profileId,
+    provider: evaluator.id,
+    configuredModel: evaluator.model,
+    promptVersion: snapshot.promptVersion,
+  };
+
   let output: AiOutput | null = null;
   let lastError: string | null = null;
   let attempts = 0;
   // Invalid output and transient provider errors are retried a bounded number of times.
   while (attempts < maxAttempts && !output) {
     attempts += 1;
+    const startedAt = performance.now();
     try {
-      const validation = validateAiOutput(await evaluator.evaluate(input));
+      const result = await evaluator.evaluate(input);
+      const validation = validateAiOutput(result.output);
       if (validation.ok) output = validation.value;
       else lastError = validation.error;
+      await recordAiCall(
+        db,
+        {
+          ...callBase,
+          attempt: attempts,
+          status: validation.ok ? "SUCCESS" : "INVALID_OUTPUT",
+          httpStatus: null,
+          latencyMs: performance.now() - startedAt,
+          usage: result.usage,
+        },
+        ctx.log,
+      );
     } catch (error) {
       lastError = sanitizeErrorMessage(error);
-      // Retrying cannot fix a missing key or a refused request; it would only repeat the call for every job.
-      if (error instanceof AiProviderError && (error.kind === "NOT_CONFIGURED" || error.kind === "REJECTED"))
-        break;
+      const kind = error instanceof AiProviderError ? error.kind : null;
+      // A NOT_CONFIGURED error never reached the provider, so it is not a model call and is not recorded.
+      if (kind === "NOT_CONFIGURED") break;
+      // Recorded before any rate-limit pause, so latency is the call's own.
+      await recordAiCall(
+        db,
+        {
+          ...callBase,
+          ...statusForError(error),
+          attempt: attempts,
+          latencyMs: performance.now() - startedAt,
+          usage: null,
+        },
+        ctx.log,
+      );
+      // Retrying cannot fix a refused request; it would only repeat the call for every job.
+      if (kind === "REJECTED") break;
       // A rate limit needs a pause before the next attempt (2 s, then 4 s, at most 8 s).
-      if (error instanceof AiProviderError && error.kind === "RATE_LIMIT" && attempts < maxAttempts) {
+      if (kind === "RATE_LIMIT" && attempts < maxAttempts) {
         await new Promise((resolve) => setTimeout(resolve, Math.min(2_000 * 2 ** (attempts - 1), 8_000)));
       }
     }
   }
 
-  // Weighted AI score, plus the priority-country bonus (the client record's country is the current one).
+  // Lead score: the weighted AI fit score blended with the rule-based Potential score, plus the priority-country
+  // bonus (the client record's country is the current one).
   const bonus = output ? priorityCountryBonus(client?.country ?? jobRow.clientCountry, config) : null;
-  const score = output
-    ? withBonus(computeAuthoritativeScore(output.dimension_scores, config.ai.weights), bonus)
-    : null;
+  const fitScore = output ? computeAuthoritativeScore(output.dimension_scores, config.ai.weights) : null;
+  const potential = computePotential(input.job, client, config);
+  const score =
+    fitScore === null ? null : withBonus(blendLeadScore(fitScore, potential.score, config), bonus);
   const notified = await alreadyNotifiedJobIds(db, config, [jobRow.id]);
   const decision = decideEligibility(
     {
@@ -115,6 +161,9 @@ async function evaluateOne(ctx: RunContext, runJob: RunJobRow, jobRow: JobRow): 
     runId: run.id,
     jobId: jobRow.id,
     score,
+    fitScore,
+    potentialScore: potential.score,
+    tier: decision.tier,
     modelReportedScore: output?.score ?? null,
     dimensionScores: output?.dimension_scores ?? null,
     decision: decision.decision,
@@ -131,8 +180,9 @@ async function evaluateOne(ctx: RunContext, runJob: RunJobRow, jobRow: JobRow): 
           positiveSignals: output.positive_signals,
           reasoningSummary: output.reasoning_summary,
           ...(bonus ? { priorityCountry: bonus.country, priorityBonus: bonus.points } : {}),
+          potential: { signals: potential.signals, reasons: potential.reasons },
         }
-      : {},
+      : { potential: { signals: potential.signals, reasons: potential.reasons } },
     riskFlags: output?.risk_flags ?? [],
     missingInformation: output?.missing_information ?? [],
     attempts,
@@ -156,7 +206,16 @@ async function evaluateOne(ctx: RunContext, runJob: RunJobRow, jobRow: JobRow): 
       .where(and(eq(runJobs.id, runJob.id), eq(runJobs.processingStatus, "PENDING_AI")));
   });
   ctx.log.info(
-    { job_id: jobRow.id, workflow_stage: "AI_EVALUATION", decision: decision.decision, score, attempts },
+    {
+      job_id: jobRow.id,
+      workflow_stage: "AI_EVALUATION",
+      decision: decision.decision,
+      tier: decision.tier,
+      score,
+      fit_score: fitScore,
+      potential_score: potential.score,
+      attempts,
+    },
     "Job evaluated",
   );
 }

@@ -20,6 +20,23 @@ export function formatMoney(amount: string | null | undefined, currency: string 
   }
 }
 
+/**
+ * Formats a micro-USD amount (bigint) as dollars without floating point.
+ * Amounts under $1 keep 4 decimals because a single AI call costs fractions of a cent.
+ */
+export function formatMicroUsd(micro: bigint | null | undefined): string {
+  if (micro === null || micro === undefined) return "–";
+  const negative = micro < 0n;
+  const abs = negative ? -micro : micro;
+  const decimals = abs >= 1_000_000n ? 2 : 4;
+  const step = 10n ** BigInt(6 - decimals);
+  const rounded = (abs + step / 2n) / step; // round half up
+  const unit = 10n ** BigInt(decimals);
+  const whole = new Intl.NumberFormat("en").format(rounded / unit);
+  const fraction = (rounded % unit).toString().padStart(decimals, "0");
+  return `${negative ? "-" : ""}$${whole}.${fraction}`;
+}
+
 export function formatDuration(ms: number | null | undefined): string {
   if (ms === null || ms === undefined) return "–";
   const seconds = Math.round(ms / 1000);

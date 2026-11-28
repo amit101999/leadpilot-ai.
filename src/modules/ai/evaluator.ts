@@ -15,12 +15,29 @@ export interface EvaluationInput {
   profile: EvaluationProfile;
 }
 
+/** Token counts reported by the provider for one call. Null when the provider reports none (mock). */
+export interface AiUsage {
+  /** Model snapshot the provider actually used, e.g. "gpt-4o-mini-2024-07-18". */
+  model: string;
+  inputTokens: number;
+  /** Subset of inputTokens served from the prompt cache (billed at the cached rate). */
+  cachedInputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+}
+
+export interface AiEvaluation {
+  /** Raw model output (validated by the caller). */
+  output: unknown;
+  usage: AiUsage | null;
+}
+
 export interface AiEvaluator {
   readonly id: string;
   readonly model: string;
   readonly isMock: boolean;
-  /** Returns the raw model output (validated by the caller). Throws AiProviderError on transport failure. */
-  evaluate(input: EvaluationInput): Promise<unknown>;
+  /** Throws AiProviderError on transport failure. */
+  evaluate(input: EvaluationInput): Promise<AiEvaluation>;
   checkConfiguration(): { configured: boolean; message: string };
   /** Live, cost-free credential check (no evaluation request). */
   checkConnection(): Promise<AiConnection>;
@@ -36,6 +53,8 @@ export class AiProviderError extends Error {
     message: string,
     /** REJECTED: the request itself was refused (bad key, no access, bad request); retrying cannot help. */
     readonly kind: "TIMEOUT" | "RATE_LIMIT" | "PROVIDER" | "REJECTED" | "NOT_CONFIGURED",
+    /** HTTP status when the provider answered with an error; null for timeouts and connection failures. */
+    readonly httpStatus: number | null = null,
   ) {
     super(message);
     this.name = "AiProviderError";

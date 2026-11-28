@@ -7,6 +7,8 @@ export interface Metric {
   /** Optional emphasis for counts that need attention (failures). */
   tone?: "default" | "danger";
   hint?: string;
+  /** Preformatted text shown instead of the count (e.g. a dollar amount). */
+  display?: string;
 }
 
 /** One bordered strip with dividers, not a grid of separate cards. */
@@ -29,7 +31,7 @@ export function MetricStrip({ metrics, label }: { metrics: Metric[]; label: stri
               metric.tone === "danger" && metric.value > 0 && "text-danger",
             )}
           >
-            {formatCount(metric.value)}
+            {metric.display ?? formatCount(metric.value)}
           </dd>
         </div>
       ))}

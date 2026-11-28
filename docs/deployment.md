@@ -93,7 +93,9 @@ check because `APP_BASE_URL` is the custom domain.
 
 Push to `main` → GitHub Actions runs every check → when they all pass, Render builds the Docker image and deploys it
 (`autoDeployTrigger: checksPass`). Render keeps the previous version running until the new one answers its health
-check (`/api/health`); a failed migration or a missing setting therefore leaves the old version live. Roll back with
+check (`/api/health`, which validates the configuration but not the database); a failed migration (including an
+unreachable database) or a missing setting therefore leaves the old version live. For uptime monitoring use
+`/api/ready`, which also checks the database. Roll back with
 **Render → service → Events → Rollback**.
 
 ## CI
